@@ -85,7 +85,7 @@ export function VideoDetailsCard({
           }}
         >
           <Radio size={12} color="#10b981" />
-          <span style={{ display: 'none', '@media (min-width: 400px)': { display: 'inline' } }}>Live Synced</span>
+          <span className="hide-on-small">Live Synced</span>
         </div>
       </div>
 
