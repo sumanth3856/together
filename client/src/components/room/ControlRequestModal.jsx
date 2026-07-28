@@ -1,58 +1,61 @@
 import React from 'react';
-import { Key, CheckCircle, XCircle } from 'lucide-react';
+import { Key, CheckCircle, XCircle, Zap } from 'lucide-react';
 
 export function ControlRequestModal({ requestNotice, onRespond }) {
   if (!requestNotice) return null;
 
   return (
-    <div className="toast-container">
-      <div 
-        className="panel" 
-        style={{
-          padding: '16px 18px',
-          border: '1px solid rgba(245, 158, 11, 0.4)',
-          background: '#121620'
-        }}
-      >
+    <div className="toast-container" style={{ maxWidth: '340px' }}>
+      <div style={{
+        background: 'var(--bg-surface-2)',
+        border: '1px solid rgba(245,158,11,0.3)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '16px 18px',
+        boxShadow: 'var(--shadow-lg), 0 0 0 1px rgba(245,158,11,0.08)',
+        animation: 'slideInRight 0.25s ease',
+      }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-          <div 
-            style={{
-              background: 'rgba(245, 158, 11, 0.15)',
-              padding: '8px',
-              borderRadius: 'var(--radius-full)',
-              color: '#fbbf24',
-              flexShrink: 0
-            }}
-          >
-            <Key size={18} />
+          {/* Icon */}
+          <div style={{
+            width: '40px', height: '40px', borderRadius: 'var(--radius-md)',
+            background: 'rgba(245,158,11,0.12)',
+            border: '1px solid rgba(245,158,11,0.22)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <Key size={18} color="var(--accent-amber)" />
           </div>
+
           <div style={{ flex: 1 }}>
-            <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fbbf24' }}>
+            <h4 style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--accent-amber)', marginBottom: '4px' }}>
               Control Request
             </h4>
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              <strong style={{ color: '#fff' }}>{requestNotice.nickname}</strong> wants playback control permission.
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              <strong style={{ color: 'var(--text-primary)' }}>{requestNotice.nickname}</strong>
+              {' '}wants playback control.
             </p>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-              <button 
-                className="btn btn-primary" 
+              <button
+                className="btn btn-success"
                 onClick={() => onRespond(requestNotice.socketId, true)}
-                style={{ flex: 1, background: '#10b981', minHeight: '36px', fontSize: '0.82rem' }}
+                style={{ flex: 1, minHeight: '36px', fontSize: '0.82rem' }}
               >
-                <CheckCircle size={14} /> Grant
+                <CheckCircle size={13} />
+                <span>Grant</span>
               </button>
-              <button 
-                className="btn btn-secondary" 
+              <button
+                className="btn btn-danger"
                 onClick={() => onRespond(requestNotice.socketId, false)}
                 style={{ flex: 1, minHeight: '36px', fontSize: '0.82rem' }}
               >
-                <XCircle size={14} /> Decline
+                <XCircle size={13} />
+                <span>Decline</span>
               </button>
             </div>
           </div>
         </div>
       </div>
+      <style>{`@keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }`}</style>
     </div>
   );
 }

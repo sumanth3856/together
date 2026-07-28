@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Lock, Unlock, CheckCircle2, Radio, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Lock, Unlock, CheckCircle2, Signal, Volume2, VolumeX } from 'lucide-react';
 
 export function YouTubePlayer({
   youtubeId,
@@ -19,8 +19,8 @@ export function YouTubePlayer({
   const [volume, setVolume] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
   const isSelfSyncing = useRef(0);
+  const hasJoinSyncedRef = useRef(false);
 
-  // Helper to extract YouTube video ID from various URL formats
   const extractVideoId = (input) => {
     if (!input) return 'dQw4w9WgXcQ';
     const cleanInput = input.trim();
@@ -50,7 +50,8 @@ export function YouTubePlayer({
           origin: window.location.origin,
           widget_referrer: window.location.origin,
           modestbranding: 1,
-          rel: 0
+          rel: 0,
+          iv_load_policy: 3,
         },
         events: {
           onReady: (event) => {
@@ -62,19 +63,17 @@ export function YouTubePlayer({
             const state = event.data;
             const nowTime = player.getCurrentTime();
 
-            // Always update local UI state immediately, regardless of control permissions!
+            // Always update local playing state for the overlay
             if (state === window.YT.PlayerState.PLAYING) {
               setLocalPlaying(true);
             } else if (state === window.YT.PlayerState.PAUSED) {
               setLocalPlaying(false);
             }
 
-            // Ignore state changes if a sync/seek occurred in the last 1500ms
-            if (Date.now() - isSelfSyncing.current < 1500) {
-              return;
-            }
+            // Skip if we triggered this state change ourselves
+            if (Date.now() - isSelfSyncing.current < 1500) return;
 
-            // Only user with control triggers sync broadcasts
+            // Only broadcast if user has control
             if (!isHost && !hasControl) return;
 
             if (state === window.YT.PlayerState.PLAYING) {
@@ -117,7 +116,7 @@ export function YouTubePlayer({
     };
   }, []);
 
-  // Update video when youtubeId changes — auto-play immediately after loading
+  // Update video when youtubeId changes — auto-play immediately
   useEffect(() => {
     if (isPlayerReady && playerRef.current) {
       const currentIdInPlayer = playerRef.current.getVideoData ? playerRef.current.getVideoData().video_id : '';
@@ -125,28 +124,24 @@ export function YouTubePlayer({
 
       if (currentIdInPlayer !== targetId && targetId) {
         isSelfSyncing.current = Date.now();
-        // loadVideoById auto-plays the video; seekTo beginning
         playerRef.current.loadVideoById({ videoId: targetId, startSeconds: playback?.currentTime || 0 });
       }
     }
   }, [youtubeId, isPlayerReady]);
 
-  // ONE-SHOT join sync: when player becomes ready, seek to where the room is
-  const hasJoinSyncedRef = useRef(false);
+  // ONE-SHOT join sync: seek to live position when player first becomes ready
   useEffect(() => {
     if (!isPlayerReady || !playerRef.current || !playback || hasJoinSyncedRef.current) return;
     hasJoinSyncedRef.current = true;
 
-    const player = playerRef.current;
     const targetTime = playback.currentTime;
     if (targetTime > 2) {
       isSelfSyncing.current = Date.now();
-      player.seekTo(targetTime, true);
+      playerRef.current.seekTo(targetTime, true);
     }
-    // Don't auto-play here; let the browser-block overlay handle it gracefully
   }, [isPlayerReady, playback]);
 
-  // ONGOING peer sync: handle playback_synced events pushed from server
+  // ONGOING peer sync: apply playback_synced events from server
   useEffect(() => {
     if (!syncedPlaybackEvent || !isPlayerReady || !playerRef.current) return;
 
@@ -160,30 +155,21 @@ export function YouTubePlayer({
 
     isSelfSyncing.current = Date.now();
 
-    // Seek if drifted more than 2 seconds
-    if (drift > 2) {
-      player.seekTo(targetTime, true);
-    }
+    if (drift > 2) player.seekTo(targetTime, true);
 
     if (serverPlayback.isPlaying) {
-      if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) {
-        player.playVideo();
-      }
+      if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) player.playVideo();
     } else {
-      if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) {
-        player.pauseVideo();
-      }
+      if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) player.pauseVideo();
     }
   }, [syncedPlaybackEvent, isPlayerReady]);
 
-  // Progress Bar Time Update Loop
+  // Progress ticker
   useEffect(() => {
     const timer = setInterval(() => {
       if (playerRef.current && playerRef.current.getCurrentTime) {
         setCurrentTime(playerRef.current.getCurrentTime() || 0);
-        if (playerRef.current.getDuration) {
-          setDuration(playerRef.current.getDuration() || 0);
-        }
+        if (playerRef.current.getDuration) setDuration(playerRef.current.getDuration() || 0);
       }
     }, 500);
     return () => clearInterval(timer);
@@ -197,12 +183,7 @@ export function YouTubePlayer({
 
   const handleManualPlayPause = () => {
     if (!playerRef.current || (!isHost && !hasControl)) return;
-    const player = playerRef.current;
-    if (localPlaying) {
-      player.pauseVideo();
-    } else {
-      player.playVideo();
-    }
+    localPlaying ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
   };
 
   const handleSeekChange = (e) => {
@@ -220,86 +201,58 @@ export function YouTubePlayer({
     setVolume(newVol);
     if (playerRef.current) {
       playerRef.current.setVolume(newVol);
-      if (newVol > 0 && isMuted) {
-        playerRef.current.unMute();
-        setIsMuted(false);
-      }
+      if (newVol > 0 && isMuted) { playerRef.current.unMute(); setIsMuted(false); }
     }
   };
 
   const handleMuteToggle = () => {
     if (!playerRef.current) return;
-    if (isMuted) {
-      playerRef.current.unMute();
-      setIsMuted(false);
-    } else {
-      playerRef.current.mute();
-      setIsMuted(true);
-    }
+    if (isMuted) { playerRef.current.unMute(); setIsMuted(false); }
+    else { playerRef.current.mute(); setIsMuted(true); }
   };
+
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* 16:9 Cinema Player Frame */}
-      <div 
+      {/* 16:9 Cinema Frame */}
+      <div
         ref={containerRef}
         style={{
           position: 'relative',
           width: '100%',
           paddingTop: '56.25%',
-          background: '#000000',
+          background: '#000',
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
-          border: '1px solid var(--border-subtle)'
+          border: '1px solid var(--border-subtle)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
         }}
       >
-        <div 
-          id="yt-player-element" 
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} 
+        <div
+          id="yt-player-element"
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         />
 
-        {/* Lock Overlay for Non-Controlling Guests */}
+        {/* Guest Lock Indicator */}
         {!isHost && !hasControl && (
-          <div 
-            style={{
-              position: 'absolute',
-              top: '12px',
-              right: '12px',
-              zIndex: 10,
-              background: '#121620',
-              border: '1px solid var(--border-subtle)',
-              padding: '5px 12px',
-              borderRadius: 'var(--radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.75rem',
-              color: 'var(--status-warning)',
-              fontWeight: '600'
-            }}
-          >
-            <Lock size={12} color="var(--status-warning)" />
-            <span>Host Controls Playback</span>
+          <div style={{
+            position: 'absolute', top: '10px', right: '10px', zIndex: 10,
+            display: 'flex', alignItems: 'center', gap: '5px',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            padding: '4px 10px', borderRadius: 'var(--radius-full)',
+            fontSize: '0.72rem', color: 'var(--accent-amber)', fontWeight: '600'
+          }}>
+            <Lock size={11} color="var(--accent-amber)" />
+            <span>Host Controls</span>
           </div>
         )}
 
-        {/* Autoplay Blocked / Out of Sync Overlay */}
+        {/* Autoplay Blocked Overlay */}
         {isPlayerReady && playback?.isPlaying && !localPlaying && (
-          <div 
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'rgba(9, 11, 16, 0.7)',
-              backdropFilter: 'blur(4px)',
-              zIndex: 20,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff'
-            }}
-          >
-            <button 
+          <div className="player-overlay">
+            <button
               onClick={() => {
                 if (playerRef.current) {
                   playerRef.current.unMute();
@@ -308,105 +261,128 @@ export function YouTubePlayer({
                 }
               }}
               className="btn btn-primary"
-              style={{ padding: '12px 24px', fontSize: '1rem', borderRadius: 'var(--radius-full)', boxShadow: '0 4px 12px rgba(88, 80, 236, 0.3)' }}
+              style={{
+                padding: '12px 28px', fontSize: '1rem',
+                borderRadius: 'var(--radius-full)',
+                boxShadow: '0 4px 24px rgba(99,102,241,0.5)',
+              }}
             >
               <Play size={20} />
-              <span>Click to Sync & Unmute</span>
+              <span>Sync &amp; Unmute</span>
             </button>
-            <span style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Browser blocked autoplay. Click to resume.
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+              Browser blocked autoplay. Click to join the stream.
             </span>
           </div>
         )}
       </div>
 
-      {/* Interactive Control Bar & Scrubber */}
-      <div className="panel" style={{ marginTop: '12px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {/* Progress Bar Scrubber */}
+      {/* Control Bar */}
+      <div className="panel" style={{
+        marginTop: '10px',
+        padding: '12px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        background: 'var(--bg-surface)',
+      }}>
+        {/* Progress Bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '40px' }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', minWidth: '38px', fontVariantNumeric: 'tabular-nums' }}>
             {formatTime(currentTime)}
           </span>
-          <input 
-            type="range" 
-            min={0}
-            max={duration || 100}
-            step={0.1}
-            value={currentTime}
-            onChange={handleSeekChange}
-            disabled={!isHost && !hasControl}
-            style={{
-              flex: 1,
-              height: '4px',
+          <div style={{ flex: 1, position: 'relative', height: '4px' }}>
+            {/* Track background */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(255,255,255,0.08)',
               borderRadius: '2px',
-              accentColor: 'var(--accent-primary)',
-              cursor: isHost || hasControl ? 'pointer' : 'default'
-            }}
-          />
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '40px', textAlign: 'right' }}>
+            }} />
+            {/* Progress fill */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, bottom: 0,
+              width: `${progressPercent}%`,
+              background: 'var(--accent-primary)',
+              borderRadius: '2px',
+              transition: 'width 0.5s linear',
+              boxShadow: '0 0 6px rgba(99,102,241,0.5)',
+            }} />
+            {/* Invisible range input */}
+            <input
+              type="range"
+              min={0} max={duration || 100} step={0.5}
+              value={currentTime}
+              onChange={handleSeekChange}
+              disabled={!isHost && !hasControl}
+              style={{
+                position: 'absolute', inset: '-6px 0',
+                width: '100%', opacity: 0,
+                cursor: isHost || hasControl ? 'pointer' : 'default',
+                height: '16px',
+              }}
+            />
+          </div>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', minWidth: '38px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
             {formatTime(duration)}
           </span>
         </div>
 
-        {/* Control Buttons & Volume */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Controls Row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Left — Play/Pause & Control Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {(isHost || hasControl) ? (
-              <button 
-                className="btn btn-primary" 
+              <button
+                className="btn btn-primary"
                 onClick={handleManualPlayPause}
-                style={{ borderRadius: 'var(--radius-full)', width: '38px', height: '38px', padding: 0 }}
+                style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-full)', padding: 0, boxShadow: '0 2px 10px rgba(99,102,241,0.4)' }}
+                title={localPlaying ? 'Pause' : 'Play'}
               >
-                {localPlaying ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: '2px' }} />}
+                {localPlaying ? <Pause size={15} /> : <Play size={15} style={{ marginLeft: '1px' }} />}
               </button>
             ) : (
-              <button 
-                className="btn btn-secondary" 
+              <button
+                className="btn btn-secondary"
                 onClick={onRequestControl}
-                style={{ borderColor: 'rgba(245, 158, 11, 0.3)', color: '#fbbf24', minHeight: '38px', fontSize: '0.8rem' }}
+                style={{
+                  minHeight: '36px', fontSize: '0.78rem',
+                  borderColor: 'rgba(245,158,11,0.25)',
+                  color: 'var(--accent-amber)',
+                  background: 'rgba(245,158,11,0.06)',
+                }}
               >
-                <Unlock size={14} />
+                <Unlock size={13} />
                 <span>Request Control</span>
               </button>
             )}
-
             {(isHost || hasControl) && (
-              <span className="badge badge-control" style={{ fontSize: '0.65rem' }}>
-                <CheckCircle2 size={10} /> Control Unlocked
+              <span className="badge badge-control" style={{ fontSize: '0.62rem' }}>
+                <CheckCircle2 size={9} /> Controlling
               </span>
             )}
           </div>
 
-          {/* Local Volume Slider */}
+          {/* Right — Volume */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button 
+            <button
               onClick={handleMuteToggle}
               className="btn btn-ghost"
-              style={{ padding: 0, width: '32px', height: '32px', minHeight: '32px' }}
+              style={{ padding: 0, width: '30px', height: '30px', minHeight: '30px', borderRadius: 'var(--radius-full)' }}
               title={isMuted ? 'Unmute' : 'Mute'}
             >
-              {isMuted || volume === 0 ? (
-                <VolumeX size={16} color="var(--status-danger)" />
-              ) : (
-                <Volume2 size={16} color="var(--text-secondary)" />
-              )}
+              {isMuted || volume === 0
+                ? <VolumeX size={15} color="var(--status-danger)" />
+                : <Volume2 size={15} color="var(--text-secondary)" />}
             </button>
-            <input 
-              type="range"
-              min={0}
-              max={100}
+            <input
+              type="range" min={0} max={100}
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
-              style={{
-                width: '70px',
-                height: '4px',
-                accentColor: 'var(--accent-primary)',
-                cursor: 'pointer'
-              }}
+              style={{ width: '68px', height: '3px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              <Radio size={12} color="var(--status-success)" />
-              <span>Sync</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+              <Signal size={11} color="var(--status-success)" />
+              <span>Synced</span>
             </div>
           </div>
         </div>

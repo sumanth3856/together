@@ -25,7 +25,7 @@ export function setupSocketHandlers(io) {
       broadcastRoomState(room.roomId);
     });
 
-    // 2. Join Room
+    // 2. Join Room (handles both fresh joins and seamless reconnects)
     socket.on('join_room', ({ roomId, nickname }, callback) => {
       const result = RoomManager.joinRoom(roomId, socket.id, nickname);
 
@@ -34,18 +34,42 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      const { room } = result;
+      const { room, wasReconnect } = result;
       currentRoomId = room.roomId;
       socket.join(room.roomId);
 
       if (typeof callback === 'function') {
-        callback({ success: true, roomState: RoomManager.getRoomStateDTO(room) });
+        callback({ success: true, roomState: RoomManager.getRoomStateDTO(room), wasReconnect });
       }
 
       broadcastRoomState(room.roomId);
     });
 
-    // 3. Playback Synchronization (Play, Pause, Seek, Load Video)
+    // 3. Intentional Leave (explicit "Leave Room" button click)
+    socket.on('leave_room', (callback) => {
+      if (!currentRoomId) {
+        if (typeof callback === 'function') callback({ success: true });
+        return;
+      }
+
+      const result = RoomManager.intentionalLeave(socket.id);
+      socket.leave(currentRoomId);
+      const roomIdSnapshot = currentRoomId;
+      currentRoomId = null;
+
+      if (result) {
+        if (result.sessionEnded) {
+          // Host intentionally left — disband for everyone
+          io.to(roomIdSnapshot).emit('session_ended');
+        } else if (result.room) {
+          broadcastRoomState(roomIdSnapshot);
+        }
+      }
+
+      if (typeof callback === 'function') callback({ success: true });
+    });
+
+    // 4. Playback Synchronization (Play, Pause, Seek, Load Video)
     socket.on('sync_playback', (data) => {
       if (!currentRoomId) return;
 
@@ -64,22 +88,21 @@ export function setupSocketHandlers(io) {
 
       if (result && result.room) {
         if (data.youtubeId) {
-          // Video changed: broadcast full state to ALL users (including sender) immediately
+          // Video changed: broadcast full state to ALL users immediately
           io.to(currentRoomId).emit('room_state_updated', RoomManager.getRoomStateDTO(result.room));
         } else {
-          // Regular play/pause/seek: push lightweight sync event to peers only
+          // Regular play/pause/seek: lightweight sync event to peers only
           socket.to(currentRoomId).emit('playback_synced', {
             playback: result.room.playback,
             currentVideo: result.room.currentVideo,
             senderId: socket.id
           });
-          // Also update full room state so member list / chat stays accurate
           broadcastRoomState(currentRoomId);
         }
       }
     });
 
-    // 4. Request Playback Control Permission
+    // 5. Request Playback Control Permission
     socket.on('request_control', () => {
       if (!currentRoomId) return;
 
@@ -91,18 +114,13 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      const { room, hostSocketId, requestData } = result;
-      
-      // Notify host specifically
+      const { hostSocketId, requestData } = result;
       io.to(hostSocketId).emit('control_request_received', requestData);
-      
-      // Notify requesting user
       socket.emit('toast_notification', { type: 'info', message: 'Request sent to host.' });
-
       broadcastRoomState(currentRoomId);
     });
 
-    // 5. Host Responds to Permission Request (Approve / Deny)
+    // 6. Host Responds to Permission Request (Approve / Deny)
     socket.on('respond_control_request', ({ targetSocketId, approved }) => {
       if (!currentRoomId) return;
 
@@ -113,19 +131,17 @@ export function setupSocketHandlers(io) {
       }
 
       if (result) {
-        // Notify target user
         io.to(targetSocketId).emit('control_status_changed', {
           hasControl: approved,
-          message: approved 
-            ? 'Host granted you playback control!' 
+          message: approved
+            ? 'Host granted you playback control!'
             : 'Host declined your control request.'
         });
-
         broadcastRoomState(currentRoomId);
       }
     });
 
-    // 6. Host Revokes Permission
+    // 7. Host Revokes Permission
     socket.on('revoke_control', ({ targetSocketId }) => {
       if (!currentRoomId) return;
 
@@ -139,7 +155,7 @@ export function setupSocketHandlers(io) {
       }
     });
 
-    // 7. Live Text Chat
+    // 8. Live Text Chat
     socket.on('send_chat', ({ text }) => {
       if (!currentRoomId || !text || !text.trim()) return;
 
@@ -150,7 +166,7 @@ export function setupSocketHandlers(io) {
       }
     });
 
-    // 8. Floating Emoji Reaction Bursts
+    // 9. Floating Emoji Reaction Bursts
     socket.on('send_reaction', ({ emoji }) => {
       if (!currentRoomId || !emoji) return;
 
@@ -162,20 +178,19 @@ export function setupSocketHandlers(io) {
         emoji,
         senderName: member?.nickname || 'Guest',
         senderColor: member?.color || '#FF5733',
-        xPos: Math.floor(15 + Math.random() * 70) // Random X percentage (15% to 85%)
+        xPos: Math.floor(15 + Math.random() * 70)
       });
     });
 
-    // Disconnect
+    // 10. Socket Disconnect (accidental — could be a reload)
     socket.on('disconnect', () => {
       if (currentRoomId) {
+        // Use grace-period leaveRoom (does NOT immediately disband)
         const result = RoomManager.leaveRoom(socket.id);
-        if (result) {
-          if (result.sessionEnded) {
-            io.to(result.roomId).emit('session_ended');
-          } else if (result.room) {
-            broadcastRoomState(result.roomId);
-          }
+        if (result && result.room) {
+          // Only broadcast updated state to remaining members
+          // (do NOT send session_ended — they may reconnect)
+          broadcastRoomState(result.roomId);
         }
       }
     });

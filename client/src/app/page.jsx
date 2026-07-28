@@ -11,12 +11,13 @@ import { MemberList } from '../components/room/MemberList';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { ControlRequestModal } from '../components/room/ControlRequestModal';
 import { MobileTabBar } from '../components/room/MobileTabBar';
-import { AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, X, Wifi, WifiOff } from 'lucide-react';
 
 export default function Page() {
   const {
     socket,
     isConnected,
+    isReconnecting,
     roomState,
     sessionEnded,
     toastNotification,
@@ -27,6 +28,7 @@ export default function Page() {
     syncedPlaybackEvent,
     createRoom,
     joinRoom,
+    leaveRoom,
     syncPlayback,
     requestControl,
     respondControlRequest,
@@ -37,37 +39,27 @@ export default function Page() {
 
   const [initialRoomId, setInitialRoomId] = useState('');
   const [mobileActiveTab, setMobileActiveTab] = useState('video');
-  const [isMobileScreen, setIsMobileScreen] = useState(false); // Default to false for SSR, update in useEffect
+  const [isMobileScreen, setIsMobileScreen] = useState(false);
 
-  // Responsive Window Listener
+  // Responsive listener
   useEffect(() => {
     setIsMobileScreen(window.innerWidth < 768);
-    const handleResize = () => {
-      setIsMobileScreen(window.innerWidth < 768);
-    };
+    const handleResize = () => setIsMobileScreen(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Auto-join room on reload if URL parameters exist and nickname is saved
+  // Pre-fill room ID from URL if no session active (for invite links with no saved nickname)
   useEffect(() => {
-    if (!isConnected) return; // Wait until socket connects
-
+    if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
     if (roomParam) {
-      const savedNickname = localStorage.getItem('tg_nickname');
-      if (savedNickname && !roomState) {
-        // Auto-join
-        handleJoinRoom(roomParam.toUpperCase(), savedNickname);
-      } else if (!roomState) {
-        // Just set the input field for them to manually enter nickname
-        setInitialRoomId(roomParam.toUpperCase());
-      }
+      setInitialRoomId(roomParam.toUpperCase());
     }
-  }, [isConnected]); // Run when socket connects
+  }, []);
 
-  // Update browser URL query string when room state changes
+  // Update URL when room state changes (keeps URL in sync)
   useEffect(() => {
     if (roomState?.roomId) {
       const newUrl = `${window.location.pathname}?room=${roomState.roomId}`;
@@ -75,11 +67,13 @@ export default function Page() {
     }
   }, [roomState?.roomId]);
 
+  // ---------- Handlers ----------
+
   const handleCreateRoom = async (nickname) => {
     try {
       await createRoom(nickname);
     } catch (err) {
-      alert('Failed to create room: ' + err);
+      setToastNotification({ type: 'error', message: `Failed to create room: ${err}` });
     }
   };
 
@@ -87,54 +81,96 @@ export default function Page() {
     try {
       await joinRoom(roomId, nickname);
     } catch (err) {
-      alert('Failed to join room: ' + err);
+      // Show a friendly toast instead of browser alert
+      setToastNotification({ type: 'error', message: `Room not found. Check the code and try again.` });
     }
   };
 
-  const handleLeaveRoom = () => {
+  const handleLeaveRoom = async () => {
+    try {
+      await leaveRoom();
+    } catch (_) {}
+    // Navigate home, clearing the room param from the URL
     window.location.href = window.location.pathname;
   };
 
+  // ---------- Derived State ----------
   const currentMember = roomState?.members?.find((m) => m.socketId === socket?.id);
   const isHost = currentMember?.isHost || false;
   const hasControl = currentMember?.hasControl || false;
 
+  // ---------- Render ----------
   return (
     <div style={{ minHeight: '100dvh', position: 'relative', background: 'var(--bg-primary)' }}>
-      {/* Toast Notification */}
+
+      {/* ── Reconnecting Banner ── */}
+      {isReconnecting && !roomState && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20000,
+          background: 'rgba(245,158,11,0.12)', borderBottom: '1px solid rgba(245,158,11,0.25)',
+          padding: '10px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+          backdropFilter: 'blur(8px)',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: '600' }}>
+            Reconnecting to your session…
+          </span>
+        </div>
+      )}
+
+      {/* ── Reconnecting Banner (in-room disconnect) ── */}
+      {isReconnecting && roomState && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20000,
+          background: 'rgba(245,158,11,0.10)', borderBottom: '1px solid rgba(245,158,11,0.2)',
+          padding: '6px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+        }}>
+          <WifiOff size={13} color="#f59e0b" />
+          <span style={{ fontSize: '0.78rem', color: '#fbbf24', fontWeight: '600' }}>
+            Connection lost — reconnecting…
+          </span>
+        </div>
+      )}
+
+      {/* ── Toast Notification ── */}
       {toastNotification && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: '16px',
-            right: '16px',
-            left: isMobileScreen ? '16px' : 'auto',
-            zIndex: 100
-          }}
-        >
-          <div 
-            className="panel"
-            style={{
-              padding: '10px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px',
-              border: toastNotification.type === 'error' ? '1px solid #ef4444' : '1px solid var(--accent-primary)',
-              background: '#0d1017'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {toastNotification.type === 'error' ? (
-                <AlertCircle size={16} color="#ef4444" />
-              ) : (
-                <CheckCircle2 size={16} color="var(--accent-primary)" />
-              )}
-              <span style={{ fontSize: '0.82rem' }}>{toastNotification.message}</span>
+        <div style={{
+          position: 'fixed',
+          top: isReconnecting ? '48px' : '16px',
+          right: '16px',
+          left: isMobileScreen ? '16px' : 'auto',
+          zIndex: 10000,
+          maxWidth: '380px',
+          animation: 'slideInRight 0.25s ease',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '12px 14px',
+            background: 'var(--bg-surface-2)',
+            border: `1px solid ${toastNotification.type === 'error' ? 'rgba(244,63,94,0.35)' : 'rgba(99,102,241,0.35)'}`,
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-lg)',
+          }}>
+            <div style={{
+              width: '30px', height: '30px', borderRadius: 'var(--radius-md)', flexShrink: 0,
+              background: toastNotification.type === 'error' ? 'rgba(244,63,94,0.12)' : 'var(--accent-primary-dim)',
+              border: `1px solid ${toastNotification.type === 'error' ? 'rgba(244,63,94,0.22)' : 'rgba(99,102,241,0.22)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {toastNotification.type === 'error'
+                ? <AlertCircle size={15} color="var(--status-danger)" />
+                : <CheckCircle2 size={15} color="var(--accent-primary)" />}
             </div>
-            <button 
+            <span style={{ fontSize: '0.84rem', color: 'var(--text-primary)', flex: 1, lineHeight: 1.4 }}>
+              {toastNotification.message}
+            </span>
+            <button
               onClick={() => setToastNotification(null)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', marginLeft: '6px' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '4px', borderRadius: 'var(--radius-sm)', display: 'flex', flexShrink: 0 }}
             >
               <X size={14} />
             </button>
@@ -142,40 +178,88 @@ export default function Page() {
         </div>
       )}
 
+      {/* ── Reconnecting full-screen overlay (no room, no session ended) ── */}
+      {isReconnecting && !roomState && !sessionEnded && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'var(--bg-primary)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px',
+          animation: 'fadeIn 0.3s ease',
+        }}>
+          <div style={{
+            width: '64px', height: '64px', borderRadius: '50%',
+            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '6px' }}>Rejoining your room…</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Restoring your session, please wait.</p>
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`}</style>
+        </div>
+      )}
+
+      {/* ── Main Content ── */}
       {!roomState ? (
-        /* Join / Create Landing Page */
         sessionEnded ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: '#fff' }}>
-            <AlertCircle size={48} color="var(--status-danger)" style={{ marginBottom: '16px' }} />
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Session Ended</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>The host has left the room and the session has ended.</p>
-            <button className="btn btn-primary" onClick={() => window.location.href = '/'}>
+          /* Session Ended Screen */
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            minHeight: '100dvh', padding: '24px', textAlign: 'center',
+          }}>
+            <div style={{
+              width: '80px', height: '80px', borderRadius: '50%',
+              background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginBottom: '20px', boxShadow: '0 0 40px rgba(244,63,94,0.12)',
+            }}>
+              <AlertCircle size={36} color="var(--status-danger)" />
+            </div>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', fontFamily: "'Outfit', sans-serif" }}>
+              Session Ended
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', maxWidth: '300px', lineHeight: 1.6, fontSize: '0.9rem' }}>
+              The host left the room and ended the session. Thanks for watching together!
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => window.location.href = '/'}
+              style={{ padding: '12px 32px', borderRadius: 'var(--radius-full)', fontSize: '0.95rem' }}
+            >
               Return Home
             </button>
           </div>
-        ) : (
-          <JoinRoomModal 
+        ) : !isReconnecting ? (
+          /* Landing / Join Page — only show if NOT reconnecting */
+          <JoinRoomModal
             initialRoomId={initialRoomId}
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
           />
-        )
+        ) : null
       ) : (
-        /* Main Co-Watching Room View */
-        <div className="room-container" style={{ maxWidth: '1360px', margin: '0 auto', padding: isMobileScreen ? '10px' : '16px 20px', minHeight: '100vh' }}>
-          <RoomHeader 
+        /* ── Main Co-Watching Room View ── */
+        <div
+          className="room-container"
+          style={{ maxWidth: '1380px', margin: '0 auto', padding: isMobileScreen ? '10px' : '14px 20px', minHeight: '100dvh' }}
+        >
+          <RoomHeader
             roomId={roomState.roomId}
             memberCount={roomState.members.length}
             isHost={isHost}
+            isConnected={isConnected}
             onLeaveRoom={handleLeaveRoom}
           />
 
           {!isMobileScreen ? (
-            /* Desktop / Tablet Grid View */
+            /* ── Desktop / Tablet Grid ── */
             <div className="desktop-grid">
-              {/* Left Column: Player, Video Details Hub & Queue */}
               <div>
-                <YouTubePlayer 
+                <YouTubePlayer
                   youtubeId={roomState.currentVideo?.youtubeId}
                   playback={roomState.playback}
                   isHost={isHost}
@@ -184,8 +268,7 @@ export default function Page() {
                   onPlaybackChange={(pData) => syncPlayback(pData)}
                   onRequestControl={requestControl}
                 />
-
-                <VideoDetailsCard 
+                <VideoDetailsCard
                   currentVideo={roomState.currentVideo}
                   roomState={roomState}
                   currentSocketId={socket?.id}
@@ -193,15 +276,13 @@ export default function Page() {
                   hasControl={hasControl}
                   onRequestControl={requestControl}
                 />
-
-                <VideoQueue 
+                <VideoQueue
                   isHost={isHost}
                   hasControl={hasControl}
                   currentVideo={roomState.currentVideo}
                   onChangeVideo={(vData) => syncPlayback(vData)}
                 />
-
-                <MemberList 
+                <MemberList
                   members={roomState.members}
                   currentSocketId={socket?.id}
                   isHost={isHost}
@@ -210,9 +291,8 @@ export default function Page() {
                 />
               </div>
 
-              {/* Right Column: Live Chat Panel */}
               <div className="chat-sidebar">
-                <ChatPanel 
+                <ChatPanel
                   chatHistory={roomState.chatHistory}
                   incomingReaction={incomingReaction}
                   onSendMessage={sendChatMessage}
@@ -221,11 +301,10 @@ export default function Page() {
               </div>
             </div>
           ) : (
-            /* Mobile View (< 768px) */
+            /* ── Mobile View ── */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Top Sticky Video Player */}
               <div className="mobile-sticky-player">
-                <YouTubePlayer 
+                <YouTubePlayer
                   youtubeId={roomState.currentVideo?.youtubeId}
                   playback={roomState.playback}
                   isHost={isHost}
@@ -236,23 +315,20 @@ export default function Page() {
                 />
               </div>
 
-              {/* Mobile Active Tab View */}
               {mobileActiveTab === 'video' && (
-                <div>
-                  <VideoDetailsCard 
-                    currentVideo={roomState.currentVideo}
-                    roomState={roomState}
-                    currentSocketId={socket?.id}
-                    isHost={isHost}
-                    hasControl={hasControl}
-                    onRequestControl={requestControl}
-                  />
-                </div>
+                <VideoDetailsCard
+                  currentVideo={roomState.currentVideo}
+                  roomState={roomState}
+                  currentSocketId={socket?.id}
+                  isHost={isHost}
+                  hasControl={hasControl}
+                  onRequestControl={requestControl}
+                />
               )}
 
               {mobileActiveTab === 'chat' && (
-                <div style={{ height: 'calc(100dvh - 280px)' }}>
-                  <ChatPanel 
+                <div style={{ height: 'calc(100dvh - 280px)', minHeight: '300px' }}>
+                  <ChatPanel
                     chatHistory={roomState.chatHistory}
                     incomingReaction={incomingReaction}
                     onSendMessage={sendChatMessage}
@@ -262,7 +338,7 @@ export default function Page() {
               )}
 
               {mobileActiveTab === 'members' && (
-                <MemberList 
+                <MemberList
                   members={roomState.members}
                   currentSocketId={socket?.id}
                   isHost={isHost}
@@ -272,7 +348,7 @@ export default function Page() {
               )}
 
               {mobileActiveTab === 'queue' && (
-                <VideoQueue 
+                <VideoQueue
                   isHost={isHost}
                   hasControl={hasControl}
                   currentVideo={roomState.currentVideo}
@@ -280,8 +356,7 @@ export default function Page() {
                 />
               )}
 
-              {/* Mobile Bottom Navigation */}
-              <MobileTabBar 
+              <MobileTabBar
                 activeTab={mobileActiveTab}
                 onSelectTab={setMobileActiveTab}
                 memberCount={roomState.members.length}
@@ -292,13 +367,19 @@ export default function Page() {
 
           {/* Host Control Request Modal */}
           {isHost && (
-            <ControlRequestModal 
+            <ControlRequestModal
               requestNotice={controlRequestNotice}
               onRespond={(targetId, approved) => respondControlRequest(targetId, approved)}
             />
           )}
         </div>
       )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+      `}</style>
     </div>
   );
 }

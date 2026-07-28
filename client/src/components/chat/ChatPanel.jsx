@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Crown, Key, Radio } from 'lucide-react';
+import { MessageSquare, Send, Crown, Key, Hash } from 'lucide-react';
 import { EmojiReactions } from './EmojiReactions';
 
 export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendReaction }) {
   const [inputText, setInputText] = useState('');
   const chatContainerRef = useRef(null);
+  const inputRef = useRef(null);
 
-  // Auto-scroll chat to bottom on new messages
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -20,131 +20,110 @@ export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, o
     setInputText('');
   };
 
-  const getAvatarLetter = (name) => {
-    return name ? name.trim().charAt(0).toUpperCase() : '?';
-  };
+  const getAvatarLetter = (name) => name ? name.trim().charAt(0).toUpperCase() : '?';
 
   return (
-    <div 
-      className="panel" 
+    <div
+      className="panel"
       style={{
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        maxHeight: 'calc(100vh - 120px)',
+        maxHeight: 'calc(100vh - 116px)',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        background: 'var(--bg-surface)',
       }}
     >
-      {/* Floating Emoji Particles Container */}
-      <EmojiReactions 
-        incomingReaction={incomingReaction} 
-        onSendReaction={onSendReaction} 
-      />
+      {/* Floating Emoji Particles */}
+      <EmojiReactions incomingReaction={incomingReaction} onSendReaction={onSendReaction} />
 
       {/* Header */}
-      <div 
-        style={{
-          padding: '12px 16px',
-          borderBottom: '1px solid var(--border-subtle)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'var(--bg-input)'
-        }}
-      >
+      <div style={{
+        padding: '12px 16px',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
+        background: 'var(--bg-surface-2)',
+        borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <MessageSquare size={16} color="var(--accent-primary)" />
-          <h3 style={{ fontSize: '0.9rem', fontWeight: '700' }}>Room Chat</h3>
+          <div style={{
+            width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
+            background: 'var(--accent-primary-dim)',
+            border: '1px solid rgba(99,102,241,0.22)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Hash size={14} color="var(--accent-primary)" />
+          </div>
+          <span style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--text-primary)' }}>Live Chat</span>
         </div>
-        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{chatHistory.length} messages</span>
+        <span style={{
+          fontSize: '0.68rem', fontWeight: '600',
+          color: 'var(--text-tertiary)',
+          background: 'var(--bg-input)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-full)',
+          padding: '2px 8px'
+        }}>
+          {chatHistory.length} msgs
+        </span>
       </div>
 
-      {/* Message Stream */}
-      <div 
+      {/* Messages */}
+      <div
         ref={chatContainerRef}
-        style={{
-          flex: 1,
-          padding: '14px',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px'
-        }}
+        className="scroll-area"
+        style={{ flex: 1, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}
       >
         {chatHistory.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '36px 12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-            <Radio size={24} color="var(--text-tertiary)" style={{ marginBottom: '6px' }} />
-            <p>No messages yet. Say hi to start watching!</p>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px 12px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '10px', opacity: 0.6 }}>💬</div>
+            <p style={{ fontSize: '0.82rem', lineHeight: 1.5 }}>No messages yet.<br />Be the first to say hi!</p>
           </div>
         ) : (
           chatHistory.map((msg) => {
             if (msg.isSystem) {
               return (
-                <div 
-                  key={msg.id} 
-                  style={{
-                    textAlign: 'center',
-                    margin: '2px 0',
-                    fontSize: '0.72rem',
-                    color: 'var(--text-secondary)',
-                    background: 'var(--bg-input)',
-                    padding: '3px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid var(--border-subtle)'
-                  }}
-                >
-                  <span>{msg.text}</span>
+                <div key={msg.id} style={{ display: 'flex', justifyContent: 'center', margin: '2px 0' }}>
+                  <span className="chat-system-pill">{msg.text}</span>
                 </div>
               );
             }
 
             return (
               <div key={msg.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                {/* User Avatar */}
-                <div 
+                {/* Avatar */}
+                <div
+                  className="avatar"
                   style={{
-                    width: '30px',
-                    height: '30px',
-                    borderRadius: 'var(--radius-sm)',
+                    width: '28px', height: '28px',
                     background: msg.color || 'var(--accent-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '700',
-                    fontSize: '0.8rem',
-                    color: '#fff',
-                    flexShrink: 0
+                    fontSize: '0.75rem',
+                    boxShadow: `0 2px 8px ${msg.color || 'rgba(99,102,241,0.4)'}40`
                   }}
                 >
                   {getAvatarLetter(msg.sender)}
                 </div>
 
-                {/* Message Content */}
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: msg.color || 'var(--text-primary)' }}>
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                    <span style={{
+                      fontSize: '0.78rem', fontWeight: '700',
+                      color: msg.color || 'var(--text-primary)',
+                    }}>
                       {msg.sender}
                     </span>
-                    {msg.isHost && <Crown size={12} color="#f59e0b" />}
-                    {msg.hasControl && <Key size={11} color="#10b981" />}
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>
+                    {msg.isHost && <Crown size={11} color="var(--accent-amber)" title="Host" />}
+                    {msg.hasControl && !msg.isHost && <Key size={10} color="var(--accent-emerald)" title="Has Control" />}
+                    <span style={{ fontSize: '0.63rem', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div 
-                    style={{
-                      background: 'var(--bg-input)',
-                      border: '1px solid var(--border-subtle)',
-                      padding: '7px 10px',
-                      borderRadius: '0 8px 8px 8px',
-                      fontSize: '0.85rem',
-                      wordBreak: 'break-word',
-                      color: 'var(--text-primary)'
-                    }}
-                  >
-                    {msg.text}
-                  </div>
+                  <div className="chat-bubble">{msg.text}</div>
                 </div>
               </div>
             );
@@ -153,29 +132,32 @@ export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, o
       </div>
 
       {/* Input */}
-      <form 
+      <form
         onSubmit={handleSend}
         style={{
           padding: '10px 12px',
           borderTop: '1px solid var(--border-subtle)',
           display: 'flex',
           gap: '8px',
-          background: 'var(--bg-input)'
+          flexShrink: 0,
+          background: 'var(--bg-surface-2)',
+          borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
         }}
       >
-        <input 
+        <input
+          ref={inputRef}
           type="text"
           className="input-field"
-          placeholder="Send a message..."
+          placeholder="Type a message…"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          style={{ minHeight: '38px', fontSize: '0.85rem' }}
+          style={{ minHeight: '38px', fontSize: '0.875rem', flex: 1, background: 'var(--bg-input)' }}
         />
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="btn btn-primary"
           disabled={!inputText.trim()}
-          style={{ minHeight: '38px', padding: '0 12px' }}
+          style={{ minHeight: '38px', width: '38px', padding: 0, borderRadius: 'var(--radius-md)', flexShrink: 0 }}
         >
           <Send size={15} />
         </button>

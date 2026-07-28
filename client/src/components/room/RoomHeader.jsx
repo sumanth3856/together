@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tv, Users, Copy, Check, LogOut, Crown, Share2 } from 'lucide-react';
+import { Monitor, Users, Copy, Check, LogOut, Crown, Share2, Signal } from 'lucide-react';
 
 export function RoomHeader({ roomId, memberCount, isHost, onLeaveRoom }) {
   const [copiedCode, setCopiedCode] = useState(false);
@@ -19,107 +19,113 @@ export function RoomHeader({ roomId, memberCount, isHost, onLeaveRoom }) {
   };
 
   return (
-    <header 
-      className="panel" 
-      style={{
-        padding: '12px 18px',
-        marginBottom: '16px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '12px',
-        flexWrap: 'wrap'
-      }}
-    >
-      {/* Brand Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div 
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--accent-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <Tv size={18} color="#ffffff" />
+    <header style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '10px',
+      padding: '10px 16px',
+      marginBottom: '14px',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: 'var(--radius-lg)',
+      flexWrap: 'wrap',
+      position: 'sticky',
+      top: '8px',
+      zIndex: 100,
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+    }}>
+      {/* Brand */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+        <div style={{
+          width: '32px', height: '32px', borderRadius: '9px',
+          background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.35)',
+          flexShrink: 0
+        }}>
+          <Monitor size={16} color="#fff" />
         </div>
-        <span style={{ fontSize: '1.15rem', fontWeight: '700', color: '#ffffff' }}>
+        <span style={{ fontSize: '1.05rem', fontWeight: '800', color: '#fff', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em' }}>
           Together
         </span>
       </div>
 
-      {/* Room Badges & Actions */}
+      {/* Center — Room info */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        {/* Room Code Button */}
-        <button 
+
+        {/* Room Code — click to copy */}
+        <button
           onClick={handleCopyCode}
-          className="badge badge-room"
-          title="Click to copy Room Code"
-          style={{ 
-            padding: '5px 12px', 
-            fontSize: '0.8rem', 
+          title="Click to copy room code"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '5px 10px',
+            background: 'var(--accent-primary-dim)',
+            border: '1px solid rgba(99,102,241,0.25)',
+            borderRadius: 'var(--radius-full)',
             cursor: 'pointer',
-            border: '1px solid var(--border-subtle)',
-            background: 'var(--bg-input)',
-            color: 'var(--text-primary)',
-            transition: 'border-color var(--transition-fast)'
+            color: '#a5b4fc',
+            fontSize: '0.8rem',
+            fontWeight: '700',
+            fontFamily: "'Outfit', monospace",
+            letterSpacing: '0.07em',
+            transition: 'all var(--transition-fast)',
           }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.22)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent-primary-dim)'; }}
         >
-          {copiedCode ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+          {copiedCode ? <Check size={12} color="var(--status-success)" /> : <Copy size={12} />}
           <span>{roomId}</span>
-          {copiedCode && <span style={{ color: '#10b981', fontSize: '0.7rem' }}>Copied</span>}
+          {copiedCode && <span style={{ color: 'var(--status-success)', fontSize: '0.68rem', fontFamily: "'Inter', sans-serif", letterSpacing: 0 }}>Copied!</span>}
         </button>
 
-        {/* Share Invite Link Button */}
+        {/* Share */}
         <button
           onClick={handleCopyShareLink}
           className="btn btn-secondary"
-          style={{ minHeight: '30px', padding: '0 10px', fontSize: '0.78rem' }}
-          title="Copy direct invite link to share with friends"
+          title="Share invite link"
+          style={{ minHeight: '32px', padding: '0 10px', fontSize: '0.78rem', borderRadius: 'var(--radius-full)' }}
         >
-          {copiedLink ? <Check size={13} color="#10b981" /> : <Share2 size={13} />}
-          <span>{copiedLink ? 'Link Copied!' : 'Share Link'}</span>
+          {copiedLink ? <Check size={12} color="var(--status-success)" /> : <Share2 size={12} />}
+          <span className="hide-on-small">{copiedLink ? 'Copied!' : 'Share'}</span>
         </button>
 
-        {/* Member Counter */}
-        <div 
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'var(--bg-input)',
-            padding: '5px 10px',
-            borderRadius: 'var(--radius-full)',
-            border: '1px solid var(--border-subtle)',
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)'
-          }}
-        >
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-success)' }} />
-          <Users size={13} />
-          <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{memberCount}</span>
+        {/* Live Member Count */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '6px',
+          padding: '5px 10px',
+          background: 'rgba(16,185,129,0.08)',
+          border: '1px solid rgba(16,185,129,0.18)',
+          borderRadius: 'var(--radius-full)',
+          fontSize: '0.78rem',
+          color: 'var(--status-success)',
+          fontWeight: '600'
+        }}>
+          <div className="pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-success)' }} />
+          <Users size={12} />
+          <span>{memberCount}</span>
         </div>
 
         {/* Host Badge */}
         {isHost && (
-          <span className="badge badge-host">
-            <Crown size={13} /> Host
+          <span className="badge badge-host" style={{ gap: '4px' }}>
+            <Crown size={11} />
+            <span>Host</span>
           </span>
         )}
       </div>
 
-      {/* Leave Room Button */}
-      <button 
+      {/* Leave */}
+      <button
         onClick={onLeaveRoom}
-        className="btn btn-ghost"
-        style={{ minHeight: '34px', padding: '0 10px', fontSize: '0.8rem', color: '#ef4444' }}
+        className="btn btn-danger"
+        style={{ minHeight: '32px', padding: '0 12px', fontSize: '0.8rem', borderRadius: 'var(--radius-full)' }}
         title="Leave room"
       >
-        <LogOut size={15} />
-        <span>Leave</span>
+        <LogOut size={14} />
+        <span className="hide-on-small">Leave</span>
       </button>
     </header>
   );

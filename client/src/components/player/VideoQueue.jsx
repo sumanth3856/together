@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { Play, Youtube, Check, Film, Music, Radio, Compass } from 'lucide-react';
+import { Play, Youtube, Check, Film, Music, Compass, Loader } from 'lucide-react';
 
 const CATEGORIZED_PRESETS = [
-  { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Beats', category: 'Music' },
-  { id: '4xDzrJKXOOY', title: 'Synthwave Chilled', category: 'Music' },
-  { id: 'BHACKCNDMW8', title: 'Deep Space Ambient 4K', category: 'Ambient' },
-  { id: '1nN_uA475YI', title: 'Tropical Beach Nature 4K', category: 'Ambient' },
-  { id: '5qap5aO4i9A', title: 'Lofi Girl - Chill Beats', category: 'Music' }
+  { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Beats', category: 'Music', emoji: '🎵' },
+  { id: '4xDzrJKXOOY', title: 'Synthwave Chilled', category: 'Music', emoji: '🌆' },
+  { id: 'BHACKCNDMW8', title: 'Deep Space Ambient 4K', category: 'Ambient', emoji: '🌌' },
+  { id: '1nN_uA475YI', title: 'Tropical Beach Nature 4K', category: 'Ambient', emoji: '🌊' },
+  { id: '5qap5aO4i9A', title: 'Lofi Girl - Chill Beats', category: 'Music', emoji: '☕' },
 ];
 
 export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) {
   const [urlInput, setUrlInput] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const [copiedPreset, setCopiedPreset] = useState(null);
+  const [loadingPreset, setLoadingPreset] = useState(null);
 
   const extractVideoId = (input) => {
     if (!input) return '';
@@ -35,58 +35,74 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
   };
 
   const handleSelectPreset = (preset) => {
-    setCopiedPreset(preset.id);
+    setLoadingPreset(preset.id);
     onChangeVideo({ youtubeId: preset.id, title: preset.title });
-    setTimeout(() => setCopiedPreset(null), 1500);
+    setTimeout(() => setLoadingPreset(null), 1200);
   };
 
-  const filteredPresets = activeCategory === 'All' 
-    ? CATEGORIZED_PRESETS 
+  const filteredPresets = activeCategory === 'All'
+    ? CATEGORIZED_PRESETS
     : CATEGORIZED_PRESETS.filter((p) => p.category === activeCategory);
 
+  const canControl = isHost || hasControl;
+
   return (
-    <div className="panel" style={{ marginTop: '16px', padding: '16px 18px' }}>
+    <div className="panel" style={{ marginTop: '14px', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+      <div style={{
+        padding: '12px 16px',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'var(--bg-surface-2)',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Youtube size={18} color="#ef4444" />
-          <h3 style={{ fontSize: '0.9rem', fontWeight: '700' }}>Load YouTube Video</h3>
+          <div style={{
+            width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
+            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Youtube size={14} color="#ef4444" />
+          </div>
+          <span style={{ fontSize: '0.88rem', fontWeight: '700' }}>Load Video</span>
         </div>
-        {!isHost && !hasControl && (
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Host Permission Required</span>
+        {!canControl && (
+          <span style={{
+            fontSize: '0.68rem', color: 'var(--text-tertiary)',
+            background: 'var(--bg-input)', border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-full)', padding: '2px 8px'
+          }}>
+            Host only
+          </span>
         )}
       </div>
 
-      {/* URL Input */}
-      <form onSubmit={handleLoadVideo} style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <input 
+      <div style={{ padding: '14px 14px' }}>
+        {/* URL Input */}
+        <form onSubmit={handleLoadVideo} style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+          <input
             type="text"
             className="input-field"
-            placeholder="Paste YouTube Link or Video ID"
+            placeholder="Paste YouTube URL or video ID…"
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
-            disabled={!isHost && !hasControl}
+            disabled={!canControl}
+            style={{ fontSize: '0.875rem', background: canControl ? 'var(--bg-input)' : 'rgba(255,255,255,0.02)' }}
           />
-        </div>
-        <button 
-          type="submit" 
-          className="btn btn-primary"
-          disabled={!isHost && !hasControl || !urlInput.trim()}
-          style={{ minHeight: '44px' }}
-        >
-          <Play size={15} />
-          <span>Load</span>
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={!canControl || !urlInput.trim()}
+            style={{ minHeight: '44px', padding: '0 14px', flexShrink: 0, borderRadius: 'var(--radius-md)' }}
+          >
+            <Play size={15} />
+            <span>Load</span>
+          </button>
+        </form>
 
-      {/* Preset Categories */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-            DEMO PRESETS
-          </span>
-          <div style={{ display: 'flex', gap: '4px' }}>
+        {/* Category Chips */}
+        <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <span className="section-label" style={{ marginBottom: 0 }}>Presets</span>
+          <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
             {['All', 'Music', 'Ambient'].map((cat) => (
               <button
                 key={cat}
@@ -94,13 +110,14 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
                 onClick={() => setActiveCategory(cat)}
                 style={{
                   background: activeCategory === cat ? 'var(--accent-primary)' : 'transparent',
-                  color: activeCategory === cat ? '#fff' : 'var(--text-secondary)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '2px 8px',
+                  color: activeCategory === cat ? '#fff' : 'var(--text-tertiary)',
+                  border: activeCategory === cat ? '1px solid transparent' : '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-full)',
+                  padding: '2px 10px',
                   fontSize: '0.7rem',
                   fontWeight: '600',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)',
                 }}
               >
                 {cat}
@@ -113,36 +130,27 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {filteredPresets.map((preset) => {
             const isPlaying = currentVideo?.youtubeId === preset.id;
+            const isLoading = loadingPreset === preset.id;
 
             return (
               <button
                 key={preset.id}
                 onClick={() => handleSelectPreset(preset)}
-                disabled={!isHost && !hasControl}
-                className="btn btn-secondary"
-                style={{
-                  minHeight: '32px',
-                  padding: '0 10px',
-                  fontSize: '0.75rem',
-                  borderRadius: 'var(--radius-full)',
-                  borderColor: isPlaying ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                  background: isPlaying ? 'rgba(88, 80, 236, 0.15)' : 'var(--bg-input)'
-                }}
+                disabled={!canControl}
+                className={`preset-chip${isPlaying ? ' active' : ''}`}
+                style={{ fontSize: '0.76rem' }}
               >
-                {copiedPreset === preset.id ? (
-                  <Check size={12} color="#10b981" />
-                ) : isPlaying ? (
-                  <Radio size={12} color="var(--status-success)" />
-                ) : (
-                  <Film size={12} color="var(--text-secondary)" />
+                {isLoading ? <Loader size={11} style={{ animation: 'spin 1s linear infinite' }} /> : (
+                  <span style={{ fontSize: '0.75rem' }}>{preset.emoji}</span>
                 )}
                 <span>{preset.title}</span>
-                {isPlaying && <span style={{ fontSize: '0.65rem', color: 'var(--status-success)', fontWeight: '700' }}>Playing</span>}
+                {isPlaying && <span style={{ fontSize: '0.62rem', color: 'var(--status-success)', fontWeight: '700' }}>● LIVE</span>}
               </button>
             );
           })}
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

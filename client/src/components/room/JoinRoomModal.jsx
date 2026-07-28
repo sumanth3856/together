@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tv, Plus, Users, ArrowRight, ShieldCheck, Zap, Smile } from 'lucide-react';
+import { Tv, Plus, Users, ArrowRight, Zap, ShieldCheck, Smile, Monitor } from 'lucide-react';
 
 export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
   const [activeTab, setActiveTab] = useState(initialRoomId ? 'join' : 'create');
@@ -13,22 +13,15 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
     if (saved) setNickname(saved);
   }, []);
 
-  const getAvatarLetter = (name) => {
-    return name ? name.trim().charAt(0).toUpperCase() : '?';
-  };
+  const getAvatarLetter = (name) => name ? name.trim().charAt(0).toUpperCase() : '?';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!nickname.trim()) {
-      alert('Please enter a nickname');
-      return;
-    }
+    if (!nickname.trim()) { alert('Please enter a nickname'); return; }
 
     localStorage.setItem('tg_nickname', nickname.trim());
     setLoading(true);
     setRetrying(false);
-
-    // Show 'Retrying...' after 2.5s if still loading (server cold-start)
     const retryTimer = setTimeout(() => setRetrying(true), 2500);
 
     try {
@@ -53,152 +46,114 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
   };
 
   return (
-    <div 
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px 16px'
-      }}
-    >
-      <div 
-        className="panel" 
-        style={{
-          width: '100%',
-          maxWidth: '440px',
-          padding: '32px 28px'
-        }}
-      >
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div 
-            style={{
-              width: '56px',
-              height: '56px',
-              margin: '0 auto 12px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--accent-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Tv size={28} color="#ffffff" />
-          </div>
+    <div className="landing-bg">
+      <div className="landing-card">
 
-          <h1 
-            style={{ 
-              fontSize: '1.75rem', 
-              fontWeight: '700', 
-              color: '#ffffff',
-              marginBottom: '4px'
-            }}
-          >
+        {/* Logo & Brand */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{
+            width: '64px', height: '64px',
+            borderRadius: '18px',
+            background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 14px',
+            boxShadow: '0 4px 20px rgba(99,102,241,0.4), 0 0 0 1px rgba(255,255,255,0.1) inset'
+          }}>
+            <Monitor size={30} color="#fff" />
+          </div>
+          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#fff', marginBottom: '6px', letterSpacing: '-0.02em' }}>
             Together
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
-            Watch YouTube videos in synchronized playback
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+            Watch YouTube in perfect sync with friends
           </p>
         </div>
 
         {/* Tab Toggle */}
-        <div 
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '4px',
-            background: 'var(--bg-input)',
-            padding: '4px',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '20px',
-            border: '1px solid var(--border-subtle)'
-          }}
-        >
-          <button 
+        <div className="tab-control" style={{ marginBottom: '22px' }}>
+          <button
             type="button"
-            className={`btn ${activeTab === 'create' ? 'btn-primary' : 'btn-ghost'}`}
+            className={`tab-control-btn ${activeTab === 'create' ? 'active' : ''}`}
             onClick={() => setActiveTab('create')}
-            style={{ height: '38px', fontSize: '0.85rem' }}
           >
-            <Plus size={16} />
+            <Plus size={15} />
             <span>Create Room</span>
           </button>
-          <button 
+          <button
             type="button"
-            className={`btn ${activeTab === 'join' ? 'btn-primary' : 'btn-ghost'}`}
+            className={`tab-control-btn ${activeTab === 'join' ? 'active' : ''}`}
             onClick={() => setActiveTab('join')}
-            style={{ height: '38px', fontSize: '0.85rem' }}
           >
-            <Users size={16} />
+            <Users size={15} />
             <span>Join Room</span>
           </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Nickname */}
+
+          {/* Nickname Input */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-              NICKNAME
-            </label>
+            <span className="section-label">Your Nickname</span>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div 
+              {/* Avatar Preview */}
+              <div
+                className="avatar"
                 style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--accent-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '700',
-                  color: '#fff',
+                  width: '44px', height: '44px', flexShrink: 0,
+                  background: nickname
+                    ? `hsl(${(nickname.charCodeAt(0) * 37) % 360}, 65%, 50%)`
+                    : 'var(--bg-surface-3)',
                   fontSize: '1.1rem',
-                  flexShrink: 0
+                  transition: 'background var(--transition-base)',
+                  boxShadow: nickname ? '0 2px 8px rgba(0,0,0,0.4)' : 'none'
                 }}
               >
                 {getAvatarLetter(nickname)}
               </div>
-              <input 
+              <input
                 type="text"
                 className="input-field"
-                placeholder="Enter your nickname"
+                placeholder="e.g. Sumanth"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 maxLength={20}
                 required
+                autoFocus
               />
             </div>
           </div>
 
-          {/* Room Code */}
+          {/* Room Code Input */}
           {activeTab === 'join' && (
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                ROOM CODE
-              </label>
-              <input 
+              <span className="section-label">Room Code</span>
+              <input
                 type="text"
                 className="input-field"
-                placeholder="e.g. TOG-4829"
+                placeholder="e.g. TOG-X7HF"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                style={{ letterSpacing: '0.05em', fontWeight: '600', textTransform: 'uppercase' }}
+                style={{ letterSpacing: '0.1em', fontFamily: "'Outfit', monospace", fontWeight: '700', fontSize: '1rem' }}
                 required
               />
             </div>
           )}
 
           {/* Submit */}
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
+          <button
+            type="submit"
+            className="btn btn-primary"
             disabled={loading}
-            style={{ width: '100%', marginTop: '4px', minHeight: '44px', fontSize: '0.9rem' }}
+            style={{ width: '100%', marginTop: '4px', minHeight: '48px', fontSize: '0.95rem', borderRadius: 'var(--radius-md)' }}
           >
             {loading ? (
-              <span>{retrying ? '⏳ Retrying...' : 'Connecting...'}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+                {retrying ? 'Retrying...' : 'Connecting...'}
+              </span>
             ) : (
               <>
                 <span>{activeTab === 'create' ? 'Create Room' : 'Join Room'}</span>
@@ -208,32 +163,37 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
           </button>
         </form>
 
-        {/* Feature List */}
-        <div 
-          style={{
-            marginTop: '24px',
-            paddingTop: '16px',
-            borderTop: '1px solid var(--border-subtle)',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '8px',
-            textAlign: 'center'
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-            <Zap size={16} color="var(--accent-secondary)" />
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Synced Video</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-            <ShieldCheck size={16} color="var(--status-warning)" />
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Host Controls</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-            <Smile size={16} color="var(--status-success)" />
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Live Reactions</span>
-          </div>
+        {/* Feature Highlights */}
+        <div style={{
+          marginTop: '24px',
+          paddingTop: '20px',
+          borderTop: '1px solid var(--border-subtle)',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '12px',
+          textAlign: 'center'
+        }}>
+          {[
+            { icon: <Zap size={16} color="var(--accent-primary)" />, label: 'Frame-perfect Sync' },
+            { icon: <ShieldCheck size={16} color="var(--accent-amber)" />, label: 'Host Controls' },
+            { icon: <Smile size={16} color="var(--accent-emerald)" />, label: 'Live Reactions' },
+          ].map(({ icon, label }) => (
+            <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '34px', height: '34px', borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-surface-2)', border: '1px solid var(--border-subtle)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                {icon}
+              </div>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>{label}</span>
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* Spin animation for loader */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

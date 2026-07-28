@@ -1,102 +1,109 @@
 import React from 'react';
-import { Users, Crown, Key, Check, X } from 'lucide-react';
+import { Users, Crown, Key, Check, X, UserCheck } from 'lucide-react';
 
-export function MemberList({
-  members = [],
-  currentSocketId,
-  isHost,
-  onGrantControl,
-  onRevokeControl
-}) {
-  const getAvatarLetter = (name) => {
-    return name ? name.trim().charAt(0).toUpperCase() : '?';
-  };
+export function MemberList({ members = [], currentSocketId, isHost, onGrantControl, onRevokeControl }) {
+  const getAvatarLetter = (name) => name ? name.trim().charAt(0).toUpperCase() : '?';
 
   return (
-    <div className="panel" style={{ marginTop: '16px', padding: '16px 18px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+    <div className="panel" style={{ marginTop: '14px', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{
+        padding: '12px 16px',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'var(--bg-surface-2)',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Users size={16} color="var(--accent-secondary)" />
-          <h3 style={{ fontSize: '0.9rem', fontWeight: '700' }}>Room Guests</h3>
+          <div style={{
+            width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
+            background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <UserCheck size={14} color="var(--accent-cyan)" />
+          </div>
+          <span style={{ fontSize: '0.88rem', fontWeight: '700' }}>Watching Together</span>
         </div>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{members.length} Connected</span>
+        <span style={{
+          fontSize: '0.68rem', fontWeight: '600',
+          padding: '2px 8px',
+          borderRadius: 'var(--radius-full)',
+          background: 'rgba(16,185,129,0.1)',
+          border: '1px solid rgba(16,185,129,0.18)',
+          color: 'var(--status-success)'
+        }}>
+          {members.length} online
+        </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {/* Member List */}
+      <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {members.map((m) => {
           const isYou = m.socketId === currentSocketId;
 
           return (
             <div
               key={m.socketId}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-md)',
-                background: isYou ? 'rgba(88, 80, 236, 0.12)' : 'var(--bg-input)',
-                border: isYou ? '1px solid rgba(88, 80, 236, 0.3)' : '1px solid var(--border-subtle)'
-              }}
+              className={`member-row${isYou ? ' you' : ''}`}
             >
-              {/* Member Info */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div 
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: 'var(--radius-full)',
-                    background: m.isHost ? '#d97706' : (m.color || 'var(--accent-primary)'),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '700',
-                    color: '#fff',
-                    fontSize: '0.82rem'
-                  }}
-                >
-                  {getAvatarLetter(m.nickname)}
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                      {m.nickname} {isYou && <span style={{ color: 'var(--accent-primary)', fontSize: '0.72rem' }}>(You)</span>}
-                    </span>
-                    {m.isHost && <Crown size={13} color="#f59e0b" />}
-                    {m.hasControl && !m.isHost && <Key size={12} color="#10b981" />}
-                  </div>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
-                    {m.isHost ? 'Room Owner' : m.hasControl ? 'Control Granted' : 'Guest'}
-                  </span>
-                </div>
+              {/* Avatar */}
+              <div
+                className="avatar"
+                style={{
+                  width: '34px', height: '34px',
+                  background: m.isHost
+                    ? 'linear-gradient(135deg, #d97706, #f59e0b)'
+                    : (m.color || 'var(--accent-primary)'),
+                  fontSize: '0.85rem',
+                  boxShadow: isYou ? `0 2px 8px ${m.color || 'rgba(99,102,241,0.5)'}60` : 'none',
+                }}
+              >
+                {getAvatarLetter(m.nickname)}
               </div>
 
-              {/* Host Actions */}
-              {isHost && !m.isHost && (
-                <div>
-                  {m.hasControl ? (
-                    <button
-                      onClick={() => onRevokeControl(m.socketId)}
-                      className="btn btn-ghost"
-                      style={{ minHeight: '30px', padding: '0 8px', fontSize: '0.72rem', color: '#ef4444' }}
-                      title="Revoke control permission"
-                    >
-                      <X size={13} />
-                      <span>Revoke</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => onGrantControl(m.socketId, true)}
-                      className="btn btn-secondary"
-                      style={{ minHeight: '30px', padding: '0 8px', fontSize: '0.72rem', borderColor: '#10b981', color: '#34d399' }}
-                      title="Grant playback control"
-                    >
-                      <Check size={13} />
-                      <span>Grant Control</span>
-                    </button>
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '0.84rem', fontWeight: '700',
+                    color: 'var(--text-primary)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                  }}>
+                    {m.nickname}
+                  </span>
+                  {isYou && (
+                    <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: '700' }}>(You)</span>
                   )}
+                  {m.isHost && <Crown size={11} color="var(--accent-amber)" />}
+                  {m.hasControl && !m.isHost && <Key size={10} color="var(--accent-emerald)" />}
                 </div>
+                <span style={{ fontSize: '0.67rem', color: 'var(--text-tertiary)', fontWeight: '500' }}>
+                  {m.isHost ? '👑 Room Host' : m.hasControl ? '🎮 Has Control' : 'Viewer'}
+                </span>
+              </div>
+
+              {/* Host Controls */}
+              {isHost && !m.isHost && (
+                m.hasControl ? (
+                  <button
+                    onClick={() => onRevokeControl(m.socketId)}
+                    className="btn btn-danger"
+                    style={{ minHeight: '28px', padding: '0 8px', fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }}
+                    title="Revoke control"
+                  >
+                    <X size={12} />
+                    <span>Revoke</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onGrantControl(m.socketId, true)}
+                    className="btn btn-success"
+                    style={{ minHeight: '28px', padding: '0 8px', fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }}
+                    title="Grant control"
+                  >
+                    <Check size={12} />
+                    <span>Grant</span>
+                  </button>
+                )
               )}
             </div>
           );

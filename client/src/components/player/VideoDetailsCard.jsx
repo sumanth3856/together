@@ -1,18 +1,12 @@
 import React, { useState } from 'react';
-import { Film, Crown, Key, Copy, Check, Share2, Unlock, Radio, Users } from 'lucide-react';
+import { Film, Crown, Key, Copy, Check, Share2, Unlock, Signal } from 'lucide-react';
 
-export function VideoDetailsCard({
-  currentVideo,
-  roomState,
-  currentSocketId,
-  isHost,
-  hasControl,
-  onRequestControl
-}) {
+export function VideoDetailsCard({ currentVideo, roomState, currentSocketId, isHost, hasControl, onRequestControl }) {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
   const controller = roomState?.members?.find((m) => m.hasControl || m.isHost);
+  const isPlaying = roomState?.playback?.isPlaying;
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomState?.roomId || '');
@@ -28,146 +22,114 @@ export function VideoDetailsCard({
   };
 
   return (
-    <div className="panel" style={{ marginTop: '16px', padding: '18px 20px' }}>
-      {/* Top Header: Video Title & Youtube ID */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
-          <div 
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--bg-input)',
-              border: '1px solid var(--border-subtle)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <Film size={20} color="var(--accent-primary)" />
+    <div className="panel" style={{ marginTop: '14px', overflow: 'hidden' }}>
+      {/* Video Info Strip */}
+      <div style={{
+        padding: '14px 16px',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px',
+        background: 'var(--bg-surface-2)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
+          {/* Icon */}
+          <div style={{
+            width: '38px', height: '38px', borderRadius: 'var(--radius-md)',
+            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <Film size={18} color="var(--accent-primary)" />
           </div>
+          {/* Title */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 
-              style={{ 
-                fontSize: '1.05rem', 
-                fontWeight: '700', 
-                color: 'var(--text-primary)', 
-                lineHeight: 1.3,
-                marginBottom: '4px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {currentVideo?.title || 'YouTube Video'}
+            <h3 style={{
+              fontSize: '0.95rem', fontWeight: '700',
+              color: 'var(--text-primary)',
+              marginBottom: '3px',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {currentVideo?.title || 'No Video Loaded'}
             </h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace', display: 'block' }}>
-              ID: {currentVideo?.youtubeId || 'dQw4w9WgXcQ'}
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontFamily: 'monospace', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              ID: {currentVideo?.youtubeId || '—'}
             </span>
           </div>
         </div>
 
-        {/* Sync Drift Indicator Pill */}
-        <div 
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px', 
-            background: 'rgba(16, 185, 129, 0.1)', 
-            padding: '4px 10px', 
-            borderRadius: 'var(--radius-full)', 
-            border: '1px solid rgba(16, 185, 129, 0.2)', 
-            fontSize: '0.72rem', 
-            fontWeight: '600',
-            color: '#10b981',
-            flexShrink: 0
-          }}
-        >
-          <Radio size={12} color="#10b981" />
-          <span className="hide-on-small">Live Synced</span>
+        {/* Live Badge */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0,
+          background: isPlaying ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${isPlaying ? 'rgba(16,185,129,0.22)' : 'var(--border-subtle)'}`,
+          padding: '4px 10px', borderRadius: 'var(--radius-full)',
+          fontSize: '0.7rem', fontWeight: '700',
+          color: isPlaying ? 'var(--status-success)' : 'var(--text-tertiary)',
+          transition: 'all 0.3s ease',
+        }}>
+          <Signal size={11} />
+          <span>{isPlaying ? 'Live' : 'Paused'}</span>
         </div>
       </div>
 
-      {/* Controller & Room Info Badges */}
-      <div 
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          padding: '12px 14px',
-          background: 'var(--bg-input)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-subtle)',
-          marginBottom: '20px'
-        }}
-      >
-        {/* Playback Controller Badge */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Playback Controller</span>
-          {controller ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {controller.isHost ? <Crown size={14} color="var(--accent-secondary)" /> : <Key size={14} color="var(--accent-primary)" />}
-              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                {controller.nickname} {controller.socketId === currentSocketId ? <span style={{ color: 'var(--text-secondary)' }}>(You)</span> : ''}
-              </span>
-            </div>
-          ) : (
-            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>None</span>
-          )}
-        </div>
-
-        {/* Room Code Badge */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Room Code</span>
-          <span className="badge badge-room" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
-            {roomState?.roomId}
+      {/* Controller & Room Strip */}
+      <div style={{
+        padding: '10px 16px',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
+        background: 'rgba(0,0,0,0.15)',
+      }}>
+        {/* Controller */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+          {controller?.isHost
+            ? <Crown size={13} color="var(--accent-amber)" />
+            : <Key size={13} color="var(--accent-emerald)" />}
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+            <span style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{controller?.nickname || '—'}</span>
+            {controller?.socketId === currentSocketId && <span style={{ color: 'var(--accent-primary)', fontSize: '0.68rem' }}> (you)</span>}
+            <span style={{ color: 'var(--text-tertiary)', marginLeft: '4px' }}>is controlling</span>
           </span>
         </div>
+
+        {/* Room Code */}
+        <button
+          onClick={handleCopyCode}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            background: 'var(--accent-primary-dim)', border: '1px solid rgba(99,102,241,0.22)',
+            borderRadius: 'var(--radius-full)', padding: '3px 10px',
+            cursor: 'pointer', color: '#a5b4fc',
+            fontSize: '0.76rem', fontWeight: '700', fontFamily: "'Outfit', monospace",
+            letterSpacing: '0.06em', transition: 'all var(--transition-fast)',
+          }}
+        >
+          {copiedCode ? <Check size={11} color="var(--status-success)" /> : <Copy size={11} />}
+          <span>{roomState?.roomId}</span>
+        </button>
       </div>
 
-      {/* Quick Action Bar (Responsive Grid) */}
-      <div 
-        style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
-          gap: '10px' 
-        }}
-      >
-        <button 
-          onClick={handleCopyCode}
-          className="btn btn-secondary"
-          style={{ minHeight: '40px', padding: '0 12px', fontSize: '0.85rem', width: '100%' }}
-        >
-          {copiedCode ? <Check size={16} color="#10b981" /> : <Copy size={16} />}
-          <span>{copiedCode ? 'Code Copied' : 'Copy Code'}</span>
-        </button>
-
-        <button 
-          onClick={handleCopyShareLink}
-          className="btn btn-secondary"
-          style={{ minHeight: '40px', padding: '0 12px', fontSize: '0.85rem', width: '100%' }}
-        >
-          {copiedLink ? <Check size={16} color="#10b981" /> : <Share2 size={16} />}
-          <span>{copiedLink ? 'Link Copied' : 'Share Link'}</span>
+      {/* Quick Actions */}
+      <div style={{
+        padding: '12px 14px',
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fit, minmax(120px, 1fr))`,
+        gap: '8px',
+      }}>
+        <button onClick={handleCopyShareLink} className="btn btn-secondary" style={{ minHeight: '38px', fontSize: '0.82rem' }}>
+          {copiedLink ? <Check size={14} color="var(--status-success)" /> : <Share2 size={14} />}
+          <span>{copiedLink ? 'Copied!' : 'Share Link'}</span>
         </button>
 
         {!isHost && !hasControl && (
-          <button 
+          <button
             onClick={onRequestControl}
             className="btn btn-secondary"
-            style={{ 
-              minHeight: '40px', 
-              padding: '0 12px', 
-              fontSize: '0.85rem', 
-              width: '100%',
-              background: 'rgba(245, 158, 11, 0.05)',
-              borderColor: 'rgba(245, 158, 11, 0.3)', 
-              color: '#fbbf24' 
+            style={{
+              minHeight: '38px', fontSize: '0.82rem',
+              background: 'rgba(245,158,11,0.06)',
+              borderColor: 'rgba(245,158,11,0.22)',
+              color: 'var(--accent-amber)'
             }}
           >
-            <Unlock size={16} />
+            <Unlock size={14} />
             <span>Request Control</span>
           </button>
         )}

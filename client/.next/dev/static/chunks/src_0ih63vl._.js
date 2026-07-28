@@ -18,12 +18,45 @@ const getSocketUrl = ()=>{
     }
     if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
     ;
-    const { protocol, hostname, port } = window.location;
+    const { protocol, hostname } = window.location;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return `${protocol}//${hostname}:4000`;
     }
     return '';
 };
+// ---------- Session Persistence Helpers ----------
+// We use sessionStorage so the session survives page reloads
+// but is cleared when the tab is closed (correct UX).
+const SESSION_KEY = 'tg_session';
+function saveSession(roomId, nickname) {
+    try {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+            roomId,
+            nickname,
+            savedAt: Date.now()
+        }));
+    } catch (_) {}
+}
+function loadSession() {
+    try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        // Expire after 2 hours to avoid stale sessions
+        if (Date.now() - data.savedAt > 7200000) {
+            sessionStorage.removeItem(SESSION_KEY);
+            return null;
+        }
+        return data;
+    } catch (_) {
+        return null;
+    }
+}
+function clearSession() {
+    try {
+        sessionStorage.removeItem(SESSION_KEY);
+    } catch (_) {}
+}
 function useSocket() {
     _s();
     const socketRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
@@ -34,6 +67,9 @@ function useSocket() {
     const [incomingReaction, setIncomingReaction] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [syncedPlaybackEvent, setSyncedPlaybackEvent] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [sessionEnded, setSessionEnded] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [isReconnecting, setIsReconnecting] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    // Track the active session locally so reconnect logic can access it
+    const activeSessionRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "useSocket.useEffect": ()=>{
             const socket = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$socket$2e$io$2d$client$2f$build$2f$esm$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["io"])(getSocketUrl(), {
@@ -42,20 +78,38 @@ function useSocket() {
                     'websocket'
                 ],
                 reconnection: true,
-                reconnectionAttempts: 10,
-                reconnectionDelay: 1000
+                reconnectionAttempts: 15,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                timeout: 20000
             });
             socketRef.current = socket;
             socket.on('connect', {
                 "useSocket.useEffect": ()=>{
                     console.log('⚡ Socket Connected:', socket.id);
                     setIsConnected(true);
+                    setIsReconnecting(false);
+                    // Auto-rejoin if we have a saved session and aren't in a room yet
+                    const session = activeSessionRef.current || loadSession();
+                    if (session && !roomState) {
+                        console.log('🔄 Auto-rejoining room:', session.roomId);
+                        attemptRejoin(socket, session.roomId, session.nickname);
+                    }
                 }
             }["useSocket.useEffect"]);
             socket.on('disconnect', {
-                "useSocket.useEffect": ()=>{
-                    console.log('❌ Socket Disconnected');
+                "useSocket.useEffect": (reason)=>{
+                    console.log('❌ Socket Disconnected:', reason);
                     setIsConnected(false);
+                    // Only show reconnecting if it was an unexpected disconnect
+                    if (reason !== 'io client disconnect') {
+                        setIsReconnecting(true);
+                    }
+                }
+            }["useSocket.useEffect"]);
+            socket.on('reconnecting', {
+                "useSocket.useEffect": ()=>{
+                    setIsReconnecting(true);
                 }
             }["useSocket.useEffect"]);
             socket.on('room_state_updated', {
@@ -101,8 +155,31 @@ function useSocket() {
             }["useSocket.useEffect"]);
             socket.on('session_ended', {
                 "useSocket.useEffect": ()=>{
+                    clearSession();
+                    activeSessionRef.current = null;
                     setSessionEnded(true);
-                    setRoomState(null); // Clear room state
+                    setRoomState(null);
+                    setIsReconnecting(false);
+                }
+            }["useSocket.useEffect"]);
+            socket.on('chat_received', {
+                "useSocket.useEffect": (message)=>{
+                    setRoomState({
+                        "useSocket.useEffect": (prev)=>{
+                            if (!prev) return prev;
+                            const alreadyExists = prev.chatHistory.some({
+                                "useSocket.useEffect.alreadyExists": (m)=>m.id === message.id
+                            }["useSocket.useEffect.alreadyExists"]);
+                            if (alreadyExists) return prev;
+                            return {
+                                ...prev,
+                                chatHistory: [
+                                    ...prev.chatHistory,
+                                    message
+                                ]
+                            };
+                        }
+                    }["useSocket.useEffect"]);
                 }
             }["useSocket.useEffect"]);
             return ({
@@ -111,7 +188,33 @@ function useSocket() {
                 }
             })["useSocket.useEffect"];
         }
-    }["useSocket.useEffect"], []);
+    }["useSocket.useEffect"], []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Attempt rejoin with retry logic (handles Render cold-start)
+    const attemptRejoin = (socket, roomId, nickname, retriesLeft = 4)=>{
+        socket.emit('join_room', {
+            roomId,
+            nickname
+        }, (response)=>{
+            if (response.success) {
+                setRoomState(response.roomState);
+                activeSessionRef.current = {
+                    roomId,
+                    nickname
+                };
+                saveSession(roomId, nickname);
+                setIsReconnecting(false);
+            } else if (response.error === 'Room not found' && retriesLeft > 0) {
+                // Server may be cold-starting — retry
+                setTimeout(()=>attemptRejoin(socket, roomId, nickname, retriesLeft - 1), 2000);
+            } else {
+                // Truly not found — clear session and let user re-enter
+                clearSession();
+                activeSessionRef.current = null;
+                setIsReconnecting(false);
+                setRoomState(null);
+            }
+        });
+    };
     const createRoom = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "useSocket.useCallback[createRoom]": (nickname)=>{
             return new Promise({
@@ -123,6 +226,12 @@ function useSocket() {
                         "useSocket.useCallback[createRoom]": (response)=>{
                             if (response.success) {
                                 setRoomState(response.roomState);
+                                const roomId = response.roomState.roomId;
+                                activeSessionRef.current = {
+                                    roomId,
+                                    nickname
+                                };
+                                saveSession(roomId, nickname);
                                 resolve(response.roomState);
                             } else {
                                 reject(response.error);
@@ -147,9 +256,14 @@ function useSocket() {
                                 "useSocket.useCallback[joinRoom].attempt": (response)=>{
                                     if (response.success) {
                                         setRoomState(response.roomState);
+                                        activeSessionRef.current = {
+                                            roomId,
+                                            nickname
+                                        };
+                                        saveSession(roomId, nickname);
                                         resolve(response.roomState);
                                     } else if (response.error === 'Room not found' && retriesLeft > 0) {
-                                        // Server may be waking up (Render free tier cold-start) — retry after 2s
+                                        // Render free tier cold-start — retry silently
                                         setTimeout({
                                             "useSocket.useCallback[joinRoom].attempt": ()=>attempt(retriesLeft - 1)
                                         }["useSocket.useCallback[joinRoom].attempt"], 2000);
@@ -160,11 +274,32 @@ function useSocket() {
                             }["useSocket.useCallback[joinRoom].attempt"]);
                         }
                     }["useSocket.useCallback[joinRoom].attempt"];
-                    attempt(3); // Up to 3 retries
+                    attempt(3);
                 }
             }["useSocket.useCallback[joinRoom]"]);
         }
     }["useSocket.useCallback[joinRoom]"], []);
+    // Intentional leave — triggers server-side disbanding for host
+    const leaveRoom = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "useSocket.useCallback[leaveRoom]": ()=>{
+            return new Promise({
+                "useSocket.useCallback[leaveRoom]": (resolve)=>{
+                    clearSession();
+                    activeSessionRef.current = null;
+                    setRoomState(null);
+                    if (!socketRef.current) {
+                        resolve();
+                        return;
+                    }
+                    socketRef.current.emit('leave_room', {
+                        "useSocket.useCallback[leaveRoom]": ()=>{
+                            resolve();
+                        }
+                    }["useSocket.useCallback[leaveRoom]"]);
+                }
+            }["useSocket.useCallback[leaveRoom]"]);
+        }
+    }["useSocket.useCallback[leaveRoom]"], []);
     const syncPlayback = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "useSocket.useCallback[syncPlayback]": (playbackData)=>{
             if (socketRef.current) {
@@ -220,6 +355,7 @@ function useSocket() {
     return {
         socket: socketRef.current,
         isConnected,
+        isReconnecting,
         roomState,
         sessionEnded,
         toastNotification,
@@ -230,6 +366,7 @@ function useSocket() {
         syncedPlaybackEvent,
         createRoom,
         joinRoom,
+        leaveRoom,
         syncPlayback,
         requestControl,
         respondControlRequest,
@@ -238,7 +375,7 @@ function useSocket() {
         sendReaction
     };
 }
-_s(useSocket, "m3ffGuy+FbbKFBaks+80CdtNnvE=");
+_s(useSocket, "V6AKsSYzbfs9H8Mz4fC+WrCR07c=");
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
 }
@@ -252,13 +389,13 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$tv$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Tv$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/tv.js [app-client] (ecmascript) <export default as Tv>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$plus$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Plus$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/plus.js [app-client] (ecmascript) <export default as Plus>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/users.js [app-client] (ecmascript) <export default as Users>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$arrow$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ArrowRight$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/arrow-right.js [app-client] (ecmascript) <export default as ArrowRight>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shield$2d$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShieldCheck$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/shield-check.js [app-client] (ecmascript) <export default as ShieldCheck>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$zap$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Zap$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/zap.js [app-client] (ecmascript) <export default as Zap>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shield$2d$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShieldCheck$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/shield-check.js [app-client] (ecmascript) <export default as ShieldCheck>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$smile$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Smile$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/smile.js [app-client] (ecmascript) <export default as Smile>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$monitor$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Monitor$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/monitor.js [app-client] (ecmascript) <export default as Monitor>");
 ;
 var _s = __turbopack_context__.k.signature();
 ;
@@ -276,9 +413,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
             if (saved) setNickname(saved);
         }
     }["JoinRoomModal.useEffect"], []);
-    const getAvatarLetter = (name)=>{
-        return name ? name.trim().charAt(0).toUpperCase() : '?';
-    };
+    const getAvatarLetter = (name)=>name ? name.trim().charAt(0).toUpperCase() : '?';
     const handleSubmit = async (e)=>{
         e.preventDefault();
         if (!nickname.trim()) {
@@ -288,7 +423,6 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
         localStorage.setItem('tg_nickname', nickname.trim());
         setLoading(true);
         setRetrying(false);
-        // Show 'Retrying...' after 2.5s if still loading (server cold-start)
         const retryTimer = setTimeout(()=>setRetrying(true), 2500);
         try {
             if (activeTab === 'create') {
@@ -311,442 +445,423 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
         }
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        style: {
-            minHeight: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px 16px'
-        },
-        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-            className: "panel",
-            style: {
-                width: '100%',
-                maxWidth: '440px',
-                padding: '32px 28px'
-            },
-            children: [
-                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    style: {
-                        textAlign: 'center',
-                        marginBottom: '24px'
-                    },
-                    children: [
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            style: {
-                                width: '56px',
-                                height: '56px',
-                                margin: '0 auto 12px',
-                                borderRadius: 'var(--radius-md)',
-                                background: 'var(--accent-primary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            },
-                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$tv$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Tv$3e$__["Tv"], {
-                                size: 28,
-                                color: "#ffffff"
+        className: "landing-bg",
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "landing-card",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        style: {
+                            textAlign: 'center',
+                            marginBottom: '28px'
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    width: '64px',
+                                    height: '64px',
+                                    borderRadius: '18px',
+                                    background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    margin: '0 auto 14px',
+                                    boxShadow: '0 4px 20px rgba(99,102,241,0.4), 0 0 0 1px rgba(255,255,255,0.1) inset'
+                                },
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$monitor$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Monitor$3e$__["Monitor"], {
+                                    size: 30,
+                                    color: "#fff"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                    lineNumber: 62,
+                                    columnNumber: 13
+                                }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                lineNumber: 87,
-                                columnNumber: 13
+                                lineNumber: 54,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
+                                style: {
+                                    fontSize: '2rem',
+                                    fontWeight: '800',
+                                    color: '#fff',
+                                    marginBottom: '6px',
+                                    letterSpacing: '-0.02em'
+                                },
+                                children: "Together"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                lineNumber: 64,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                style: {
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.9rem',
+                                    lineHeight: 1.5
+                                },
+                                children: "Watch YouTube in perfect sync with friends"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                lineNumber: 67,
+                                columnNumber: 11
                             }, this)
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 75,
-                            columnNumber: 11
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
-                            style: {
-                                fontSize: '1.75rem',
-                                fontWeight: '700',
-                                color: '#ffffff',
-                                marginBottom: '4px'
-                            },
-                            children: "Together"
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 90,
-                            columnNumber: 11
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                            style: {
-                                color: 'var(--text-secondary)',
-                                fontSize: '0.88rem'
-                            },
-                            children: "Watch YouTube videos in synchronized playback"
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 100,
-                            columnNumber: 11
-                        }, this)
-                    ]
-                }, void 0, true, {
-                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                    lineNumber: 74,
-                    columnNumber: 9
-                }, this),
-                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    style: {
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '4px',
-                        background: 'var(--bg-input)',
-                        padding: '4px',
-                        borderRadius: 'var(--radius-md)',
-                        marginBottom: '20px',
-                        border: '1px solid var(--border-subtle)'
-                    },
-                    children: [
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                            type: "button",
-                            className: `btn ${activeTab === 'create' ? 'btn-primary' : 'btn-ghost'}`,
-                            onClick: ()=>setActiveTab('create'),
-                            style: {
-                                height: '38px',
-                                fontSize: '0.85rem'
-                            },
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$plus$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Plus$3e$__["Plus"], {
-                                    size: 16
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 124,
-                                    columnNumber: 13
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                    children: "Create Room"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 125,
-                                    columnNumber: 13
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 118,
-                            columnNumber: 11
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                            type: "button",
-                            className: `btn ${activeTab === 'join' ? 'btn-primary' : 'btn-ghost'}`,
-                            onClick: ()=>setActiveTab('join'),
-                            style: {
-                                height: '38px',
-                                fontSize: '0.85rem'
-                            },
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__["Users"], {
-                                    size: 16
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 133,
-                                    columnNumber: 13
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                    children: "Join Room"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 134,
-                                    columnNumber: 13
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 127,
-                            columnNumber: 11
-                        }, this)
-                    ]
-                }, void 0, true, {
-                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                    lineNumber: 106,
-                    columnNumber: 9
-                }, this),
-                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
-                    onSubmit: handleSubmit,
-                    style: {
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '16px'
-                    },
-                    children: [
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                    style: {
-                                        display: 'block',
-                                        fontSize: '0.8rem',
-                                        fontWeight: '600',
-                                        color: 'var(--text-secondary)',
-                                        marginBottom: '6px'
-                                    },
-                                    children: "NICKNAME"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 142,
-                                    columnNumber: 13
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                        lineNumber: 53,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "tab-control",
+                        style: {
+                            marginBottom: '22px'
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                type: "button",
+                                className: `tab-control-btn ${activeTab === 'create' ? 'active' : ''}`,
+                                onClick: ()=>setActiveTab('create'),
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$plus$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Plus$3e$__["Plus"], {
+                                        size: 15
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                        lineNumber: 79,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        children: "Create Room"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                        lineNumber: 80,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                lineNumber: 74,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                type: "button",
+                                className: `tab-control-btn ${activeTab === 'join' ? 'active' : ''}`,
+                                onClick: ()=>setActiveTab('join'),
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__["Users"], {
+                                        size: 15
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                        lineNumber: 87,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        children: "Join Room"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                        lineNumber: 88,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                lineNumber: 82,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                        lineNumber: 73,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                        onSubmit: handleSubmit,
+                        style: {
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px'
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        className: "section-label",
+                                        children: "Your Nickname"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                        lineNumber: 97,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        style: {
+                                            display: 'flex',
+                                            gap: '10px',
+                                            alignItems: 'center'
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "avatar",
+                                                style: {
+                                                    width: '44px',
+                                                    height: '44px',
+                                                    flexShrink: 0,
+                                                    background: nickname ? `hsl(${nickname.charCodeAt(0) * 37 % 360}, 65%, 50%)` : 'var(--bg-surface-3)',
+                                                    fontSize: '1.1rem',
+                                                    transition: 'background var(--transition-base)',
+                                                    boxShadow: nickname ? '0 2px 8px rgba(0,0,0,0.4)' : 'none'
+                                                },
+                                                children: getAvatarLetter(nickname)
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                                lineNumber: 100,
+                                                columnNumber: 15
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                type: "text",
+                                                className: "input-field",
+                                                placeholder: "e.g. Sumanth",
+                                                value: nickname,
+                                                onChange: (e)=>setNickname(e.target.value),
+                                                maxLength: 20,
+                                                required: true,
+                                                autoFocus: true
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                                lineNumber: 114,
+                                                columnNumber: 15
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                        lineNumber: 98,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                lineNumber: 96,
+                                columnNumber: 11
+                            }, this),
+                            activeTab === 'join' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        className: "section-label",
+                                        children: "Room Code"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                        lineNumber: 130,
+                                        columnNumber: 15
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                        type: "text",
+                                        className: "input-field",
+                                        placeholder: "e.g. TOG-X7HF",
+                                        value: roomId,
+                                        onChange: (e)=>setRoomId(e.target.value.toUpperCase()),
+                                        style: {
+                                            letterSpacing: '0.1em',
+                                            fontFamily: "'Outfit', monospace",
+                                            fontWeight: '700',
+                                            fontSize: '1rem'
+                                        },
+                                        required: true
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                        lineNumber: 131,
+                                        columnNumber: 15
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                lineNumber: 129,
+                                columnNumber: 13
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                type: "submit",
+                                className: "btn btn-primary",
+                                disabled: loading,
+                                style: {
+                                    width: '100%',
+                                    marginTop: '4px',
+                                    minHeight: '48px',
+                                    fontSize: '0.95rem',
+                                    borderRadius: 'var(--radius-md)'
+                                },
+                                children: loading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                     style: {
                                         display: 'flex',
-                                        gap: '10px',
-                                        alignItems: 'center'
+                                        alignItems: 'center',
+                                        gap: '8px'
                                     },
                                     children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
+                                            width: "16",
+                                            height: "16",
+                                            viewBox: "0 0 24 24",
+                                            fill: "none",
+                                            stroke: "currentColor",
+                                            strokeWidth: "2.5",
+                                            strokeLinecap: "round",
                                             style: {
-                                                width: '42px',
-                                                height: '42px',
-                                                borderRadius: 'var(--radius-md)',
-                                                background: 'var(--accent-primary)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontWeight: '700',
-                                                color: '#fff',
-                                                fontSize: '1.1rem',
-                                                flexShrink: 0
+                                                animation: 'spin 1s linear infinite'
                                             },
-                                            children: getAvatarLetter(nickname)
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+                                                d: "M21 12a9 9 0 1 1-6.219-8.56"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                                lineNumber: 153,
+                                                columnNumber: 19
+                                            }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                            lineNumber: 146,
-                                            columnNumber: 15
+                                            lineNumber: 152,
+                                            columnNumber: 17
                                         }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                            type: "text",
-                                            className: "input-field",
-                                            placeholder: "Enter your nickname",
-                                            value: nickname,
-                                            onChange: (e)=>setNickname(e.target.value),
-                                            maxLength: 20,
-                                            required: true
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                            lineNumber: 163,
-                                            columnNumber: 15
-                                        }, this)
+                                        retrying ? 'Retrying...' : 'Connecting...'
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 145,
-                                    columnNumber: 13
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 141,
-                            columnNumber: 11
-                        }, this),
-                        activeTab === 'join' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                    style: {
-                                        display: 'block',
-                                        fontSize: '0.8rem',
-                                        fontWeight: '600',
-                                        color: 'var(--text-secondary)',
-                                        marginBottom: '6px'
-                                    },
-                                    children: "ROOM CODE"
+                                    lineNumber: 151,
+                                    columnNumber: 15
+                                }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                            children: activeTab === 'create' ? 'Create Room' : 'Join Room'
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                            lineNumber: 159,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$arrow$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ArrowRight$3e$__["ArrowRight"], {
+                                            size: 16
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                            lineNumber: 160,
+                                            columnNumber: 17
+                                        }, this)
+                                    ]
+                                }, void 0, true)
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                lineNumber: 144,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                        lineNumber: 93,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        style: {
+                            marginTop: '24px',
+                            paddingTop: '20px',
+                            borderTop: '1px solid var(--border-subtle)',
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr 1fr',
+                            gap: '12px',
+                            textAlign: 'center'
+                        },
+                        children: [
+                            {
+                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$zap$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Zap$3e$__["Zap"], {
+                                    size: 16,
+                                    color: "var(--accent-primary)"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                    lineNumber: 177,
+                                    columnNumber: 21
+                                }, this),
+                                label: 'Frame-perfect Sync'
+                            },
+                            {
+                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shield$2d$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShieldCheck$3e$__["ShieldCheck"], {
+                                    size: 16,
+                                    color: "var(--accent-amber)"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
                                     lineNumber: 178,
-                                    columnNumber: 15
+                                    columnNumber: 21
                                 }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                    type: "text",
-                                    className: "input-field",
-                                    placeholder: "e.g. TOG-4829",
-                                    value: roomId,
-                                    onChange: (e)=>setRoomId(e.target.value.toUpperCase()),
-                                    style: {
-                                        letterSpacing: '0.05em',
-                                        fontWeight: '600',
-                                        textTransform: 'uppercase'
-                                    },
-                                    required: true
+                                label: 'Host Controls'
+                            },
+                            {
+                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$smile$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Smile$3e$__["Smile"], {
+                                    size: 16,
+                                    color: "var(--accent-emerald)"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 181,
-                                    columnNumber: 15
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 177,
-                            columnNumber: 13
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                            type: "submit",
-                            className: "btn btn-primary",
-                            disabled: loading,
-                            style: {
-                                width: '100%',
-                                marginTop: '4px',
-                                minHeight: '44px',
-                                fontSize: '0.9rem'
-                            },
-                            children: loading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                children: retrying ? '⏳ Retrying...' : 'Connecting...'
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                lineNumber: 201,
-                                columnNumber: 15
-                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                    lineNumber: 179,
+                                    columnNumber: 21
+                                }, this),
+                                label: 'Live Reactions'
+                            }
+                        ].map(({ icon, label })=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                },
                                 children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        children: activeTab === 'create' ? 'Create Room' : 'Join Room'
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        style: {
+                                            width: '34px',
+                                            height: '34px',
+                                            borderRadius: 'var(--radius-md)',
+                                            background: 'var(--bg-surface-2)',
+                                            border: '1px solid var(--border-subtle)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        },
+                                        children: icon
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                        lineNumber: 204,
-                                        columnNumber: 17
+                                        lineNumber: 182,
+                                        columnNumber: 15
                                     }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$arrow$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ArrowRight$3e$__["ArrowRight"], {
-                                        size: 16
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        style: {
+                                            fontSize: '0.7rem',
+                                            color: 'var(--text-secondary)',
+                                            lineHeight: 1.3
+                                        },
+                                        children: label
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                        lineNumber: 205,
-                                        columnNumber: 17
+                                        lineNumber: 189,
+                                        columnNumber: 15
                                     }, this)
                                 ]
-                            }, void 0, true)
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 194,
-                            columnNumber: 11
-                        }, this)
-                    ]
-                }, void 0, true, {
-                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                    lineNumber: 139,
-                    columnNumber: 9
-                }, this),
-                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    style: {
-                        marginTop: '24px',
-                        paddingTop: '16px',
-                        borderTop: '1px solid var(--border-subtle)',
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr 1fr',
-                        gap: '8px',
-                        textAlign: 'center'
-                    },
-                    children: [
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            style: {
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px'
-                            },
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$zap$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Zap$3e$__["Zap"], {
-                                    size: 16,
-                                    color: "var(--accent-secondary)"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 224,
-                                    columnNumber: 13
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                    style: {
-                                        fontSize: '0.72rem',
-                                        color: 'var(--text-secondary)'
-                                    },
-                                    children: "Synced Video"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 225,
-                                    columnNumber: 13
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 223,
-                            columnNumber: 11
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            style: {
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px'
-                            },
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shield$2d$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShieldCheck$3e$__["ShieldCheck"], {
-                                    size: 16,
-                                    color: "var(--status-warning)"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 228,
-                                    columnNumber: 13
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                    style: {
-                                        fontSize: '0.72rem',
-                                        color: 'var(--text-secondary)'
-                                    },
-                                    children: "Host Controls"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 229,
-                                    columnNumber: 13
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 227,
-                            columnNumber: 11
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            style: {
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px'
-                            },
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$smile$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Smile$3e$__["Smile"], {
-                                    size: 16,
-                                    color: "var(--status-success)"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 232,
-                                    columnNumber: 13
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                    style: {
-                                        fontSize: '0.72rem',
-                                        color: 'var(--text-secondary)'
-                                    },
-                                    children: "Live Reactions"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 233,
-                                    columnNumber: 13
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 231,
-                            columnNumber: 11
-                        }, this)
-                    ]
-                }, void 0, true, {
-                    fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                    lineNumber: 212,
-                    columnNumber: 9
-                }, this)
-            ]
-        }, void 0, true, {
-            fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-            lineNumber: 65,
-            columnNumber: 7
-        }, this)
-    }, void 0, false, {
+                            }, label, true, {
+                                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                                lineNumber: 181,
+                                columnNumber: 13
+                            }, this))
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                        lineNumber: 167,
+                        columnNumber: 9
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                lineNumber: 50,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("style", {
+                children: `@keyframes spin { to { transform: rotate(360deg); } }`
+            }, void 0, false, {
+                fileName: "[project]/src/components/room/JoinRoomModal.jsx",
+                lineNumber: 196,
+                columnNumber: 7
+            }, this)
+        ]
+    }, void 0, true, {
         fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-        lineNumber: 56,
+        lineNumber: 49,
         columnNumber: 5
     }, this);
 }
@@ -767,7 +882,7 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$tv$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Tv$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/tv.js [app-client] (ecmascript) <export default as Tv>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$monitor$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Monitor$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/monitor.js [app-client] (ecmascript) <export default as Monitor>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/users.js [app-client] (ecmascript) <export default as Users>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$copy$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Copy$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/copy.js [app-client] (ecmascript) <export default as Copy>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/check.js [app-client] (ecmascript) <export default as Check>");
@@ -794,63 +909,74 @@ function RoomHeader({ roomId, memberCount, isHost, onLeaveRoom }) {
         setTimeout(()=>setCopiedLink(false), 2000);
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("header", {
-        className: "panel",
         style: {
-            padding: '12px 18px',
-            marginBottom: '16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px',
-            flexWrap: 'wrap'
+            gap: '10px',
+            padding: '10px 16px',
+            marginBottom: '14px',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            flexWrap: 'wrap',
+            position: 'sticky',
+            top: '8px',
+            zIndex: 100,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)'
         },
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px'
+                    gap: '9px'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
-                            width: '34px',
-                            height: '34px',
-                            borderRadius: 'var(--radius-sm)',
-                            background: 'var(--accent-primary)',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '9px',
+                            background: 'linear-gradient(135deg, #6366f1, #818cf8)',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 8px rgba(99,102,241,0.35)',
+                            flexShrink: 0
                         },
-                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$tv$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Tv$3e$__["Tv"], {
-                            size: 18,
-                            color: "#ffffff"
+                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$monitor$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Monitor$3e$__["Monitor"], {
+                            size: 16,
+                            color: "#fff"
                         }, void 0, false, {
                             fileName: "[project]/src/components/room/RoomHeader.jsx",
-                            lineNumber: 47,
+                            lineNumber: 48,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/room/RoomHeader.jsx",
-                        lineNumber: 36,
+                        lineNumber: 41,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         style: {
-                            fontSize: '1.15rem',
-                            fontWeight: '700',
-                            color: '#ffffff'
+                            fontSize: '1.05rem',
+                            fontWeight: '800',
+                            color: '#fff',
+                            fontFamily: "'Outfit', sans-serif",
+                            letterSpacing: '-0.02em'
                         },
                         children: "Together"
                     }, void 0, false, {
                         fileName: "[project]/src/components/room/RoomHeader.jsx",
-                        lineNumber: 49,
+                        lineNumber: 50,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                lineNumber: 35,
+                lineNumber: 40,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -863,91 +989,107 @@ function RoomHeader({ roomId, memberCount, isHost, onLeaveRoom }) {
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         onClick: handleCopyCode,
-                        className: "badge badge-room",
-                        title: "Click to copy Room Code",
+                        title: "Click to copy room code",
                         style: {
-                            padding: '5px 12px',
-                            fontSize: '0.8rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '5px 10px',
+                            background: 'var(--accent-primary-dim)',
+                            border: '1px solid rgba(99,102,241,0.25)',
+                            borderRadius: 'var(--radius-full)',
                             cursor: 'pointer',
-                            border: '1px solid var(--border-subtle)',
-                            background: 'var(--bg-input)',
-                            color: 'var(--text-primary)',
-                            transition: 'border-color var(--transition-fast)'
+                            color: '#a5b4fc',
+                            fontSize: '0.8rem',
+                            fontWeight: '700',
+                            fontFamily: "'Outfit', monospace",
+                            letterSpacing: '0.07em',
+                            transition: 'all var(--transition-fast)'
+                        },
+                        onMouseEnter: (e)=>{
+                            e.currentTarget.style.background = 'rgba(99,102,241,0.22)';
+                        },
+                        onMouseLeave: (e)=>{
+                            e.currentTarget.style.background = 'var(--accent-primary-dim)';
                         },
                         children: [
                             copiedCode ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
-                                size: 13,
-                                color: "#10b981"
+                                size: 12,
+                                color: "var(--status-success)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 71,
+                                lineNumber: 79,
                                 columnNumber: 25
                             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$copy$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Copy$3e$__["Copy"], {
-                                size: 13
+                                size: 12
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 71,
-                                columnNumber: 63
+                                lineNumber: 79,
+                                columnNumber: 77
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: roomId
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 72,
+                                lineNumber: 80,
                                 columnNumber: 11
                             }, this),
                             copiedCode && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 style: {
-                                    color: '#10b981',
-                                    fontSize: '0.7rem'
+                                    color: 'var(--status-success)',
+                                    fontSize: '0.68rem',
+                                    fontFamily: "'Inter', sans-serif",
+                                    letterSpacing: 0
                                 },
-                                children: "Copied"
+                                children: "Copied!"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 73,
+                                lineNumber: 81,
                                 columnNumber: 26
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/room/RoomHeader.jsx",
-                        lineNumber: 57,
+                        lineNumber: 59,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         onClick: handleCopyShareLink,
                         className: "btn btn-secondary",
+                        title: "Share invite link",
                         style: {
-                            minHeight: '30px',
+                            minHeight: '32px',
                             padding: '0 10px',
-                            fontSize: '0.78rem'
+                            fontSize: '0.78rem',
+                            borderRadius: 'var(--radius-full)'
                         },
-                        title: "Copy direct invite link to share with friends",
                         children: [
                             copiedLink ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
-                                size: 13,
-                                color: "#10b981"
+                                size: 12,
+                                color: "var(--status-success)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 83,
+                                lineNumber: 91,
                                 columnNumber: 25
                             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$share$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Share2$3e$__["Share2"], {
-                                size: 13
+                                size: 12
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 83,
-                                columnNumber: 63
+                                lineNumber: 91,
+                                columnNumber: 77
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                children: copiedLink ? 'Link Copied!' : 'Share Link'
+                                className: "hide-on-small",
+                                children: copiedLink ? 'Copied!' : 'Share'
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 84,
+                                lineNumber: 92,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/room/RoomHeader.jsx",
-                        lineNumber: 77,
+                        lineNumber: 85,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -955,15 +1097,17 @@ function RoomHeader({ roomId, memberCount, isHost, onLeaveRoom }) {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            background: 'var(--bg-input)',
                             padding: '5px 10px',
+                            background: 'rgba(16,185,129,0.08)',
+                            border: '1px solid rgba(16,185,129,0.18)',
                             borderRadius: 'var(--radius-full)',
-                            border: '1px solid var(--border-subtle)',
                             fontSize: '0.78rem',
-                            color: 'var(--text-secondary)'
+                            color: 'var(--status-success)',
+                            fontWeight: '600'
                         },
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "pulse-dot",
                                 style: {
                                     width: '6px',
                                     height: '6px',
@@ -972,85 +1116,91 @@ function RoomHeader({ roomId, memberCount, isHost, onLeaveRoom }) {
                                 }
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 101,
+                                lineNumber: 106,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__["Users"], {
-                                size: 13
+                                size: 12
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 102,
+                                lineNumber: 107,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                style: {
-                                    fontWeight: '600',
-                                    color: 'var(--text-primary)'
-                                },
                                 children: memberCount
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 103,
+                                lineNumber: 108,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/room/RoomHeader.jsx",
-                        lineNumber: 88,
+                        lineNumber: 96,
                         columnNumber: 9
                     }, this),
                     isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         className: "badge badge-host",
+                        style: {
+                            gap: '4px'
+                        },
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$crown$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Crown$3e$__["Crown"], {
-                                size: 13
+                                size: 11
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                                lineNumber: 109,
+                                lineNumber: 114,
                                 columnNumber: 13
                             }, this),
-                            " Host"
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                children: "Host"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/room/RoomHeader.jsx",
+                                lineNumber: 115,
+                                columnNumber: 13
+                            }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/room/RoomHeader.jsx",
-                        lineNumber: 108,
+                        lineNumber: 113,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                lineNumber: 55,
+                lineNumber: 56,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                 onClick: onLeaveRoom,
-                className: "btn btn-ghost",
+                className: "btn btn-danger",
                 style: {
-                    minHeight: '34px',
-                    padding: '0 10px',
+                    minHeight: '32px',
+                    padding: '0 12px',
                     fontSize: '0.8rem',
-                    color: '#ef4444'
+                    borderRadius: 'var(--radius-full)'
                 },
                 title: "Leave room",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$log$2d$out$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LogOut$3e$__["LogOut"], {
-                        size: 15
+                        size: 14
                     }, void 0, false, {
                         fileName: "[project]/src/components/room/RoomHeader.jsx",
-                        lineNumber: 121,
+                        lineNumber: 127,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        className: "hide-on-small",
                         children: "Leave"
                     }, void 0, false, {
                         fileName: "[project]/src/components/room/RoomHeader.jsx",
-                        lineNumber: 122,
+                        lineNumber: 128,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/room/RoomHeader.jsx",
-                lineNumber: 115,
+                lineNumber: 121,
                 columnNumber: 7
             }, this)
         ]
@@ -1082,7 +1232,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$re
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$lock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Lock$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/lock.js [app-client] (ecmascript) <export default as Lock>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$unlock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Unlock$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/unlock.js [app-client] (ecmascript) <export default as Unlock>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2d$circle$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CheckCircle2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/check-circle-2.js [app-client] (ecmascript) <export default as CheckCircle2>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$radio$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Radio$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/radio.js [app-client] (ecmascript) <export default as Radio>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$signal$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Signal$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/signal.js [app-client] (ecmascript) <export default as Signal>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Volume2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/volume-2.js [app-client] (ecmascript) <export default as Volume2>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__VolumeX$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/volume-x.js [app-client] (ecmascript) <export default as VolumeX>");
 ;
@@ -1100,7 +1250,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
     const [volume, setVolume] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(100);
     const [isMuted, setIsMuted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const isSelfSyncing = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(0);
-    // Helper to extract YouTube video ID from various URL formats
+    const hasJoinSyncedRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(false);
     const extractVideoId = (input)=>{
         if (!input) return 'dQw4w9WgXcQ';
         const cleanInput = input.trim();
@@ -1129,7 +1279,8 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                             origin: window.location.origin,
                             widget_referrer: window.location.origin,
                             modestbranding: 1,
-                            rel: 0
+                            rel: 0,
+                            iv_load_policy: 3
                         },
                         events: {
                             onReady: {
@@ -1143,17 +1294,15 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                     const player = event.target;
                                     const state = event.data;
                                     const nowTime = player.getCurrentTime();
-                                    // Always update local UI state immediately, regardless of control permissions!
+                                    // Always update local playing state for the overlay
                                     if (state === window.YT.PlayerState.PLAYING) {
                                         setLocalPlaying(true);
                                     } else if (state === window.YT.PlayerState.PAUSED) {
                                         setLocalPlaying(false);
                                     }
-                                    // Ignore state changes if a sync/seek occurred in the last 1500ms
-                                    if (Date.now() - isSelfSyncing.current < 1500) {
-                                        return;
-                                    }
-                                    // Only user with control triggers sync broadcasts
+                                    // Skip if we triggered this state change ourselves
+                                    if (Date.now() - isSelfSyncing.current < 1500) return;
+                                    // Only broadcast if user has control
                                     if (!isHost && !hasControl) return;
                                     if (state === window.YT.PlayerState.PLAYING) {
                                         onPlaybackChange({
@@ -1204,7 +1353,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
             })["YouTubePlayer.useEffect"];
         }
     }["YouTubePlayer.useEffect"], []);
-    // Update video when youtubeId changes — auto-play immediately after loading
+    // Update video when youtubeId changes — auto-play immediately
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "YouTubePlayer.useEffect": ()=>{
             if (isPlayerReady && playerRef.current) {
@@ -1212,7 +1361,6 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                 const targetId = extractVideoId(youtubeId);
                 if (currentIdInPlayer !== targetId && targetId) {
                     isSelfSyncing.current = Date.now();
-                    // loadVideoById auto-plays the video; seekTo beginning
                     playerRef.current.loadVideoById({
                         videoId: targetId,
                         startSeconds: playback?.currentTime || 0
@@ -1224,25 +1372,22 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
         youtubeId,
         isPlayerReady
     ]);
-    // ONE-SHOT join sync: when player becomes ready, seek to where the room is
-    const hasJoinSyncedRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(false);
+    // ONE-SHOT join sync: seek to live position when player first becomes ready
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "YouTubePlayer.useEffect": ()=>{
             if (!isPlayerReady || !playerRef.current || !playback || hasJoinSyncedRef.current) return;
             hasJoinSyncedRef.current = true;
-            const player = playerRef.current;
             const targetTime = playback.currentTime;
             if (targetTime > 2) {
                 isSelfSyncing.current = Date.now();
-                player.seekTo(targetTime, true);
+                playerRef.current.seekTo(targetTime, true);
             }
-        // Don't auto-play here; let the browser-block overlay handle it gracefully
         }
     }["YouTubePlayer.useEffect"], [
         isPlayerReady,
         playback
     ]);
-    // ONGOING peer sync: handle playback_synced events pushed from server
+    // ONGOING peer sync: apply playback_synced events from server
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "YouTubePlayer.useEffect": ()=>{
             if (!syncedPlaybackEvent || !isPlayerReady || !playerRef.current) return;
@@ -1253,34 +1398,25 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
             const targetTime = serverPlayback.currentTime;
             const drift = Math.abs(localTime - targetTime);
             isSelfSyncing.current = Date.now();
-            // Seek if drifted more than 2 seconds
-            if (drift > 2) {
-                player.seekTo(targetTime, true);
-            }
+            if (drift > 2) player.seekTo(targetTime, true);
             if (serverPlayback.isPlaying) {
-                if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) {
-                    player.playVideo();
-                }
+                if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) player.playVideo();
             } else {
-                if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) {
-                    player.pauseVideo();
-                }
+                if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) player.pauseVideo();
             }
         }
     }["YouTubePlayer.useEffect"], [
         syncedPlaybackEvent,
         isPlayerReady
     ]);
-    // Progress Bar Time Update Loop
+    // Progress ticker
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "YouTubePlayer.useEffect": ()=>{
             const timer = setInterval({
                 "YouTubePlayer.useEffect.timer": ()=>{
                     if (playerRef.current && playerRef.current.getCurrentTime) {
                         setCurrentTime(playerRef.current.getCurrentTime() || 0);
-                        if (playerRef.current.getDuration) {
-                            setDuration(playerRef.current.getDuration() || 0);
-                        }
+                        if (playerRef.current.getDuration) setDuration(playerRef.current.getDuration() || 0);
                     }
                 }
             }["YouTubePlayer.useEffect.timer"], 500);
@@ -1296,12 +1432,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
     };
     const handleManualPlayPause = ()=>{
         if (!playerRef.current || !isHost && !hasControl) return;
-        const player = playerRef.current;
-        if (localPlaying) {
-            player.pauseVideo();
-        } else {
-            player.playVideo();
-        }
+        localPlaying ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
     };
     const handleSeekChange = (e)=>{
         const newTime = parseFloat(e.target.value);
@@ -1336,6 +1467,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
             setIsMuted(true);
         }
     };
+    const progressPercent = duration > 0 ? currentTime / duration * 100 : 0;
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         style: {
             position: 'relative',
@@ -1350,10 +1482,11 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                     position: 'relative',
                     width: '100%',
                     paddingTop: '56.25%',
-                    background: '#000000',
+                    background: '#000',
                     borderRadius: 'var(--radius-lg)',
                     overflow: 'hidden',
-                    border: '1px solid var(--border-subtle)'
+                    border: '1px solid var(--border-subtle)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.6)'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1367,61 +1500,51 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 256,
+                        lineNumber: 232,
                         columnNumber: 9
                     }, this),
                     !isHost && !hasControl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
                             position: 'absolute',
-                            top: '12px',
-                            right: '12px',
+                            top: '10px',
+                            right: '10px',
                             zIndex: 10,
-                            background: '#121620',
-                            border: '1px solid var(--border-subtle)',
-                            padding: '5px 12px',
-                            borderRadius: 'var(--radius-full)',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '0.75rem',
-                            color: 'var(--status-warning)',
+                            gap: '5px',
+                            background: 'rgba(0,0,0,0.7)',
+                            backdropFilter: 'blur(8px)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            padding: '4px 10px',
+                            borderRadius: 'var(--radius-full)',
+                            fontSize: '0.72rem',
+                            color: 'var(--accent-amber)',
                             fontWeight: '600'
                         },
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$lock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Lock$3e$__["Lock"], {
-                                size: 12,
-                                color: "var(--status-warning)"
+                                size: 11,
+                                color: "var(--accent-amber)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 281,
+                                lineNumber: 247,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                children: "Host Controls Playback"
+                                children: "Host Controls"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 282,
+                                lineNumber: 248,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 263,
+                        lineNumber: 239,
                         columnNumber: 11
                     }, this),
                     isPlayerReady && playback?.isPlaying && !localPlaying && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        style: {
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'rgba(9, 11, 16, 0.7)',
-                            backdropFilter: 'blur(4px)',
-                            zIndex: 20,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#fff'
-                        },
+                        className: "player-overlay",
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                 onClick: ()=>{
@@ -1433,64 +1556,65 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 },
                                 className: "btn btn-primary",
                                 style: {
-                                    padding: '12px 24px',
+                                    padding: '12px 28px',
                                     fontSize: '1rem',
                                     borderRadius: 'var(--radius-full)',
-                                    boxShadow: '0 4px 12px rgba(88, 80, 236, 0.3)'
+                                    boxShadow: '0 4px 24px rgba(99,102,241,0.5)'
                                 },
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$play$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Play$3e$__["Play"], {
                                         size: 20
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 313,
+                                        lineNumber: 270,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        children: "Click to Sync & Unmute"
+                                        children: "Sync & Unmute"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 314,
+                                        lineNumber: 271,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 302,
+                                lineNumber: 255,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 style: {
-                                    marginTop: '12px',
-                                    fontSize: '0.8rem',
-                                    color: 'var(--text-secondary)'
+                                    fontSize: '0.78rem',
+                                    color: 'var(--text-secondary)',
+                                    textAlign: 'center'
                                 },
-                                children: "Browser blocked autoplay. Click to resume."
+                                children: "Browser blocked autoplay. Click to join the stream."
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 316,
+                                lineNumber: 273,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 288,
+                        lineNumber: 254,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                lineNumber: 244,
+                lineNumber: 219,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "panel",
                 style: {
-                    marginTop: '12px',
-                    padding: '14px 16px',
+                    marginTop: '10px',
+                    padding: '12px 14px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '10px'
+                    gap: '10px',
+                    background: 'var(--bg-surface)'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1502,53 +1626,98 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 style: {
-                                    fontSize: '0.75rem',
-                                    color: 'var(--text-secondary)',
-                                    minWidth: '40px'
+                                    fontSize: '0.72rem',
+                                    color: 'var(--text-tertiary)',
+                                    minWidth: '38px',
+                                    fontVariantNumeric: 'tabular-nums'
                                 },
                                 children: formatTime(currentTime)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 327,
+                                lineNumber: 291,
                                 columnNumber: 11
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                type: "range",
-                                min: 0,
-                                max: duration || 100,
-                                step: 0.1,
-                                value: currentTime,
-                                onChange: handleSeekChange,
-                                disabled: !isHost && !hasControl,
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 style: {
                                     flex: 1,
-                                    height: '4px',
-                                    borderRadius: '2px',
-                                    accentColor: 'var(--accent-primary)',
-                                    cursor: isHost || hasControl ? 'pointer' : 'default'
-                                }
-                            }, void 0, false, {
+                                    position: 'relative',
+                                    height: '4px'
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        style: {
+                                            position: 'absolute',
+                                            inset: 0,
+                                            background: 'rgba(255,255,255,0.08)',
+                                            borderRadius: '2px'
+                                        }
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/player/YouTubePlayer.jsx",
+                                        lineNumber: 296,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        style: {
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            bottom: 0,
+                                            width: `${progressPercent}%`,
+                                            background: 'var(--accent-primary)',
+                                            borderRadius: '2px',
+                                            transition: 'width 0.5s linear',
+                                            boxShadow: '0 0 6px rgba(99,102,241,0.5)'
+                                        }
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/player/YouTubePlayer.jsx",
+                                        lineNumber: 302,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                        type: "range",
+                                        min: 0,
+                                        max: duration || 100,
+                                        step: 0.5,
+                                        value: currentTime,
+                                        onChange: handleSeekChange,
+                                        disabled: !isHost && !hasControl,
+                                        style: {
+                                            position: 'absolute',
+                                            inset: '-6px 0',
+                                            width: '100%',
+                                            opacity: 0,
+                                            cursor: isHost || hasControl ? 'pointer' : 'default',
+                                            height: '16px'
+                                        }
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/player/YouTubePlayer.jsx",
+                                        lineNumber: 311,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 330,
+                                lineNumber: 294,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 style: {
-                                    fontSize: '0.75rem',
-                                    color: 'var(--text-secondary)',
-                                    minWidth: '40px',
-                                    textAlign: 'right'
+                                    fontSize: '0.72rem',
+                                    color: 'var(--text-tertiary)',
+                                    minWidth: '38px',
+                                    textAlign: 'right',
+                                    fontVariantNumeric: 'tabular-nums'
                                 },
                                 children: formatTime(duration)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 346,
+                                lineNumber: 325,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 326,
+                        lineNumber: 290,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1556,100 +1725,103 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            flexWrap: 'wrap',
-                            gap: '12px'
+                            gap: '10px',
+                            flexWrap: 'wrap'
                         },
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 style: {
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '12px'
+                                    gap: '10px'
                                 },
                                 children: [
                                     isHost || hasControl ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                         className: "btn btn-primary",
                                         onClick: handleManualPlayPause,
                                         style: {
+                                            width: '36px',
+                                            height: '36px',
                                             borderRadius: 'var(--radius-full)',
-                                            width: '38px',
-                                            height: '38px',
-                                            padding: 0
+                                            padding: 0,
+                                            boxShadow: '0 2px 10px rgba(99,102,241,0.4)'
                                         },
+                                        title: localPlaying ? 'Pause' : 'Play',
                                         children: localPlaying ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$pause$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Pause$3e$__["Pause"], {
-                                            size: 16
+                                            size: 15
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 360,
+                                            lineNumber: 341,
                                             columnNumber: 33
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$play$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Play$3e$__["Play"], {
-                                            size: 16,
+                                            size: 15,
                                             style: {
-                                                marginLeft: '2px'
+                                                marginLeft: '1px'
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 360,
+                                            lineNumber: 341,
                                             columnNumber: 55
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 355,
+                                        lineNumber: 335,
                                         columnNumber: 15
                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                         className: "btn btn-secondary",
                                         onClick: onRequestControl,
                                         style: {
-                                            borderColor: 'rgba(245, 158, 11, 0.3)',
-                                            color: '#fbbf24',
-                                            minHeight: '38px',
-                                            fontSize: '0.8rem'
+                                            minHeight: '36px',
+                                            fontSize: '0.78rem',
+                                            borderColor: 'rgba(245,158,11,0.25)',
+                                            color: 'var(--accent-amber)',
+                                            background: 'rgba(245,158,11,0.06)'
                                         },
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$unlock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Unlock$3e$__["Unlock"], {
-                                                size: 14
+                                                size: 13
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 368,
+                                                lineNumber: 354,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "Request Control"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 369,
+                                                lineNumber: 355,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 363,
+                                        lineNumber: 344,
                                         columnNumber: 15
                                     }, this),
                                     (isHost || hasControl) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         className: "badge badge-control",
                                         style: {
-                                            fontSize: '0.65rem'
+                                            fontSize: '0.62rem'
                                         },
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2d$circle$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CheckCircle2$3e$__["CheckCircle2"], {
-                                                size: 10
+                                                size: 9
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 375,
+                                                lineNumber: 360,
                                                 columnNumber: 17
                                             }, this),
-                                            " Control Unlocked"
+                                            " Controlling"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 374,
+                                        lineNumber: 359,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 353,
+                                lineNumber: 333,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1664,29 +1836,30 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                         className: "btn btn-ghost",
                                         style: {
                                             padding: 0,
-                                            width: '32px',
-                                            height: '32px',
-                                            minHeight: '32px'
+                                            width: '30px',
+                                            height: '30px',
+                                            minHeight: '30px',
+                                            borderRadius: 'var(--radius-full)'
                                         },
                                         title: isMuted ? 'Unmute' : 'Mute',
                                         children: isMuted || volume === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__VolumeX$3e$__["VolumeX"], {
-                                            size: 16,
+                                            size: 15,
                                             color: "var(--status-danger)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 389,
-                                            columnNumber: 17
+                                            lineNumber: 374,
+                                            columnNumber: 19
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Volume2$3e$__["Volume2"], {
-                                            size: 16,
+                                            size: 15,
                                             color: "var(--text-secondary)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 391,
-                                            columnNumber: 17
+                                            lineNumber: 375,
+                                            columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 382,
+                                        lineNumber: 367,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1696,73 +1869,72 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                         value: isMuted ? 0 : volume,
                                         onChange: handleVolumeChange,
                                         style: {
-                                            width: '70px',
-                                            height: '4px',
+                                            width: '68px',
+                                            height: '3px',
                                             accentColor: 'var(--accent-primary)',
                                             cursor: 'pointer'
                                         }
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 394,
+                                        lineNumber: 377,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                         style: {
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '6px',
-                                            marginLeft: '6px',
-                                            fontSize: '0.75rem',
-                                            color: 'var(--text-secondary)'
+                                            gap: '5px',
+                                            fontSize: '0.72rem',
+                                            color: 'var(--text-tertiary)'
                                         },
                                         children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$radio$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Radio$3e$__["Radio"], {
-                                                size: 12,
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$signal$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Signal$3e$__["Signal"], {
+                                                size: 11,
                                                 color: "var(--status-success)"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 408,
+                                                lineNumber: 384,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                children: "Sync"
+                                                children: "Synced"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 409,
+                                                lineNumber: 385,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 407,
+                                        lineNumber: 383,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 381,
+                                lineNumber: 366,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 352,
+                        lineNumber: 331,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                lineNumber: 324,
+                lineNumber: 281,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-        lineNumber: 242,
+        lineNumber: 217,
         columnNumber: 5
     }, this);
 }
-_s(YouTubePlayer, "bMCz2zuL0R28SPqQAfwMVCidJyw=");
+_s(YouTubePlayer, "GqqowkzRODP9uuaDGwhCdapq2Sg=");
 _c = YouTubePlayer;
 var _c;
 __turbopack_context__.k.register(_c, "YouTubePlayer");
@@ -1786,7 +1958,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$re
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/check.js [app-client] (ecmascript) <export default as Check>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$share$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Share2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/share-2.js [app-client] (ecmascript) <export default as Share2>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$unlock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Unlock$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/unlock.js [app-client] (ecmascript) <export default as Unlock>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$radio$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Radio$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/radio.js [app-client] (ecmascript) <export default as Radio>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$signal$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Signal$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/signal.js [app-client] (ecmascript) <export default as Signal>");
 ;
 var _s = __turbopack_context__.k.signature();
 ;
@@ -1796,6 +1968,7 @@ function VideoDetailsCard({ currentVideo, roomState, currentSocketId, isHost, ha
     const [copiedCode, setCopiedCode] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [copiedLink, setCopiedLink] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const controller = roomState?.members?.find((m)=>m.hasControl || m.isHost);
+    const isPlaying = roomState?.playback?.isPlaying;
     const handleCopyCode = ()=>{
         navigator.clipboard.writeText(roomState?.roomId || '');
         setCopiedCode(true);
@@ -1810,17 +1983,19 @@ function VideoDetailsCard({ currentVideo, roomState, currentSocketId, isHost, ha
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "panel",
         style: {
-            marginTop: '16px',
-            padding: '18px 20px'
+            marginTop: '14px',
+            overflow: 'hidden'
         },
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
+                    padding: '14px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     gap: '12px',
-                    marginBottom: '16px'
+                    background: 'var(--bg-surface-2)'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1828,27 +2003,28 @@ function VideoDetailsCard({ currentVideo, roomState, currentSocketId, isHost, ha
                             display: 'flex',
                             alignItems: 'flex-start',
                             gap: '12px',
-                            flex: 1
+                            flex: 1,
+                            minWidth: 0
                         },
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 style: {
-                                    width: '42px',
-                                    height: '42px',
+                                    width: '38px',
+                                    height: '38px',
                                     borderRadius: 'var(--radius-md)',
-                                    background: 'var(--bg-input)',
-                                    border: '1px solid var(--border-subtle)',
+                                    background: 'rgba(99,102,241,0.1)',
+                                    border: '1px solid rgba(99,102,241,0.2)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     flexShrink: 0
                                 },
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$film$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Film$3e$__["Film"], {
-                                    size: 20,
+                                    size: 18,
                                     color: "var(--accent-primary)"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                    lineNumber: 48,
+                                    lineNumber: 40,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
@@ -1864,366 +2040,314 @@ function VideoDetailsCard({ currentVideo, roomState, currentSocketId, isHost, ha
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
                                         style: {
-                                            fontSize: '1.05rem',
+                                            fontSize: '0.95rem',
                                             fontWeight: '700',
                                             color: 'var(--text-primary)',
-                                            lineHeight: 1.3,
-                                            marginBottom: '4px',
-                                            whiteSpace: 'nowrap',
+                                            marginBottom: '3px',
                                             overflow: 'hidden',
-                                            textOverflow: 'ellipsis'
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
                                         },
-                                        children: currentVideo?.title || 'YouTube Video'
+                                        children: currentVideo?.title || 'No Video Loaded'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                        lineNumber: 51,
+                                        lineNumber: 44,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         style: {
-                                            fontSize: '0.75rem',
-                                            color: 'var(--text-secondary)',
+                                            fontSize: '0.7rem',
+                                            color: 'var(--text-tertiary)',
                                             fontFamily: 'monospace',
-                                            display: 'block'
+                                            display: 'block',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
                                         },
                                         children: [
                                             "ID: ",
-                                            currentVideo?.youtubeId || 'dQw4w9WgXcQ'
+                                            currentVideo?.youtubeId || '—'
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                        lineNumber: 65,
+                                        lineNumber: 52,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 50,
+                                lineNumber: 43,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                        lineNumber: 34,
+                        lineNumber: 33,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            background: 'rgba(16, 185, 129, 0.1)',
+                            gap: '5px',
+                            flexShrink: 0,
+                            background: isPlaying ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${isPlaying ? 'rgba(16,185,129,0.22)' : 'var(--border-subtle)'}`,
                             padding: '4px 10px',
                             borderRadius: 'var(--radius-full)',
-                            border: '1px solid rgba(16, 185, 129, 0.2)',
-                            fontSize: '0.72rem',
-                            fontWeight: '600',
-                            color: '#10b981',
-                            flexShrink: 0
+                            fontSize: '0.7rem',
+                            fontWeight: '700',
+                            color: isPlaying ? 'var(--status-success)' : 'var(--text-tertiary)',
+                            transition: 'all 0.3s ease'
                         },
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$radio$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Radio$3e$__["Radio"], {
-                                size: 12,
-                                color: "#10b981"
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$signal$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Signal$3e$__["Signal"], {
+                                size: 11
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 87,
+                                lineNumber: 68,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                className: "hide-on-small",
-                                children: "Live Synced"
+                                children: isPlaying ? 'Live' : 'Paused'
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 88,
+                                lineNumber: 69,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                        lineNumber: 72,
+                        lineNumber: 59,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                lineNumber: 33,
+                lineNumber: 27,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
+                    padding: '10px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
                     gap: '12px',
-                    padding: '12px 14px',
-                    background: 'var(--bg-input)',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-subtle)',
-                    marginBottom: '20px'
+                    flexWrap: 'wrap',
+                    background: 'rgba(0,0,0,0.15)'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
                             display: 'flex',
-                            flexDirection: 'column',
-                            gap: '4px'
+                            alignItems: 'center',
+                            gap: '6px',
+                            flex: 1
                         },
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                style: {
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '0.7rem',
-                                    fontWeight: '600',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em'
-                                },
-                                children: "Playback Controller"
+                            controller?.isHost ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$crown$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Crown$3e$__["Crown"], {
+                                size: 13,
+                                color: "var(--accent-amber)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 108,
-                                columnNumber: 11
+                                lineNumber: 83,
+                                columnNumber: 15
+                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"], {
+                                size: 13,
+                                color: "var(--accent-emerald)"
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
+                                lineNumber: 84,
+                                columnNumber: 15
                             }, this),
-                            controller ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 style: {
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px'
+                                    fontSize: '0.78rem',
+                                    color: 'var(--text-secondary)'
                                 },
                                 children: [
-                                    controller.isHost ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$crown$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Crown$3e$__["Crown"], {
-                                        size: 14,
-                                        color: "var(--accent-secondary)"
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        style: {
+                                            color: 'var(--text-primary)',
+                                            fontWeight: '700'
+                                        },
+                                        children: controller?.nickname || '—'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                        lineNumber: 111,
-                                        columnNumber: 36
-                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"], {
-                                        size: 14,
-                                        color: "var(--accent-primary)"
+                                        lineNumber: 86,
+                                        columnNumber: 13
+                                    }, this),
+                                    controller?.socketId === currentSocketId && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        style: {
+                                            color: 'var(--accent-primary)',
+                                            fontSize: '0.68rem'
+                                        },
+                                        children: " (you)"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                        lineNumber: 111,
-                                        columnNumber: 90
+                                        lineNumber: 87,
+                                        columnNumber: 58
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         style: {
-                                            fontSize: '0.85rem',
-                                            fontWeight: '600',
-                                            color: 'var(--text-primary)'
+                                            color: 'var(--text-tertiary)',
+                                            marginLeft: '4px'
                                         },
-                                        children: [
-                                            controller.nickname,
-                                            " ",
-                                            controller.socketId === currentSocketId ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                style: {
-                                                    color: 'var(--text-secondary)'
-                                                },
-                                                children: "(You)"
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                                lineNumber: 113,
-                                                columnNumber: 82
-                                            }, this) : ''
-                                        ]
-                                    }, void 0, true, {
+                                        children: "is controlling"
+                                    }, void 0, false, {
                                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                        lineNumber: 112,
-                                        columnNumber: 15
+                                        lineNumber: 88,
+                                        columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 110,
-                                columnNumber: 13
-                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                style: {
-                                    fontSize: '0.85rem',
-                                    fontWeight: '600',
-                                    color: 'var(--text-secondary)'
-                                },
-                                children: "None"
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 117,
-                                columnNumber: 13
+                                lineNumber: 85,
+                                columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                        lineNumber: 107,
+                        lineNumber: 81,
                         columnNumber: 9
                     }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        onClick: handleCopyCode,
                         style: {
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'flex-end',
-                            gap: '4px'
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'var(--accent-primary-dim)',
+                            border: '1px solid rgba(99,102,241,0.22)',
+                            borderRadius: 'var(--radius-full)',
+                            padding: '3px 10px',
+                            cursor: 'pointer',
+                            color: '#a5b4fc',
+                            fontSize: '0.76rem',
+                            fontWeight: '700',
+                            fontFamily: "'Outfit', monospace",
+                            letterSpacing: '0.06em',
+                            transition: 'all var(--transition-fast)'
                         },
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                style: {
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '0.7rem',
-                                    fontWeight: '600',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em'
-                                },
-                                children: "Room Code"
+                            copiedCode ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
+                                size: 11,
+                                color: "var(--status-success)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 123,
-                                columnNumber: 11
+                                lineNumber: 104,
+                                columnNumber: 25
+                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$copy$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Copy$3e$__["Copy"], {
+                                size: 11
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
+                                lineNumber: 104,
+                                columnNumber: 77
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                className: "badge badge-room",
-                                style: {
-                                    padding: '4px 10px',
-                                    fontSize: '0.8rem'
-                                },
                                 children: roomState?.roomId
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 124,
+                                lineNumber: 105,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                        lineNumber: 122,
+                        lineNumber: 93,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                lineNumber: 93,
+                lineNumber: 74,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
+                    padding: '12px 14px',
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                    gap: '10px'
+                    gridTemplateColumns: `repeat(auto-fit, minmax(120px, 1fr))`,
+                    gap: '8px'
                 },
                 children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        onClick: handleCopyCode,
-                        className: "btn btn-secondary",
-                        style: {
-                            minHeight: '40px',
-                            padding: '0 12px',
-                            fontSize: '0.85rem',
-                            width: '100%'
-                        },
-                        children: [
-                            copiedCode ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
-                                size: 16,
-                                color: "#10b981"
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 143,
-                                columnNumber: 25
-                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$copy$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Copy$3e$__["Copy"], {
-                                size: 16
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 143,
-                                columnNumber: 63
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                children: copiedCode ? 'Code Copied' : 'Copy Code'
-                            }, void 0, false, {
-                                fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 144,
-                                columnNumber: 11
-                            }, this)
-                        ]
-                    }, void 0, true, {
-                        fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                        lineNumber: 138,
-                        columnNumber: 9
-                    }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         onClick: handleCopyShareLink,
                         className: "btn btn-secondary",
                         style: {
-                            minHeight: '40px',
-                            padding: '0 12px',
-                            fontSize: '0.85rem',
-                            width: '100%'
+                            minHeight: '38px',
+                            fontSize: '0.82rem'
                         },
                         children: [
                             copiedLink ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
-                                size: 16,
-                                color: "#10b981"
+                                size: 14,
+                                color: "var(--status-success)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 152,
+                                lineNumber: 117,
                                 columnNumber: 25
                             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$share$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Share2$3e$__["Share2"], {
-                                size: 16
+                                size: 14
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 152,
-                                columnNumber: 63
+                                lineNumber: 117,
+                                columnNumber: 77
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                children: copiedLink ? 'Link Copied' : 'Share Link'
+                                children: copiedLink ? 'Copied!' : 'Share Link'
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 153,
+                                lineNumber: 118,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                        lineNumber: 147,
+                        lineNumber: 116,
                         columnNumber: 9
                     }, this),
                     !isHost && !hasControl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         onClick: onRequestControl,
                         className: "btn btn-secondary",
                         style: {
-                            minHeight: '40px',
-                            padding: '0 12px',
-                            fontSize: '0.85rem',
-                            width: '100%',
-                            background: 'rgba(245, 158, 11, 0.05)',
-                            borderColor: 'rgba(245, 158, 11, 0.3)',
-                            color: '#fbbf24'
+                            minHeight: '38px',
+                            fontSize: '0.82rem',
+                            background: 'rgba(245,158,11,0.06)',
+                            borderColor: 'rgba(245,158,11,0.22)',
+                            color: 'var(--accent-amber)'
                         },
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$unlock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Unlock$3e$__["Unlock"], {
-                                size: 16
+                                size: 14
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 170,
+                                lineNumber: 132,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: "Request Control"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                                lineNumber: 171,
+                                lineNumber: 133,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                        lineNumber: 157,
+                        lineNumber: 122,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-                lineNumber: 131,
+                lineNumber: 110,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/player/VideoDetailsCard.jsx",
-        lineNumber: 31,
+        lineNumber: 25,
         columnNumber: 5
     }, this);
 }
@@ -2246,9 +2370,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$play$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Play$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/play.js [app-client] (ecmascript) <export default as Play>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$youtube$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Youtube$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/youtube.js [app-client] (ecmascript) <export default as Youtube>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/check.js [app-client] (ecmascript) <export default as Check>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$film$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Film$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/film.js [app-client] (ecmascript) <export default as Film>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$radio$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Radio$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/radio.js [app-client] (ecmascript) <export default as Radio>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$loader$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Loader$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/loader.js [app-client] (ecmascript) <export default as Loader>");
 ;
 var _s = __turbopack_context__.k.signature();
 ;
@@ -2257,34 +2379,39 @@ const CATEGORIZED_PRESETS = [
     {
         id: 'jfKfPfyJRdk',
         title: 'Lofi Hip Hop Beats',
-        category: 'Music'
+        category: 'Music',
+        emoji: '🎵'
     },
     {
         id: '4xDzrJKXOOY',
         title: 'Synthwave Chilled',
-        category: 'Music'
+        category: 'Music',
+        emoji: '🌆'
     },
     {
         id: 'BHACKCNDMW8',
         title: 'Deep Space Ambient 4K',
-        category: 'Ambient'
+        category: 'Ambient',
+        emoji: '🌌'
     },
     {
         id: '1nN_uA475YI',
         title: 'Tropical Beach Nature 4K',
-        category: 'Ambient'
+        category: 'Ambient',
+        emoji: '🌊'
     },
     {
         id: '5qap5aO4i9A',
         title: 'Lofi Girl - Chill Beats',
-        category: 'Music'
+        category: 'Music',
+        emoji: '☕'
     }
 ];
 function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) {
     _s();
     const [urlInput, setUrlInput] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('');
     const [activeCategory, setActiveCategory] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('All');
-    const [copiedPreset, setCopiedPreset] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [loadingPreset, setLoadingPreset] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const extractVideoId = (input)=>{
         if (!input) return '';
         const cleanInput = input.trim();
@@ -2307,27 +2434,30 @@ function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) {
         setUrlInput('');
     };
     const handleSelectPreset = (preset)=>{
-        setCopiedPreset(preset.id);
+        setLoadingPreset(preset.id);
         onChangeVideo({
             youtubeId: preset.id,
             title: preset.title
         });
-        setTimeout(()=>setCopiedPreset(null), 1500);
+        setTimeout(()=>setLoadingPreset(null), 1200);
     };
     const filteredPresets = activeCategory === 'All' ? CATEGORIZED_PRESETS : CATEGORIZED_PRESETS.filter((p)=>p.category === activeCategory);
+    const canControl = isHost || hasControl;
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "panel",
         style: {
-            marginTop: '16px',
-            padding: '16px 18px'
+            marginTop: '14px',
+            overflow: 'hidden'
         },
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    marginBottom: '12px'
+                    background: 'var(--bg-surface-2)'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2337,138 +2467,159 @@ function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) {
                             gap: '8px'
                         },
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$youtube$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Youtube$3e$__["Youtube"], {
-                                size: 18,
-                                color: "#ef4444"
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: 'rgba(239,68,68,0.1)',
+                                    border: '1px solid rgba(239,68,68,0.2)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                },
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$youtube$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Youtube$3e$__["Youtube"], {
+                                    size: 14,
+                                    color: "#ef4444"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/player/VideoQueue.jsx",
+                                    lineNumber: 64,
+                                    columnNumber: 13
+                                }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                lineNumber: 52,
+                                lineNumber: 59,
                                 columnNumber: 11
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 style: {
-                                    fontSize: '0.9rem',
+                                    fontSize: '0.88rem',
                                     fontWeight: '700'
                                 },
-                                children: "Load YouTube Video"
+                                children: "Load Video"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                lineNumber: 53,
+                                lineNumber: 66,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                        lineNumber: 51,
+                        lineNumber: 58,
                         columnNumber: 9
                     }, this),
-                    !isHost && !hasControl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                    !canControl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         style: {
-                            fontSize: '0.72rem',
-                            color: 'var(--text-secondary)'
+                            fontSize: '0.68rem',
+                            color: 'var(--text-tertiary)',
+                            background: 'var(--bg-input)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-full)',
+                            padding: '2px 8px'
                         },
-                        children: "Host Permission Required"
+                        children: "Host only"
                     }, void 0, false, {
                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                        lineNumber: 56,
+                        lineNumber: 69,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                lineNumber: 50,
+                lineNumber: 52,
                 columnNumber: 7
             }, this),
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
-                onSubmit: handleLoadVideo,
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
-                    display: 'flex',
-                    gap: '8px',
-                    marginBottom: '14px'
+                    padding: '14px 14px'
                 },
                 children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                        onSubmit: handleLoadVideo,
                         style: {
-                            position: 'relative',
-                            flex: 1
-                        },
-                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                            type: "text",
-                            className: "input-field",
-                            placeholder: "Paste YouTube Link or Video ID",
-                            value: urlInput,
-                            onChange: (e)=>setUrlInput(e.target.value),
-                            disabled: !isHost && !hasControl
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/player/VideoQueue.jsx",
-                            lineNumber: 63,
-                            columnNumber: 11
-                        }, this)
-                    }, void 0, false, {
-                        fileName: "[project]/src/components/player/VideoQueue.jsx",
-                        lineNumber: 62,
-                        columnNumber: 9
-                    }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        type: "submit",
-                        className: "btn btn-primary",
-                        disabled: !isHost && !hasControl || !urlInput.trim(),
-                        style: {
-                            minHeight: '44px'
+                            display: 'flex',
+                            gap: '8px',
+                            marginBottom: '14px'
                         },
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$play$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Play$3e$__["Play"], {
-                                size: 15
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                type: "text",
+                                className: "input-field",
+                                placeholder: "Paste YouTube URL or video ID…",
+                                value: urlInput,
+                                onChange: (e)=>setUrlInput(e.target.value),
+                                disabled: !canControl,
+                                style: {
+                                    fontSize: '0.875rem',
+                                    background: canControl ? 'var(--bg-input)' : 'rgba(255,255,255,0.02)'
+                                }
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                lineNumber: 78,
+                                lineNumber: 82,
                                 columnNumber: 11
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                children: "Load"
-                            }, void 0, false, {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                type: "submit",
+                                className: "btn btn-primary",
+                                disabled: !canControl || !urlInput.trim(),
+                                style: {
+                                    minHeight: '44px',
+                                    padding: '0 14px',
+                                    flexShrink: 0,
+                                    borderRadius: 'var(--radius-md)'
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$play$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Play$3e$__["Play"], {
+                                        size: 15
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/player/VideoQueue.jsx",
+                                        lineNumber: 97,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        children: "Load"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/player/VideoQueue.jsx",
+                                        lineNumber: 98,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                lineNumber: 79,
+                                lineNumber: 91,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                        lineNumber: 72,
+                        lineNumber: 81,
                         columnNumber: 9
-                    }, this)
-                ]
-            }, void 0, true, {
-                fileName: "[project]/src/components/player/VideoQueue.jsx",
-                lineNumber: 61,
-                columnNumber: 7
-            }, this),
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                children: [
+                    }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
+                            marginBottom: '10px',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginBottom: '8px'
+                            gap: '6px',
+                            flexWrap: 'wrap'
                         },
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                className: "section-label",
                                 style: {
-                                    fontSize: '0.72rem',
-                                    fontWeight: '600',
-                                    color: 'var(--text-secondary)'
+                                    marginBottom: 0
                                 },
-                                children: "DEMO PRESETS"
+                                children: "Presets"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                lineNumber: 86,
+                                lineNumber: 104,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 style: {
                                     display: 'flex',
-                                    gap: '4px'
+                                    gap: '4px',
+                                    marginLeft: 'auto'
                                 },
                                 children: [
                                     'All',
@@ -2479,29 +2630,30 @@ function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) {
                                         onClick: ()=>setActiveCategory(cat),
                                         style: {
                                             background: activeCategory === cat ? 'var(--accent-primary)' : 'transparent',
-                                            color: activeCategory === cat ? '#fff' : 'var(--text-secondary)',
-                                            border: 'none',
-                                            borderRadius: 'var(--radius-sm)',
-                                            padding: '2px 8px',
+                                            color: activeCategory === cat ? '#fff' : 'var(--text-tertiary)',
+                                            border: activeCategory === cat ? '1px solid transparent' : '1px solid var(--border-subtle)',
+                                            borderRadius: 'var(--radius-full)',
+                                            padding: '2px 10px',
                                             fontSize: '0.7rem',
                                             fontWeight: '600',
-                                            cursor: 'pointer'
+                                            cursor: 'pointer',
+                                            transition: 'all var(--transition-fast)'
                                         },
                                         children: cat
                                     }, cat, false, {
                                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                        lineNumber: 91,
+                                        lineNumber: 107,
                                         columnNumber: 15
                                     }, this))
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                lineNumber: 89,
+                                lineNumber: 105,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                        lineNumber: 85,
+                        lineNumber: 103,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2512,86 +2664,86 @@ function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) {
                         },
                         children: filteredPresets.map((preset)=>{
                             const isPlaying = currentVideo?.youtubeId === preset.id;
+                            const isLoading = loadingPreset === preset.id;
                             return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                 onClick: ()=>handleSelectPreset(preset),
-                                disabled: !isHost && !hasControl,
-                                className: "btn btn-secondary",
+                                disabled: !canControl,
+                                className: `preset-chip${isPlaying ? ' active' : ''}`,
                                 style: {
-                                    minHeight: '32px',
-                                    padding: '0 10px',
-                                    fontSize: '0.75rem',
-                                    borderRadius: 'var(--radius-full)',
-                                    borderColor: isPlaying ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                                    background: isPlaying ? 'rgba(88, 80, 236, 0.15)' : 'var(--bg-input)'
+                                    fontSize: '0.76rem'
                                 },
                                 children: [
-                                    copiedPreset === preset.id ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
-                                        size: 12,
-                                        color: "#10b981"
+                                    isLoading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$loader$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Loader$3e$__["Loader"], {
+                                        size: 11,
+                                        style: {
+                                            animation: 'spin 1s linear infinite'
+                                        }
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                        lineNumber: 133,
-                                        columnNumber: 19
-                                    }, this) : isPlaying ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$radio$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Radio$3e$__["Radio"], {
-                                        size: 12,
-                                        color: "var(--status-success)"
+                                        lineNumber: 143,
+                                        columnNumber: 30
+                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        style: {
+                                            fontSize: '0.75rem'
+                                        },
+                                        children: preset.emoji
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                        lineNumber: 135,
-                                        columnNumber: 19
-                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$film$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Film$3e$__["Film"], {
-                                        size: 12,
-                                        color: "var(--text-secondary)"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                        lineNumber: 137,
+                                        lineNumber: 144,
                                         columnNumber: 19
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: preset.title
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                        lineNumber: 139,
+                                        lineNumber: 146,
                                         columnNumber: 17
                                     }, this),
                                     isPlaying && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         style: {
-                                            fontSize: '0.65rem',
+                                            fontSize: '0.62rem',
                                             color: 'var(--status-success)',
                                             fontWeight: '700'
                                         },
-                                        children: "Playing"
+                                        children: "● LIVE"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                        lineNumber: 140,
+                                        lineNumber: 147,
                                         columnNumber: 31
                                     }, this)
                                 ]
                             }, preset.id, true, {
                                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                                lineNumber: 118,
+                                lineNumber: 136,
                                 columnNumber: 15
                             }, this);
                         })
                     }, void 0, false, {
                         fileName: "[project]/src/components/player/VideoQueue.jsx",
-                        lineNumber: 113,
+                        lineNumber: 130,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/VideoQueue.jsx",
-                lineNumber: 84,
+                lineNumber: 79,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("style", {
+                children: `@keyframes spin { to { transform: rotate(360deg); } }`
+            }, void 0, false, {
+                fileName: "[project]/src/components/player/VideoQueue.jsx",
+                lineNumber: 153,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/player/VideoQueue.jsx",
-        lineNumber: 48,
+        lineNumber: 50,
         columnNumber: 5
     }, this);
 }
-_s(VideoQueue, "MX1EsZpXzDurmf21fwSn1HVL+r8=");
+_s(VideoQueue, "fvCL2PTOw0n2/ljSetzBUlS2k6I=");
 _c = VideoQueue;
 var _c;
 __turbopack_context__.k.register(_c, "VideoQueue");
@@ -2608,31 +2760,31 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/users.js [app-client] (ecmascript) <export default as Users>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$crown$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Crown$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/crown.js [app-client] (ecmascript) <export default as Crown>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/key.js [app-client] (ecmascript) <export default as Key>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/check.js [app-client] (ecmascript) <export default as Check>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/x.js [app-client] (ecmascript) <export default as X>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$user$2d$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__UserCheck$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/user-check.js [app-client] (ecmascript) <export default as UserCheck>");
 ;
 ;
 ;
 function MemberList({ members = [], currentSocketId, isHost, onGrantControl, onRevokeControl }) {
-    const getAvatarLetter = (name)=>{
-        return name ? name.trim().charAt(0).toUpperCase() : '?';
-    };
+    const getAvatarLetter = (name)=>name ? name.trim().charAt(0).toUpperCase() : '?';
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "panel",
         style: {
-            marginTop: '16px',
-            padding: '16px 18px'
+            marginTop: '14px',
+            overflow: 'hidden'
         },
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    marginBottom: '12px'
+                    background: 'var(--bg-surface-2)'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2642,260 +2794,257 @@ function MemberList({ members = [], currentSocketId, isHost, onGrantControl, onR
                             gap: '8px'
                         },
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$users$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Users$3e$__["Users"], {
-                                size: 16,
-                                color: "var(--accent-secondary)"
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: 'rgba(6,182,212,0.1)',
+                                    border: '1px solid rgba(6,182,212,0.2)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                },
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$user$2d$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__UserCheck$3e$__["UserCheck"], {
+                                    size: 14,
+                                    color: "var(--accent-cyan)"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/room/MemberList.jsx",
+                                    lineNumber: 22,
+                                    columnNumber: 13
+                                }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/MemberList.jsx",
-                                lineNumber: 19,
+                                lineNumber: 17,
                                 columnNumber: 11
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 style: {
-                                    fontSize: '0.9rem',
+                                    fontSize: '0.88rem',
                                     fontWeight: '700'
                                 },
-                                children: "Room Guests"
+                                children: "Watching Together"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/MemberList.jsx",
-                                lineNumber: 20,
+                                lineNumber: 24,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/room/MemberList.jsx",
-                        lineNumber: 18,
+                        lineNumber: 16,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         style: {
-                            fontSize: '0.75rem',
-                            color: 'var(--text-secondary)'
+                            fontSize: '0.68rem',
+                            fontWeight: '600',
+                            padding: '2px 8px',
+                            borderRadius: 'var(--radius-full)',
+                            background: 'rgba(16,185,129,0.1)',
+                            border: '1px solid rgba(16,185,129,0.18)',
+                            color: 'var(--status-success)'
                         },
                         children: [
                             members.length,
-                            " Connected"
+                            " online"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/room/MemberList.jsx",
-                        lineNumber: 22,
+                        lineNumber: 26,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/room/MemberList.jsx",
-                lineNumber: 17,
+                lineNumber: 10,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
+                    padding: '10px 12px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '8px'
+                    gap: '6px'
                 },
                 children: members.map((m)=>{
                     const isYou = m.socketId === currentSocketId;
                     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        style: {
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            borderRadius: 'var(--radius-md)',
-                            background: isYou ? 'rgba(88, 80, 236, 0.12)' : 'var(--bg-input)',
-                            border: isYou ? '1px solid rgba(88, 80, 236, 0.3)' : '1px solid var(--border-subtle)'
-                        },
+                        className: `member-row${isYou ? ' you' : ''}`,
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "avatar",
                                 style: {
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px'
+                                    width: '34px',
+                                    height: '34px',
+                                    background: m.isHost ? 'linear-gradient(135deg, #d97706, #f59e0b)' : m.color || 'var(--accent-primary)',
+                                    fontSize: '0.85rem',
+                                    boxShadow: isYou ? `0 2px 8px ${m.color || 'rgba(99,102,241,0.5)'}60` : 'none'
+                                },
+                                children: getAvatarLetter(m.nickname)
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/room/MemberList.jsx",
+                                lineNumber: 49,
+                                columnNumber: 15
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    flex: 1,
+                                    minWidth: 0
                                 },
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                         style: {
-                                            width: '32px',
-                                            height: '32px',
-                                            borderRadius: 'var(--radius-full)',
-                                            background: m.isHost ? '#d97706' : m.color || 'var(--accent-primary)',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontWeight: '700',
-                                            color: '#fff',
-                                            fontSize: '0.82rem'
+                                            gap: '5px',
+                                            flexWrap: 'wrap'
                                         },
-                                        children: getAvatarLetter(m.nickname)
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/room/MemberList.jsx",
-                                        lineNumber: 44,
-                                        columnNumber: 17
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                         children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px'
-                                                },
-                                                children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        style: {
-                                                            fontSize: '0.85rem',
-                                                            fontWeight: '600',
-                                                            color: 'var(--text-primary)'
-                                                        },
-                                                        children: [
-                                                            m.nickname,
-                                                            " ",
-                                                            isYou && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                style: {
-                                                                    color: 'var(--accent-primary)',
-                                                                    fontSize: '0.72rem'
-                                                                },
-                                                                children: "(You)"
-                                                            }, void 0, false, {
-                                                                fileName: "[project]/src/components/room/MemberList.jsx",
-                                                                lineNumber: 64,
-                                                                columnNumber: 46
-                                                            }, this)
-                                                        ]
-                                                    }, void 0, true, {
-                                                        fileName: "[project]/src/components/room/MemberList.jsx",
-                                                        lineNumber: 63,
-                                                        columnNumber: 21
-                                                    }, this),
-                                                    m.isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$crown$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Crown$3e$__["Crown"], {
-                                                        size: 13,
-                                                        color: "#f59e0b"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/src/components/room/MemberList.jsx",
-                                                        lineNumber: 66,
-                                                        columnNumber: 34
-                                                    }, this),
-                                                    m.hasControl && !m.isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"], {
-                                                        size: 12,
-                                                        color: "#10b981"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/src/components/room/MemberList.jsx",
-                                                        lineNumber: 67,
-                                                        columnNumber: 51
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/src/components/room/MemberList.jsx",
-                                                lineNumber: 62,
-                                                columnNumber: 19
-                                            }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 style: {
-                                                    fontSize: '0.68rem',
-                                                    color: 'var(--text-secondary)'
+                                                    fontSize: '0.84rem',
+                                                    fontWeight: '700',
+                                                    color: 'var(--text-primary)',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap'
                                                 },
-                                                children: m.isHost ? 'Room Owner' : m.hasControl ? 'Control Granted' : 'Guest'
+                                                children: m.nickname
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/room/MemberList.jsx",
-                                                lineNumber: 69,
+                                                lineNumber: 66,
                                                 columnNumber: 19
+                                            }, this),
+                                            isYou && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                style: {
+                                                    fontSize: '0.65rem',
+                                                    color: 'var(--accent-primary)',
+                                                    fontWeight: '700'
+                                                },
+                                                children: "(You)"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/room/MemberList.jsx",
+                                                lineNumber: 74,
+                                                columnNumber: 21
+                                            }, this),
+                                            m.isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$crown$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Crown$3e$__["Crown"], {
+                                                size: 11,
+                                                color: "var(--accent-amber)"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/room/MemberList.jsx",
+                                                lineNumber: 76,
+                                                columnNumber: 32
+                                            }, this),
+                                            m.hasControl && !m.isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"], {
+                                                size: 10,
+                                                color: "var(--accent-emerald)"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/room/MemberList.jsx",
+                                                lineNumber: 77,
+                                                columnNumber: 49
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/room/MemberList.jsx",
-                                        lineNumber: 61,
+                                        lineNumber: 65,
+                                        columnNumber: 17
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        style: {
+                                            fontSize: '0.67rem',
+                                            color: 'var(--text-tertiary)',
+                                            fontWeight: '500'
+                                        },
+                                        children: m.isHost ? '👑 Room Host' : m.hasControl ? '🎮 Has Control' : 'Viewer'
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/MemberList.jsx",
+                                        lineNumber: 79,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/room/MemberList.jsx",
-                                lineNumber: 43,
+                                lineNumber: 64,
                                 columnNumber: 15
                             }, this),
-                            isHost && !m.isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                children: m.hasControl ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                    onClick: ()=>onRevokeControl(m.socketId),
-                                    className: "btn btn-ghost",
-                                    style: {
-                                        minHeight: '30px',
-                                        padding: '0 8px',
-                                        fontSize: '0.72rem',
-                                        color: '#ef4444'
-                                    },
-                                    title: "Revoke control permission",
-                                    children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__["X"], {
-                                            size: 13
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/components/room/MemberList.jsx",
-                                            lineNumber: 85,
-                                            columnNumber: 23
-                                        }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                            children: "Revoke"
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/components/room/MemberList.jsx",
-                                            lineNumber: 86,
-                                            columnNumber: 23
-                                        }, this)
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/src/components/room/MemberList.jsx",
-                                    lineNumber: 79,
-                                    columnNumber: 21
-                                }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                    onClick: ()=>onGrantControl(m.socketId, true),
-                                    className: "btn btn-secondary",
-                                    style: {
-                                        minHeight: '30px',
-                                        padding: '0 8px',
-                                        fontSize: '0.72rem',
-                                        borderColor: '#10b981',
-                                        color: '#34d399'
-                                    },
-                                    title: "Grant playback control",
-                                    children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
-                                            size: 13
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/components/room/MemberList.jsx",
-                                            lineNumber: 95,
-                                            columnNumber: 23
-                                        }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                            children: "Grant Control"
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/components/room/MemberList.jsx",
-                                            lineNumber: 96,
-                                            columnNumber: 23
-                                        }, this)
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/src/components/room/MemberList.jsx",
-                                    lineNumber: 89,
-                                    columnNumber: 21
-                                }, this)
-                            }, void 0, false, {
+                            isHost && !m.isHost && (m.hasControl ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                onClick: ()=>onRevokeControl(m.socketId),
+                                className: "btn btn-danger",
+                                style: {
+                                    minHeight: '28px',
+                                    padding: '0 8px',
+                                    fontSize: '0.7rem',
+                                    borderRadius: 'var(--radius-sm)'
+                                },
+                                title: "Revoke control",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__["X"], {
+                                        size: 12
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/MemberList.jsx",
+                                        lineNumber: 93,
+                                        columnNumber: 21
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        children: "Revoke"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/MemberList.jsx",
+                                        lineNumber: 94,
+                                        columnNumber: 21
+                                    }, this)
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/src/components/room/MemberList.jsx",
-                                lineNumber: 77,
-                                columnNumber: 17
-                            }, this)
+                                lineNumber: 87,
+                                columnNumber: 19
+                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                onClick: ()=>onGrantControl(m.socketId, true),
+                                className: "btn btn-success",
+                                style: {
+                                    minHeight: '28px',
+                                    padding: '0 8px',
+                                    fontSize: '0.7rem',
+                                    borderRadius: 'var(--radius-sm)'
+                                },
+                                title: "Grant control",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
+                                        size: 12
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/MemberList.jsx",
+                                        lineNumber: 103,
+                                        columnNumber: 21
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        children: "Grant"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/room/MemberList.jsx",
+                                        lineNumber: 104,
+                                        columnNumber: 21
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/room/MemberList.jsx",
+                                lineNumber: 97,
+                                columnNumber: 19
+                            }, this))
                         ]
                     }, m.socketId, true, {
                         fileName: "[project]/src/components/room/MemberList.jsx",
-                        lineNumber: 30,
+                        lineNumber: 44,
                         columnNumber: 13
                     }, this);
                 })
             }, void 0, false, {
                 fileName: "[project]/src/components/room/MemberList.jsx",
-                lineNumber: 25,
+                lineNumber: 39,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/room/MemberList.jsx",
-        lineNumber: 16,
+        lineNumber: 8,
         columnNumber: 5
     }, this);
 }
@@ -3046,11 +3195,10 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$square$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageSquare$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/message-square.js [app-client] (ecmascript) <export default as MessageSquare>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$send$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Send$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/send.js [app-client] (ecmascript) <export default as Send>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$crown$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Crown$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/crown.js [app-client] (ecmascript) <export default as Crown>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/key.js [app-client] (ecmascript) <export default as Key>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$radio$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Radio$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/radio.js [app-client] (ecmascript) <export default as Radio>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$hash$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Hash$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/hash.js [app-client] (ecmascript) <export default as Hash>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$chat$2f$EmojiReactions$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/chat/EmojiReactions.jsx [app-client] (ecmascript)");
 ;
 var _s = __turbopack_context__.k.signature();
@@ -3061,7 +3209,7 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
     _s();
     const [inputText, setInputText] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('');
     const chatContainerRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
-    // Auto-scroll chat to bottom on new messages
+    const inputRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "ChatPanel.useEffect": ()=>{
             if (chatContainerRef.current) {
@@ -3077,18 +3225,17 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
         onSendMessage(inputText.trim());
         setInputText('');
     };
-    const getAvatarLetter = (name)=>{
-        return name ? name.trim().charAt(0).toUpperCase() : '?';
-    };
+    const getAvatarLetter = (name)=>name ? name.trim().charAt(0).toUpperCase() : '?';
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "panel",
         style: {
             display: 'flex',
             flexDirection: 'column',
             height: '100%',
-            maxHeight: 'calc(100vh - 120px)',
+            maxHeight: 'calc(100vh - 116px)',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            background: 'var(--bg-surface)'
         },
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$chat$2f$EmojiReactions$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["EmojiReactions"], {
@@ -3096,7 +3243,7 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
                 onSendReaction: onSendReaction
             }, void 0, false, {
                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                lineNumber: 40,
+                lineNumber: 39,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3106,7 +3253,9 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: 'var(--bg-input)'
+                    flexShrink: 0,
+                    background: 'var(--bg-surface-2)',
+                    borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3116,115 +3265,151 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
                             gap: '8px'
                         },
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$square$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageSquare$3e$__["MessageSquare"], {
-                                size: 16,
-                                color: "var(--accent-primary)"
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    background: 'var(--accent-primary-dim)',
+                                    border: '1px solid rgba(99,102,241,0.22)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                },
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$hash$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Hash$3e$__["Hash"], {
+                                    size: 14,
+                                    color: "var(--accent-primary)"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/chat/ChatPanel.jsx",
+                                    lineNumber: 59,
+                                    columnNumber: 13
+                                }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                lineNumber: 57,
+                                lineNumber: 53,
                                 columnNumber: 11
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 style: {
-                                    fontSize: '0.9rem',
-                                    fontWeight: '700'
+                                    fontSize: '0.88rem',
+                                    fontWeight: '700',
+                                    color: 'var(--text-primary)'
                                 },
-                                children: "Room Chat"
+                                children: "Live Chat"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                lineNumber: 58,
+                                lineNumber: 61,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                        lineNumber: 56,
+                        lineNumber: 52,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         style: {
-                            fontSize: '0.72rem',
-                            color: 'var(--text-secondary)'
+                            fontSize: '0.68rem',
+                            fontWeight: '600',
+                            color: 'var(--text-tertiary)',
+                            background: 'var(--bg-input)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-full)',
+                            padding: '2px 8px'
                         },
                         children: [
                             chatHistory.length,
-                            " messages"
+                            " msgs"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                        lineNumber: 60,
+                        lineNumber: 63,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                lineNumber: 46,
+                lineNumber: 42,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 ref: chatContainerRef,
+                className: "scroll-area",
                 style: {
                     flex: 1,
-                    padding: '14px',
-                    overflowY: 'auto',
+                    padding: '14px 12px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '10px'
+                    gap: '8px',
+                    overflowY: 'auto'
                 },
                 children: chatHistory.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     style: {
-                        textAlign: 'center',
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         padding: '36px 12px',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.82rem'
+                        color: 'var(--text-tertiary)',
+                        textAlign: 'center'
                     },
                     children: [
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$radio$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Radio$3e$__["Radio"], {
-                            size: 24,
-                            color: "var(--text-tertiary)",
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             style: {
-                                marginBottom: '6px'
-                            }
+                                fontSize: '2rem',
+                                marginBottom: '10px',
+                                opacity: 0.6
+                            },
+                            children: "💬"
                         }, void 0, false, {
                             fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                            lineNumber: 77,
+                            lineNumber: 83,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                            children: "No messages yet. Say hi to start watching!"
-                        }, void 0, false, {
+                            style: {
+                                fontSize: '0.82rem',
+                                lineHeight: 1.5
+                            },
+                            children: [
+                                "No messages yet.",
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("br", {}, void 0, false, {
+                                    fileName: "[project]/src/components/chat/ChatPanel.jsx",
+                                    lineNumber: 84,
+                                    columnNumber: 81
+                                }, this),
+                                "Be the first to say hi!"
+                            ]
+                        }, void 0, true, {
                             fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                            lineNumber: 78,
+                            lineNumber: 84,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                    lineNumber: 76,
+                    lineNumber: 82,
                     columnNumber: 11
                 }, this) : chatHistory.map((msg)=>{
                     if (msg.isSystem) {
                         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             style: {
-                                textAlign: 'center',
-                                margin: '2px 0',
-                                fontSize: '0.72rem',
-                                color: 'var(--text-secondary)',
-                                background: 'var(--bg-input)',
-                                padding: '3px 10px',
-                                borderRadius: 'var(--radius-full)',
-                                border: '1px solid var(--border-subtle)'
+                                display: 'flex',
+                                justifyContent: 'center',
+                                margin: '2px 0'
                             },
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                className: "chat-system-pill",
                                 children: msg.text
                             }, void 0, false, {
                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                lineNumber: 97,
+                                lineNumber: 91,
                                 columnNumber: 19
                             }, this)
                         }, msg.id, false, {
                             fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                            lineNumber: 84,
+                            lineNumber: 90,
                             columnNumber: 17
                         }, this);
                     }
@@ -3236,69 +3421,68 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
                         },
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "avatar",
                                 style: {
-                                    width: '30px',
-                                    height: '30px',
-                                    borderRadius: 'var(--radius-sm)',
+                                    width: '28px',
+                                    height: '28px',
                                     background: msg.color || 'var(--accent-primary)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontWeight: '700',
-                                    fontSize: '0.8rem',
-                                    color: '#fff',
-                                    flexShrink: 0
+                                    fontSize: '0.75rem',
+                                    boxShadow: `0 2px 8px ${msg.color || 'rgba(99,102,241,0.4)'}40`
                                 },
                                 children: getAvatarLetter(msg.sender)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                lineNumber: 105,
+                                lineNumber: 99,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 style: {
-                                    flex: 1
+                                    flex: 1,
+                                    minWidth: 0
                                 },
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                         style: {
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '6px',
-                                            marginBottom: '2px'
+                                            gap: '5px',
+                                            marginBottom: '4px',
+                                            flexWrap: 'wrap'
                                         },
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 style: {
-                                                    fontSize: '0.8rem',
-                                                    fontWeight: '600',
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: '700',
                                                     color: msg.color || 'var(--text-primary)'
                                                 },
                                                 children: msg.sender
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                                lineNumber: 126,
+                                                lineNumber: 114,
                                                 columnNumber: 21
                                             }, this),
                                             msg.isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$crown$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Crown$3e$__["Crown"], {
-                                                size: 12,
-                                                color: "#f59e0b"
+                                                size: 11,
+                                                color: "var(--accent-amber)",
+                                                title: "Host"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                                lineNumber: 129,
+                                                lineNumber: 120,
                                                 columnNumber: 36
                                             }, this),
-                                            msg.hasControl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"], {
-                                                size: 11,
-                                                color: "#10b981"
+                                            msg.hasControl && !msg.isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"], {
+                                                size: 10,
+                                                color: "var(--accent-emerald)",
+                                                title: "Has Control"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                                lineNumber: 130,
-                                                columnNumber: 40
+                                                lineNumber: 121,
+                                                columnNumber: 55
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 style: {
-                                                    fontSize: '0.65rem',
+                                                    fontSize: '0.63rem',
                                                     color: 'var(--text-tertiary)',
                                                     marginLeft: 'auto'
                                                 },
@@ -3308,47 +3492,39 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
                                                 })
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                                lineNumber: 131,
+                                                lineNumber: 122,
                                                 columnNumber: 21
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                        lineNumber: 125,
+                                        lineNumber: 113,
                                         columnNumber: 19
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        style: {
-                                            background: 'var(--bg-input)',
-                                            border: '1px solid var(--border-subtle)',
-                                            padding: '7px 10px',
-                                            borderRadius: '0 8px 8px 8px',
-                                            fontSize: '0.85rem',
-                                            wordBreak: 'break-word',
-                                            color: 'var(--text-primary)'
-                                        },
+                                        className: "chat-bubble",
                                         children: msg.text
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                        lineNumber: 135,
+                                        lineNumber: 126,
                                         columnNumber: 19
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                                lineNumber: 124,
+                                lineNumber: 112,
                                 columnNumber: 17
                             }, this)
                         ]
                     }, msg.id, true, {
                         fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                        lineNumber: 103,
+                        lineNumber: 97,
                         columnNumber: 15
                     }, this);
                 })
             }, void 0, false, {
                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                lineNumber: 64,
+                lineNumber: 76,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -3358,22 +3534,27 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
                     borderTop: '1px solid var(--border-subtle)',
                     display: 'flex',
                     gap: '8px',
-                    background: 'var(--bg-input)'
+                    flexShrink: 0,
+                    background: 'var(--bg-surface-2)',
+                    borderRadius: '0 0 var(--radius-lg) var(--radius-lg)'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                        ref: inputRef,
                         type: "text",
                         className: "input-field",
-                        placeholder: "Send a message...",
+                        placeholder: "Type a message…",
                         value: inputText,
                         onChange: (e)=>setInputText(e.target.value),
                         style: {
                             minHeight: '38px',
-                            fontSize: '0.85rem'
+                            fontSize: '0.875rem',
+                            flex: 1,
+                            background: 'var(--bg-input)'
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                        lineNumber: 166,
+                        lineNumber: 147,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3382,34 +3563,37 @@ function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendRe
                         disabled: !inputText.trim(),
                         style: {
                             minHeight: '38px',
-                            padding: '0 12px'
+                            width: '38px',
+                            padding: 0,
+                            borderRadius: 'var(--radius-md)',
+                            flexShrink: 0
                         },
                         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$send$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Send$3e$__["Send"], {
                             size: 15
                         }, void 0, false, {
                             fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                            lineNumber: 180,
+                            lineNumber: 162,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                        lineNumber: 174,
+                        lineNumber: 156,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/chat/ChatPanel.jsx",
-                lineNumber: 156,
+                lineNumber: 135,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/chat/ChatPanel.jsx",
-        lineNumber: 28,
+        lineNumber: 26,
         columnNumber: 5
     }, this);
 }
-_s(ChatPanel, "YKMGmaFYSLshVeusMsgcEp6n5ZE=");
+_s(ChatPanel, "iGb8tvxR14emfh/ZSvTxudMuvxw=");
 _c = ChatPanel;
 var _c;
 __turbopack_context__.k.register(_c, "ChatPanel");
@@ -3436,159 +3620,191 @@ function ControlRequestModal({ requestNotice, onRespond }) {
     if (!requestNotice) return null;
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "toast-container",
-        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-            className: "panel",
-            style: {
-                padding: '16px 18px',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
-                background: '#121620'
-            },
-            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        style: {
+            maxWidth: '340px'
+        },
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px'
+                    background: 'var(--bg-surface-2)',
+                    border: '1px solid rgba(245,158,11,0.3)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '16px 18px',
+                    boxShadow: 'var(--shadow-lg), 0 0 0 1px rgba(245,158,11,0.08)',
+                    animation: 'slideInRight 0.25s ease'
                 },
-                children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        style: {
-                            background: 'rgba(245, 158, 11, 0.15)',
-                            padding: '8px',
-                            borderRadius: 'var(--radius-full)',
-                            color: '#fbbf24',
-                            flexShrink: 0
-                        },
-                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"], {
-                            size: 18
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                            lineNumber: 27,
-                            columnNumber: 13
-                        }, this)
-                    }, void 0, false, {
-                        fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                        lineNumber: 18,
-                        columnNumber: 11
-                    }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        style: {
-                            flex: 1
-                        },
-                        children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h4", {
-                                style: {
-                                    fontSize: '0.92rem',
-                                    fontWeight: 700,
-                                    color: '#fbbf24'
-                                },
-                                children: "Control Request"
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    style: {
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px'
+                    },
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            style: {
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: 'var(--radius-md)',
+                                background: 'rgba(245,158,11,0.12)',
+                                border: '1px solid rgba(245,158,11,0.22)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                            },
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Key$3e$__["Key"], {
+                                size: 18,
+                                color: "var(--accent-amber)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                                lineNumber: 30,
-                                columnNumber: 13
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                style: {
-                                    fontSize: '0.84rem',
-                                    color: 'var(--text-secondary)',
-                                    marginTop: '2px'
-                                },
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
-                                        style: {
-                                            color: '#fff'
-                                        },
-                                        children: requestNotice.nickname
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                                        lineNumber: 34,
-                                        columnNumber: 15
-                                    }, this),
-                                    " wants playback control permission."
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                                lineNumber: 33,
-                                columnNumber: 13
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                style: {
-                                    display: 'flex',
-                                    gap: '8px',
-                                    marginTop: '12px'
-                                },
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        className: "btn btn-primary",
-                                        onClick: ()=>onRespond(requestNotice.socketId, true),
-                                        style: {
-                                            flex: 1,
-                                            background: '#10b981',
-                                            minHeight: '36px',
-                                            fontSize: '0.82rem'
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CheckCircle$3e$__["CheckCircle"], {
-                                                size: 14
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                                                lineNumber: 43,
-                                                columnNumber: 17
-                                            }, this),
-                                            " Grant"
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                                        lineNumber: 38,
-                                        columnNumber: 15
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        className: "btn btn-secondary",
-                                        onClick: ()=>onRespond(requestNotice.socketId, false),
-                                        style: {
-                                            flex: 1,
-                                            minHeight: '36px',
-                                            fontSize: '0.82rem'
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__XCircle$3e$__["XCircle"], {
-                                                size: 14
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                                                lineNumber: 50,
-                                                columnNumber: 17
-                                            }, this),
-                                            " Decline"
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                                        lineNumber: 45,
-                                        columnNumber: 15
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                                lineNumber: 37,
+                                lineNumber: 25,
                                 columnNumber: 13
                             }, this)
-                        ]
-                    }, void 0, true, {
-                        fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                        lineNumber: 29,
-                        columnNumber: 11
-                    }, this)
-                ]
-            }, void 0, true, {
+                        }, void 0, false, {
+                            fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                            lineNumber: 19,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            style: {
+                                flex: 1
+                            },
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h4", {
+                                    style: {
+                                        fontSize: '0.88rem',
+                                        fontWeight: '700',
+                                        color: 'var(--accent-amber)',
+                                        marginBottom: '4px'
+                                    },
+                                    children: "Control Request"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                    lineNumber: 29,
+                                    columnNumber: 13
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                    style: {
+                                        fontSize: '0.82rem',
+                                        color: 'var(--text-secondary)',
+                                        lineHeight: 1.5
+                                    },
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                            style: {
+                                                color: 'var(--text-primary)'
+                                            },
+                                            children: requestNotice.nickname
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                            lineNumber: 33,
+                                            columnNumber: 15
+                                        }, this),
+                                        ' ',
+                                        "wants playback control."
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                    lineNumber: 32,
+                                    columnNumber: 13
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    style: {
+                                        display: 'flex',
+                                        gap: '8px',
+                                        marginTop: '12px'
+                                    },
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                            className: "btn btn-success",
+                                            onClick: ()=>onRespond(requestNotice.socketId, true),
+                                            style: {
+                                                flex: 1,
+                                                minHeight: '36px',
+                                                fontSize: '0.82rem'
+                                            },
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CheckCircle$3e$__["CheckCircle"], {
+                                                    size: 13
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                                    lineNumber: 43,
+                                                    columnNumber: 17
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    children: "Grant"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                                    lineNumber: 44,
+                                                    columnNumber: 17
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                            lineNumber: 38,
+                                            columnNumber: 15
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                            className: "btn btn-danger",
+                                            onClick: ()=>onRespond(requestNotice.socketId, false),
+                                            style: {
+                                                flex: 1,
+                                                minHeight: '36px',
+                                                fontSize: '0.82rem'
+                                            },
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__XCircle$3e$__["XCircle"], {
+                                                    size: 13
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                                    lineNumber: 51,
+                                                    columnNumber: 17
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    children: "Decline"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                                    lineNumber: 52,
+                                                    columnNumber: 17
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                            lineNumber: 46,
+                                            columnNumber: 15
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                                    lineNumber: 37,
+                                    columnNumber: 13
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                            lineNumber: 28,
+                            columnNumber: 11
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                    lineNumber: 17,
+                    columnNumber: 9
+                }, this)
+            }, void 0, false, {
                 fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-                lineNumber: 17,
-                columnNumber: 9
+                lineNumber: 9,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("style", {
+                children: `@keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }`
+            }, void 0, false, {
+                fileName: "[project]/src/components/room/ControlRequestModal.jsx",
+                lineNumber: 58,
+                columnNumber: 7
             }, this)
-        }, void 0, false, {
-            fileName: "[project]/src/components/room/ControlRequestModal.jsx",
-            lineNumber: 9,
-            columnNumber: 7
-        }, this)
-    }, void 0, false, {
+        ]
+    }, void 0, true, {
         fileName: "[project]/src/components/room/ControlRequestModal.jsx",
         lineNumber: 8,
         columnNumber: 5
@@ -3778,6 +3994,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$alert$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertCircle$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/alert-circle.js [app-client] (ecmascript) <export default as AlertCircle>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2d$circle$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CheckCircle2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/check-circle-2.js [app-client] (ecmascript) <export default as CheckCircle2>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/x.js [app-client] (ecmascript) <export default as X>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$wifi$2d$off$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__WifiOff$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/wifi-off.js [app-client] (ecmascript) <export default as WifiOff>");
 ;
 var _s = __turbopack_context__.k.signature();
 "use client";
@@ -3795,18 +4012,16 @@ var _s = __turbopack_context__.k.signature();
 ;
 function Page() {
     _s();
-    const { socket, isConnected, roomState, sessionEnded, toastNotification, setToastNotification, controlRequestNotice, setControlRequestNotice, incomingReaction, syncedPlaybackEvent, createRoom, joinRoom, syncPlayback, requestControl, respondControlRequest, revokeControl, sendChatMessage, sendReaction } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$useSocket$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSocket"])();
+    const { socket, isConnected, isReconnecting, roomState, sessionEnded, toastNotification, setToastNotification, controlRequestNotice, setControlRequestNotice, incomingReaction, syncedPlaybackEvent, createRoom, joinRoom, leaveRoom, syncPlayback, requestControl, respondControlRequest, revokeControl, sendChatMessage, sendReaction } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$useSocket$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSocket"])();
     const [initialRoomId, setInitialRoomId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('');
     const [mobileActiveTab, setMobileActiveTab] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('video');
-    const [isMobileScreen, setIsMobileScreen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false); // Default to false for SSR, update in useEffect
-    // Responsive Window Listener
+    const [isMobileScreen, setIsMobileScreen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    // Responsive listener
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "Page.useEffect": ()=>{
             setIsMobileScreen(window.innerWidth < 768);
             const handleResize = {
-                "Page.useEffect.handleResize": ()=>{
-                    setIsMobileScreen(window.innerWidth < 768);
-                }
+                "Page.useEffect.handleResize": ()=>setIsMobileScreen(window.innerWidth < 768)
             }["Page.useEffect.handleResize"];
             window.addEventListener('resize', handleResize);
             return ({
@@ -3814,27 +4029,19 @@ function Page() {
             })["Page.useEffect"];
         }
     }["Page.useEffect"], []);
-    // Auto-join room on reload if URL parameters exist and nickname is saved
+    // Pre-fill room ID from URL if no session active (for invite links with no saved nickname)
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "Page.useEffect": ()=>{
-            if (!isConnected) return; // Wait until socket connects
+            if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
+            ;
             const params = new URLSearchParams(window.location.search);
             const roomParam = params.get('room');
             if (roomParam) {
-                const savedNickname = localStorage.getItem('tg_nickname');
-                if (savedNickname && !roomState) {
-                    // Auto-join
-                    handleJoinRoom(roomParam.toUpperCase(), savedNickname);
-                } else if (!roomState) {
-                    // Just set the input field for them to manually enter nickname
-                    setInitialRoomId(roomParam.toUpperCase());
-                }
+                setInitialRoomId(roomParam.toUpperCase());
             }
         }
-    }["Page.useEffect"], [
-        isConnected
-    ]); // Run when socket connects
-    // Update browser URL query string when room state changes
+    }["Page.useEffect"], []);
+    // Update URL when room state changes (keeps URL in sync)
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "Page.useEffect": ()=>{
             if (roomState?.roomId) {
@@ -3847,26 +4054,40 @@ function Page() {
     }["Page.useEffect"], [
         roomState?.roomId
     ]);
+    // ---------- Handlers ----------
     const handleCreateRoom = async (nickname)=>{
         try {
             await createRoom(nickname);
         } catch (err) {
-            alert('Failed to create room: ' + err);
+            setToastNotification({
+                type: 'error',
+                message: `Failed to create room: ${err}`
+            });
         }
     };
     const handleJoinRoom = async (roomId, nickname)=>{
         try {
             await joinRoom(roomId, nickname);
         } catch (err) {
-            alert('Failed to join room: ' + err);
+            // Show a friendly toast instead of browser alert
+            setToastNotification({
+                type: 'error',
+                message: `Room not found. Check the code and try again.`
+            });
         }
     };
-    const handleLeaveRoom = ()=>{
+    const handleLeaveRoom = async ()=>{
+        try {
+            await leaveRoom();
+        } catch (_) {}
+        // Navigate home, clearing the room param from the URL
         window.location.href = window.location.pathname;
     };
+    // ---------- Derived State ----------
     const currentMember = roomState?.members?.find((m)=>m.socketId === socket?.id);
     const isHost = currentMember?.isHost || false;
     const hasControl = currentMember?.hasControl || false;
+    // ---------- Render ----------
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         style: {
             minHeight: '100dvh',
@@ -3874,62 +4095,172 @@ function Page() {
             background: 'var(--bg-primary)'
         },
         children: [
+            isReconnecting && !roomState && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: {
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 20000,
+                    background: 'rgba(245,158,11,0.12)',
+                    borderBottom: '1px solid rgba(245,158,11,0.25)',
+                    padding: '10px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    backdropFilter: 'blur(8px)'
+                },
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
+                        width: "14",
+                        height: "14",
+                        viewBox: "0 0 24 24",
+                        fill: "none",
+                        stroke: "#f59e0b",
+                        strokeWidth: "2.5",
+                        strokeLinecap: "round",
+                        style: {
+                            animation: 'spin 1s linear infinite',
+                            flexShrink: 0
+                        },
+                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+                            d: "M21 12a9 9 0 1 1-6.219-8.56"
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.jsx",
+                            lineNumber: 116,
+                            columnNumber: 13
+                        }, this)
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 115,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        style: {
+                            fontSize: '0.82rem',
+                            color: '#fbbf24',
+                            fontWeight: '600'
+                        },
+                        children: "Reconnecting to your session…"
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 118,
+                        columnNumber: 11
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/app/page.jsx",
+                lineNumber: 108,
+                columnNumber: 9
+            }, this),
+            isReconnecting && roomState && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: {
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 20000,
+                    background: 'rgba(245,158,11,0.10)',
+                    borderBottom: '1px solid rgba(245,158,11,0.2)',
+                    padding: '6px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                },
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$wifi$2d$off$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__WifiOff$3e$__["WifiOff"], {
+                        size: 13,
+                        color: "#f59e0b"
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 132,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        style: {
+                            fontSize: '0.78rem',
+                            color: '#fbbf24',
+                            fontWeight: '600'
+                        },
+                        children: "Connection lost — reconnecting…"
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 133,
+                        columnNumber: 11
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/app/page.jsx",
+                lineNumber: 126,
+                columnNumber: 9
+            }, this),
             toastNotification && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
                     position: 'fixed',
-                    top: '16px',
+                    top: isReconnecting ? '48px' : '16px',
                     right: '16px',
                     left: isMobileScreen ? '16px' : 'auto',
-                    zIndex: 100
+                    zIndex: 10000,
+                    maxWidth: '380px',
+                    animation: 'slideInRight 0.25s ease'
                 },
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    className: "panel",
                     style: {
-                        padding: '10px 14px',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
                         gap: '10px',
-                        border: toastNotification.type === 'error' ? '1px solid #ef4444' : '1px solid var(--accent-primary)',
-                        background: '#0d1017'
+                        padding: '12px 14px',
+                        background: 'var(--bg-surface-2)',
+                        border: `1px solid ${toastNotification.type === 'error' ? 'rgba(244,63,94,0.35)' : 'rgba(99,102,241,0.35)'}`,
+                        borderRadius: 'var(--radius-lg)',
+                        boxShadow: 'var(--shadow-lg)'
                     },
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             style: {
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: 'var(--radius-md)',
+                                flexShrink: 0,
+                                background: toastNotification.type === 'error' ? 'rgba(244,63,94,0.12)' : 'var(--accent-primary-dim)',
+                                border: `1px solid ${toastNotification.type === 'error' ? 'rgba(244,63,94,0.22)' : 'rgba(99,102,241,0.22)'}`,
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '8px'
+                                justifyContent: 'center'
                             },
-                            children: [
-                                toastNotification.type === 'error' ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$alert$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertCircle$3e$__["AlertCircle"], {
-                                    size: 16,
-                                    color: "#ef4444"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 129,
-                                    columnNumber: 17
-                                }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2d$circle$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CheckCircle2$3e$__["CheckCircle2"], {
-                                    size: 16,
-                                    color: "var(--accent-primary)"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 131,
-                                    columnNumber: 17
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                    style: {
-                                        fontSize: '0.82rem'
-                                    },
-                                    children: toastNotification.message
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 133,
-                                    columnNumber: 15
-                                }, this)
-                            ]
-                        }, void 0, true, {
+                            children: toastNotification.type === 'error' ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$alert$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertCircle$3e$__["AlertCircle"], {
+                                size: 15,
+                                color: "var(--status-danger)"
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.jsx",
+                                lineNumber: 165,
+                                columnNumber: 19
+                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2d$circle$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__CheckCircle2$3e$__["CheckCircle2"], {
+                                size: 15,
+                                color: "var(--accent-primary)"
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.jsx",
+                                lineNumber: 166,
+                                columnNumber: 19
+                            }, this)
+                        }, void 0, false, {
                             fileName: "[project]/src/app/page.jsx",
-                            lineNumber: 127,
+                            lineNumber: 158,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                            style: {
+                                fontSize: '0.84rem',
+                                color: 'var(--text-primary)',
+                                flex: 1,
+                                lineHeight: 1.4
+                            },
+                            children: toastNotification.message
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.jsx",
+                            lineNumber: 168,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3937,118 +4268,248 @@ function Page() {
                             style: {
                                 background: 'transparent',
                                 border: 'none',
-                                color: 'var(--text-secondary)',
+                                color: 'var(--text-tertiary)',
                                 cursor: 'pointer',
-                                marginLeft: '6px'
+                                padding: '4px',
+                                borderRadius: 'var(--radius-sm)',
+                                display: 'flex',
+                                flexShrink: 0
                             },
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__["X"], {
                                 size: 14
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 139,
+                                lineNumber: 175,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.jsx",
-                            lineNumber: 135,
+                            lineNumber: 171,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.jsx",
-                    lineNumber: 115,
+                    lineNumber: 150,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 106,
+                lineNumber: 141,
                 columnNumber: 9
             }, this),
-            !roomState ? /* Join / Create Landing Page */ sessionEnded ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            isReconnecting && !roomState && !sessionEnded && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: {
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'var(--bg-primary)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '16px',
+                    animation: 'fadeIn 0.3s ease'
+                },
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        style: {
+                            width: '64px',
+                            height: '64px',
+                            borderRadius: '50%',
+                            background: 'rgba(99,102,241,0.1)',
+                            border: '1px solid rgba(99,102,241,0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        },
+                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
+                            width: "28",
+                            height: "28",
+                            viewBox: "0 0 24 24",
+                            fill: "none",
+                            stroke: "var(--accent-primary)",
+                            strokeWidth: "2.5",
+                            strokeLinecap: "round",
+                            style: {
+                                animation: 'spin 1s linear infinite'
+                            },
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+                                d: "M21 12a9 9 0 1 1-6.219-8.56"
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.jsx",
+                                lineNumber: 195,
+                                columnNumber: 15
+                            }, this)
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.jsx",
+                            lineNumber: 194,
+                            columnNumber: 13
+                        }, this)
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 189,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        style: {
+                            textAlign: 'center'
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                style: {
+                                    fontSize: '1.3rem',
+                                    fontWeight: '700',
+                                    marginBottom: '6px'
+                                },
+                                children: "Rejoining your room…"
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.jsx",
+                                lineNumber: 199,
+                                columnNumber: 13
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                style: {
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.875rem'
+                                },
+                                children: "Restoring your session, please wait."
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.jsx",
+                                lineNumber: 200,
+                                columnNumber: 13
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 198,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("style", {
+                        children: `@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 202,
+                        columnNumber: 11
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/app/page.jsx",
+                lineNumber: 183,
+                columnNumber: 9
+            }, this),
+            !roomState ? sessionEnded ? /* Session Ended Screen */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 style: {
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minHeight: '100vh',
-                    color: '#fff'
+                    minHeight: '100dvh',
+                    padding: '24px',
+                    textAlign: 'center'
                 },
                 children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$alert$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertCircle$3e$__["AlertCircle"], {
-                        size: 48,
-                        color: "var(--status-danger)",
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
-                            marginBottom: '16px'
-                        }
+                            width: '80px',
+                            height: '80px',
+                            borderRadius: '50%',
+                            background: 'rgba(244,63,94,0.1)',
+                            border: '1px solid rgba(244,63,94,0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: '20px',
+                            boxShadow: '0 0 40px rgba(244,63,94,0.12)'
+                        },
+                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$alert$2d$circle$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertCircle$3e$__["AlertCircle"], {
+                            size: 36,
+                            color: "var(--status-danger)"
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.jsx",
+                            lineNumber: 220,
+                            columnNumber: 15
+                        }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 149,
+                        lineNumber: 214,
                         columnNumber: 13
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
                         style: {
-                            fontSize: '1.5rem',
-                            marginBottom: '8px'
+                            fontSize: '1.8rem',
+                            fontWeight: '800',
+                            marginBottom: '10px',
+                            fontFamily: "'Outfit', sans-serif"
                         },
                         children: "Session Ended"
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 150,
+                        lineNumber: 222,
                         columnNumber: 13
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                         style: {
                             color: 'var(--text-secondary)',
-                            marginBottom: '24px'
+                            marginBottom: '28px',
+                            maxWidth: '300px',
+                            lineHeight: 1.6,
+                            fontSize: '0.9rem'
                         },
-                        children: "The host has left the room and the session has ended."
+                        children: "The host left the room and ended the session. Thanks for watching together!"
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 151,
+                        lineNumber: 225,
                         columnNumber: 13
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         className: "btn btn-primary",
                         onClick: ()=>window.location.href = '/',
+                        style: {
+                            padding: '12px 32px',
+                            borderRadius: 'var(--radius-full)',
+                            fontSize: '0.95rem'
+                        },
                         children: "Return Home"
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 152,
+                        lineNumber: 228,
                         columnNumber: 13
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 148,
+                lineNumber: 210,
                 columnNumber: 11
-            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$JoinRoomModal$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["JoinRoomModal"], {
+            }, this) : !isReconnecting ? /* Landing / Join Page — only show if NOT reconnecting */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$JoinRoomModal$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["JoinRoomModal"], {
                 initialRoomId: initialRoomId,
                 onCreateRoom: handleCreateRoom,
                 onJoinRoom: handleJoinRoom
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 157,
+                lineNumber: 238,
                 columnNumber: 11
-            }, this) : /* Main Co-Watching Room View */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            }, this) : null : /* ── Main Co-Watching Room View ── */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "room-container",
                 style: {
-                    maxWidth: '1360px',
+                    maxWidth: '1380px',
                     margin: '0 auto',
-                    padding: isMobileScreen ? '10px' : '16px 20px',
-                    minHeight: '100vh'
+                    padding: isMobileScreen ? '10px' : '14px 20px',
+                    minHeight: '100dvh'
                 },
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$RoomHeader$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["RoomHeader"], {
                         roomId: roomState.roomId,
                         memberCount: roomState.members.length,
                         isHost: isHost,
+                        isConnected: isConnected,
                         onLeaveRoom: handleLeaveRoom
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 166,
+                        lineNumber: 250,
                         columnNumber: 11
                     }, this),
-                    !isMobileScreen ? /* Desktop / Tablet Grid View */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    !isMobileScreen ? /* ── Desktop / Tablet Grid ── */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "desktop-grid",
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4063,7 +4524,7 @@ function Page() {
                                         onRequestControl: requestControl
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.jsx",
-                                        lineNumber: 178,
+                                        lineNumber: 262,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoDetailsCard$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["VideoDetailsCard"], {
@@ -4075,7 +4536,7 @@ function Page() {
                                         onRequestControl: requestControl
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.jsx",
-                                        lineNumber: 188,
+                                        lineNumber: 271,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoQueue$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["VideoQueue"], {
@@ -4085,7 +4546,7 @@ function Page() {
                                         onChangeVideo: (vData)=>syncPlayback(vData)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.jsx",
-                                        lineNumber: 197,
+                                        lineNumber: 279,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$MemberList$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["MemberList"], {
@@ -4096,13 +4557,13 @@ function Page() {
                                         onRevokeControl: (targetId)=>revokeControl(targetId)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.jsx",
-                                        lineNumber: 204,
+                                        lineNumber: 285,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 177,
+                                lineNumber: 261,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4114,20 +4575,20 @@ function Page() {
                                     onSendReaction: sendReaction
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 215,
+                                    lineNumber: 295,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 214,
+                                lineNumber: 294,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 175,
+                        lineNumber: 260,
                         columnNumber: 13
-                    }, this) : /* Mobile View (< 768px) */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    }, this) : /* ── Mobile View ── */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
                             display: 'flex',
                             flexDirection: 'column',
@@ -4146,35 +4607,30 @@ function Page() {
                                     onRequestControl: requestControl
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 228,
+                                    lineNumber: 307,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 227,
+                                lineNumber: 306,
                                 columnNumber: 15
                             }, this),
-                            mobileActiveTab === 'video' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoDetailsCard$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["VideoDetailsCard"], {
-                                    currentVideo: roomState.currentVideo,
-                                    roomState: roomState,
-                                    currentSocketId: socket?.id,
-                                    isHost: isHost,
-                                    hasControl: hasControl,
-                                    onRequestControl: requestControl
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 242,
-                                    columnNumber: 19
-                                }, this)
+                            mobileActiveTab === 'video' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoDetailsCard$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["VideoDetailsCard"], {
+                                currentVideo: roomState.currentVideo,
+                                roomState: roomState,
+                                currentSocketId: socket?.id,
+                                isHost: isHost,
+                                hasControl: hasControl,
+                                onRequestControl: requestControl
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 241,
+                                lineNumber: 319,
                                 columnNumber: 17
                             }, this),
                             mobileActiveTab === 'chat' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 style: {
-                                    height: 'calc(100dvh - 280px)'
+                                    height: 'calc(100dvh - 280px)',
+                                    minHeight: '300px'
                                 },
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$chat$2f$ChatPanel$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ChatPanel"], {
                                     chatHistory: roomState.chatHistory,
@@ -4183,12 +4639,12 @@ function Page() {
                                     onSendReaction: sendReaction
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 255,
+                                    lineNumber: 331,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 254,
+                                lineNumber: 330,
                                 columnNumber: 17
                             }, this),
                             mobileActiveTab === 'members' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$MemberList$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["MemberList"], {
@@ -4199,7 +4655,7 @@ function Page() {
                                 onRevokeControl: (targetId)=>revokeControl(targetId)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 265,
+                                lineNumber: 341,
                                 columnNumber: 17
                             }, this),
                             mobileActiveTab === 'queue' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoQueue$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["VideoQueue"], {
@@ -4209,7 +4665,7 @@ function Page() {
                                 onChangeVideo: (vData)=>syncPlayback(vData)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 275,
+                                lineNumber: 351,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$MobileTabBar$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["MobileTabBar"], {
@@ -4219,13 +4675,13 @@ function Page() {
                                 chatCount: roomState.chatHistory.length
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 284,
+                                lineNumber: 359,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 225,
+                        lineNumber: 305,
                         columnNumber: 13
                     }, this),
                     isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$ControlRequestModal$2e$jsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ControlRequestModal"], {
@@ -4233,23 +4689,34 @@ function Page() {
                         onRespond: (targetId, approved)=>respondControlRequest(targetId, approved)
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 295,
+                        lineNumber: 370,
                         columnNumber: 13
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 165,
+                lineNumber: 246,
                 columnNumber: 9
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("style", {
+                children: `
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+      `
+            }, void 0, false, {
+                fileName: "[project]/src/app/page.jsx",
+                lineNumber: 378,
+                columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/page.jsx",
-        lineNumber: 103,
+        lineNumber: 104,
         columnNumber: 5
     }, this);
 }
-_s(Page, "Ml2yVl7ErGfEmQYIF8qlX+Yghs0=", false, function() {
+_s(Page, "oha43XKpNvAlPdY94ej9lsh/ilQ=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$useSocket$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSocket"]
     ];
