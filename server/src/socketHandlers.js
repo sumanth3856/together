@@ -166,8 +166,12 @@ export function setupSocketHandlers(io) {
     socket.on('disconnect', () => {
       if (currentRoomId) {
         const result = RoomManager.leaveRoom(socket.id);
-        if (result && result.room) {
-          broadcastRoomState(result.roomId);
+        if (result) {
+          if (result.sessionEnded) {
+            io.to(result.roomId).emit('session_ended');
+          } else if (result.room) {
+            broadcastRoomState(result.roomId);
+          }
         }
       }
     });

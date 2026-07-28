@@ -127,35 +127,16 @@ export const RoomManager = {
           timestamp: Date.now()
         });
 
+        let sessionEnded = false;
+
         // Handle Host leaving
         if (room.hostId === socketId) {
-          if (room.members.size > 0) {
-            // Reassign host to oldest remaining member
-            const nextHostSocketId = Array.from(room.members.keys())[0];
-            const newHost = room.members.get(nextHostSocketId);
-            newHost.isHost = true;
-            newHost.hasControl = true;
-            room.hostId = nextHostSocketId;
-
-            room.chatHistory.push({
-              id: `sys-host-${Date.now()}`,
-              sender: 'System',
-              text: `${newHost.nickname} is now the room Host.`,
-              isSystem: true,
-              timestamp: Date.now()
-            });
-          } else {
-            // Delete empty room after 1 minute of inactivity
-            setTimeout(() => {
-              const currentRoom = rooms.get(roomId);
-              if (currentRoom && currentRoom.members.size === 0) {
-                rooms.delete(roomId);
-              }
-            }, 60000);
-          }
+          // Immediately disband the room for everyone
+          rooms.delete(roomId);
+          sessionEnded = true;
         }
 
-        return { roomId, room, member };
+        return { roomId, room, member, sessionEnded };
       }
     }
     return null;
@@ -290,11 +271,22 @@ export const RoomManager = {
 
   getRoomStateDTO(room) {
     if (!room) return null;
+    
+    // Calculate accurate live interpolated time
+    let liveCurrentTime = room.playback.currentTime;
+    if (room.playback.isPlaying) {
+      const elapsedSeconds = (Date.now() - room.playback.updatedAt) / 1000;
+      liveCurrentTime += elapsedSeconds;
+    }
+
     return {
       roomId: room.roomId,
       hostId: room.hostId,
       currentVideo: room.currentVideo,
-      playback: room.playback,
+      playback: {
+        ...room.playback,
+        currentTime: liveCurrentTime
+      },
       members: Array.from(room.members.values()),
       controlRequests: Array.from(room.controlRequests.values()),
       chatHistory: room.chatHistory

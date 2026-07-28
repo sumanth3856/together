@@ -18,6 +18,7 @@ export default function Page() {
     socket,
     isConnected,
     roomState,
+    sessionEnded,
     toastNotification,
     setToastNotification,
     controlRequestNotice,
@@ -143,11 +144,22 @@ export default function Page() {
 
       {!roomState ? (
         /* Join / Create Landing Page */
-        <JoinRoomModal 
-          initialRoomId={initialRoomId}
-          onCreateRoom={handleCreateRoom}
-          onJoinRoom={handleJoinRoom}
-        />
+        sessionEnded ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: '#fff' }}>
+            <AlertCircle size={48} color="var(--status-danger)" style={{ marginBottom: '16px' }} />
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Session Ended</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>The host has left the room and the session has ended.</p>
+            <button className="btn btn-primary" onClick={() => window.location.href = '/'}>
+              Return Home
+            </button>
+          </div>
+        ) : (
+          <JoinRoomModal 
+            initialRoomId={initialRoomId}
+            onCreateRoom={handleCreateRoom}
+            onJoinRoom={handleJoinRoom}
+          />
+        )
       ) : (
         /* Main Co-Watching Room View */
         <div className="room-container" style={{ maxWidth: '1360px', margin: '0 auto', padding: isMobileScreen ? '10px' : '16px 20px', minHeight: '100vh' }}>
@@ -226,7 +238,7 @@ export default function Page() {
 
               {/* Mobile Active Tab View */}
               {mobileActiveTab === 'video' && (
-                <div style={{ paddingBottom: '70px' }}>
+                <div>
                   <VideoDetailsCard 
                     currentVideo={roomState.currentVideo}
                     roomState={roomState}

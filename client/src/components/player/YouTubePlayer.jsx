@@ -130,11 +130,11 @@ export function YouTubePlayer({
     }
   }, [youtubeId, isPlayerReady]);
 
-  // Handle incoming Socket playback sync events from Host/Controller
+  // Handle incoming playback sync state
   useEffect(() => {
-    if (!syncedPlaybackEvent || !isPlayerReady || !playerRef.current) return;
+    if (!playback || !isPlayerReady || !playerRef.current) return;
 
-    const { playback: serverPlayback } = syncedPlaybackEvent;
+    const serverPlayback = playback;
     if (!serverPlayback) return;
 
     const player = playerRef.current;
@@ -142,25 +142,24 @@ export function YouTubePlayer({
     const targetTime = serverPlayback.currentTime;
     const drift = Math.abs(localTime - targetTime);
 
-    isSelfSyncing.current = Date.now();
-
     // Auto-seek if drift is greater than 1.5 seconds
     if (drift > 1.5) {
+      isSelfSyncing.current = Date.now();
       player.seekTo(targetTime, true);
     }
 
     if (serverPlayback.isPlaying) {
       if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) {
+        isSelfSyncing.current = Date.now();
         player.playVideo();
-        setLocalPlaying(true);
       }
     } else {
       if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) {
+        isSelfSyncing.current = Date.now();
         player.pauseVideo();
-        setLocalPlaying(false);
       }
     }
-  }, [syncedPlaybackEvent, isPlayerReady]);
+  }, [playback, isPlayerReady]);
 
   // Progress Bar Time Update Loop
   useEffect(() => {

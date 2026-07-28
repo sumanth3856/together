@@ -22,6 +22,7 @@ export function useSocket() {
   const [controlRequestNotice, setControlRequestNotice] = useState(null);
   const [incomingReaction, setIncomingReaction] = useState(null);
   const [syncedPlaybackEvent, setSyncedPlaybackEvent] = useState(null);
+  const [sessionEnded, setSessionEnded] = useState(false);
 
   useEffect(() => {
     const socket = io(getSocketUrl(), {
@@ -69,6 +70,11 @@ export function useSocket() {
 
     socket.on('error_message', ({ message }) => {
       setToastNotification({ type: 'error', message });
+    });
+
+    socket.on('session_ended', () => {
+      setSessionEnded(true);
+      setRoomState(null); // Clear room state
     });
 
     return () => {
@@ -145,6 +151,7 @@ export function useSocket() {
     socket: socketRef.current,
     isConnected,
     roomState,
+    sessionEnded,
     toastNotification,
     setToastNotification,
     controlRequestNotice,

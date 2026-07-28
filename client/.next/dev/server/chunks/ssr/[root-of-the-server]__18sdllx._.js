@@ -117,6 +117,7 @@ function useSocket() {
     const [controlRequestNotice, setControlRequestNotice] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [incomingReaction, setIncomingReaction] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [syncedPlaybackEvent, setSyncedPlaybackEvent] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [sessionEnded, setSessionEnded] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         const socket = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$socket$2e$io$2d$client$2f$build$2f$esm$2d$debug$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["io"])(getSocketUrl(), {
             transports: [
@@ -162,6 +163,10 @@ function useSocket() {
                 type: 'error',
                 message
             });
+        });
+        socket.on('session_ended', ()=>{
+            setSessionEnded(true);
+            setRoomState(null); // Clear room state
         });
         return ()=>{
             socket.disconnect();
@@ -242,6 +247,7 @@ function useSocket() {
         socket: socketRef.current,
         isConnected,
         roomState,
+        sessionEnded,
         toastNotification,
         setToastNotification,
         controlRequestNotice,
@@ -1193,33 +1199,33 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
         youtubeId,
         isPlayerReady
     ]);
-    // Handle incoming Socket playback sync events from Host/Controller
+    // Handle incoming playback sync state
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        if (!syncedPlaybackEvent || !isPlayerReady || !playerRef.current) return;
-        const { playback: serverPlayback } = syncedPlaybackEvent;
+        if (!playback || !isPlayerReady || !playerRef.current) return;
+        const serverPlayback = playback;
         if (!serverPlayback) return;
         const player = playerRef.current;
         const localTime = player.getCurrentTime() || 0;
         const targetTime = serverPlayback.currentTime;
         const drift = Math.abs(localTime - targetTime);
-        isSelfSyncing.current = Date.now();
         // Auto-seek if drift is greater than 1.5 seconds
         if (drift > 1.5) {
+            isSelfSyncing.current = Date.now();
             player.seekTo(targetTime, true);
         }
         if (serverPlayback.isPlaying) {
             if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) {
+                isSelfSyncing.current = Date.now();
                 player.playVideo();
-                setLocalPlaying(true);
             }
         } else {
             if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) {
+                isSelfSyncing.current = Date.now();
                 player.pauseVideo();
-                setLocalPlaying(false);
             }
         }
     }, [
-        syncedPlaybackEvent,
+        playback,
         isPlayerReady
     ]);
     // Progress Bar Time Update Loop
@@ -1312,7 +1318,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 242,
+                        lineNumber: 241,
                         columnNumber: 9
                     }, this),
                     !isHost && !hasControl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1338,20 +1344,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 color: "var(--status-warning)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 267,
+                                lineNumber: 266,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: "Host Controls Playback"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 268,
+                                lineNumber: 267,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 249,
+                        lineNumber: 248,
                         columnNumber: 11
                     }, this),
                     isPlayerReady && playback?.isPlaying && !localPlaying && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1388,20 +1394,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                         size: 20
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 299,
+                                        lineNumber: 298,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: "Click to Sync & Unmute"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 300,
+                                        lineNumber: 299,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 288,
+                                lineNumber: 287,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1413,19 +1419,19 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: "Browser blocked autoplay. Click to resume."
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 302,
+                                lineNumber: 301,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 274,
+                        lineNumber: 273,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                lineNumber: 230,
+                lineNumber: 229,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1454,7 +1460,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: formatTime(currentTime)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 313,
+                                lineNumber: 312,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1474,7 +1480,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 }
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 316,
+                                lineNumber: 315,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1487,13 +1493,13 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: formatTime(duration)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 332,
+                                lineNumber: 331,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 312,
+                        lineNumber: 311,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1525,7 +1531,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             size: 16
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 346,
+                                            lineNumber: 345,
                                             columnNumber: 33
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$play$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Play$3e$__["Play"], {
                                             size: 16,
@@ -1534,12 +1540,12 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 346,
+                                            lineNumber: 345,
                                             columnNumber: 55
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 341,
+                                        lineNumber: 340,
                                         columnNumber: 15
                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                         className: "btn btn-secondary",
@@ -1555,20 +1561,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 size: 14
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 354,
+                                                lineNumber: 353,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "Request Control"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 355,
+                                                lineNumber: 354,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 349,
+                                        lineNumber: 348,
                                         columnNumber: 15
                                     }, this),
                                     (isHost || hasControl) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1581,20 +1587,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 size: 10
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 361,
+                                                lineNumber: 360,
                                                 columnNumber: 17
                                             }, this),
                                             " Control Unlocked"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 360,
+                                        lineNumber: 359,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 339,
+                                lineNumber: 338,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1619,19 +1625,19 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             color: "var(--status-danger)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 375,
+                                            lineNumber: 374,
                                             columnNumber: 17
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$2$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Volume2$3e$__["Volume2"], {
                                             size: 16,
                                             color: "var(--text-secondary)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 377,
+                                            lineNumber: 376,
                                             columnNumber: 17
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 368,
+                                        lineNumber: 367,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1648,7 +1654,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                         }
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 380,
+                                        lineNumber: 379,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1666,44 +1672,44 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 color: "var(--status-success)"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 394,
+                                                lineNumber: 393,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "Sync"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 395,
+                                                lineNumber: 394,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 393,
+                                        lineNumber: 392,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 367,
+                                lineNumber: 366,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 338,
+                        lineNumber: 337,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                lineNumber: 310,
+                lineNumber: 309,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-        lineNumber: 228,
+        lineNumber: 227,
         columnNumber: 5
     }, this);
 }
@@ -3665,7 +3671,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$re
 ;
 ;
 function Page() {
-    const { socket, isConnected, roomState, toastNotification, setToastNotification, controlRequestNotice, setControlRequestNotice, incomingReaction, syncedPlaybackEvent, createRoom, joinRoom, syncPlayback, requestControl, respondControlRequest, revokeControl, sendChatMessage, sendReaction } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$useSocket$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useSocket"])();
+    const { socket, isConnected, roomState, sessionEnded, toastNotification, setToastNotification, controlRequestNotice, setControlRequestNotice, incomingReaction, syncedPlaybackEvent, createRoom, joinRoom, syncPlayback, requestControl, respondControlRequest, revokeControl, sendChatMessage, sendReaction } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$useSocket$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useSocket"])();
     const [initialRoomId, setInitialRoomId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])('');
     const [mobileActiveTab, setMobileActiveTab] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])('video');
     const [isMobileScreen, setIsMobileScreen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false); // Default to false for SSR, update in useEffect
@@ -3766,14 +3772,14 @@ function Page() {
                                     color: "#ef4444"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 128,
+                                    lineNumber: 129,
                                     columnNumber: 17
                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2d$circle$2d$2$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__CheckCircle2$3e$__["CheckCircle2"], {
                                     size: 16,
                                     color: "var(--accent-primary)"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 130,
+                                    lineNumber: 131,
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3783,13 +3789,13 @@ function Page() {
                                     children: toastNotification.message
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 132,
+                                    lineNumber: 133,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.jsx",
-                            lineNumber: 126,
+                            lineNumber: 127,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3805,33 +3811,90 @@ function Page() {
                                 size: 14
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 138,
+                                lineNumber: 139,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.jsx",
-                            lineNumber: 134,
+                            lineNumber: 135,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.jsx",
-                    lineNumber: 114,
+                    lineNumber: 115,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 105,
+                lineNumber: 106,
                 columnNumber: 9
             }, this),
-            !roomState ? /* Join / Create Landing Page */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$JoinRoomModal$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["JoinRoomModal"], {
+            !roomState ? /* Join / Create Landing Page */ sessionEnded ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: {
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '100vh',
+                    color: '#fff'
+                },
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$alert$2d$circle$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertCircle$3e$__["AlertCircle"], {
+                        size: 48,
+                        color: "var(--status-danger)",
+                        style: {
+                            marginBottom: '16px'
+                        }
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 149,
+                        columnNumber: 13
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                        style: {
+                            fontSize: '1.5rem',
+                            marginBottom: '8px'
+                        },
+                        children: "Session Ended"
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 150,
+                        columnNumber: 13
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                        style: {
+                            color: 'var(--text-secondary)',
+                            marginBottom: '24px'
+                        },
+                        children: "The host has left the room and the session has ended."
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 151,
+                        columnNumber: 13
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        className: "btn btn-primary",
+                        onClick: ()=>window.location.href = '/',
+                        children: "Return Home"
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/page.jsx",
+                        lineNumber: 152,
+                        columnNumber: 13
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/app/page.jsx",
+                lineNumber: 148,
+                columnNumber: 11
+            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$JoinRoomModal$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["JoinRoomModal"], {
                 initialRoomId: initialRoomId,
                 onCreateRoom: handleCreateRoom,
                 onJoinRoom: handleJoinRoom
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 146,
-                columnNumber: 9
+                lineNumber: 157,
+                columnNumber: 11
             }, this) : /* Main Co-Watching Room View */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "room-container",
                 style: {
@@ -3848,7 +3911,7 @@ function Page() {
                         onLeaveRoom: handleLeaveRoom
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 154,
+                        lineNumber: 166,
                         columnNumber: 11
                     }, this),
                     !isMobileScreen ? /* Desktop / Tablet Grid View */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3866,7 +3929,7 @@ function Page() {
                                         onRequestControl: requestControl
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.jsx",
-                                        lineNumber: 166,
+                                        lineNumber: 178,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoDetailsCard$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["VideoDetailsCard"], {
@@ -3878,7 +3941,7 @@ function Page() {
                                         onRequestControl: requestControl
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.jsx",
-                                        lineNumber: 176,
+                                        lineNumber: 188,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoQueue$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["VideoQueue"], {
@@ -3888,7 +3951,7 @@ function Page() {
                                         onChangeVideo: (vData)=>syncPlayback(vData)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.jsx",
-                                        lineNumber: 185,
+                                        lineNumber: 197,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$MemberList$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MemberList"], {
@@ -3899,13 +3962,13 @@ function Page() {
                                         onRevokeControl: (targetId)=>revokeControl(targetId)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.jsx",
-                                        lineNumber: 192,
+                                        lineNumber: 204,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 165,
+                                lineNumber: 177,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3917,18 +3980,18 @@ function Page() {
                                     onSendReaction: sendReaction
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 203,
+                                    lineNumber: 215,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 202,
+                                lineNumber: 214,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 163,
+                        lineNumber: 175,
                         columnNumber: 13
                     }, this) : /* Mobile View (< 768px) */ /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
@@ -3949,18 +4012,15 @@ function Page() {
                                     onRequestControl: requestControl
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 216,
+                                    lineNumber: 228,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 215,
+                                lineNumber: 227,
                                 columnNumber: 15
                             }, this),
                             mobileActiveTab === 'video' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                style: {
-                                    paddingBottom: '70px'
-                                },
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoDetailsCard$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["VideoDetailsCard"], {
                                     currentVideo: roomState.currentVideo,
                                     roomState: roomState,
@@ -3970,12 +4030,12 @@ function Page() {
                                     onRequestControl: requestControl
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 230,
+                                    lineNumber: 242,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 229,
+                                lineNumber: 241,
                                 columnNumber: 17
                             }, this),
                             mobileActiveTab === 'chat' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3989,12 +4049,12 @@ function Page() {
                                     onSendReaction: sendReaction
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 243,
+                                    lineNumber: 255,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 242,
+                                lineNumber: 254,
                                 columnNumber: 17
                             }, this),
                             mobileActiveTab === 'members' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$MemberList$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MemberList"], {
@@ -4005,7 +4065,7 @@ function Page() {
                                 onRevokeControl: (targetId)=>revokeControl(targetId)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 253,
+                                lineNumber: 265,
                                 columnNumber: 17
                             }, this),
                             mobileActiveTab === 'queue' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$player$2f$VideoQueue$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["VideoQueue"], {
@@ -4015,7 +4075,7 @@ function Page() {
                                 onChangeVideo: (vData)=>syncPlayback(vData)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 263,
+                                lineNumber: 275,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$MobileTabBar$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["MobileTabBar"], {
@@ -4025,13 +4085,13 @@ function Page() {
                                 chatCount: roomState.chatHistory.length
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.jsx",
-                                lineNumber: 272,
+                                lineNumber: 284,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 213,
+                        lineNumber: 225,
                         columnNumber: 13
                     }, this),
                     isHost && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$room$2f$ControlRequestModal$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ControlRequestModal"], {
@@ -4039,19 +4099,19 @@ function Page() {
                         onRespond: (targetId, approved)=>respondControlRequest(targetId, approved)
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 283,
+                        lineNumber: 295,
                         columnNumber: 13
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 153,
+                lineNumber: 165,
                 columnNumber: 9
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/page.jsx",
-        lineNumber: 102,
+        lineNumber: 103,
         columnNumber: 5
     }, this);
 }

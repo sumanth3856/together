@@ -202,10 +202,11 @@ h1, h2, h3, h4, .font-heading {
   bottom: 0;
   left: 0;
   right: 0;
+  width: 100%;
   height: calc(62px + env(safe-area-inset-bottom));
   background: #0d1017;
   border-top: 1px solid var(--border-subtle);
-  z-index: 90;
+  z-index: 9999;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
