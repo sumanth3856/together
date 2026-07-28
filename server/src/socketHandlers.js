@@ -62,8 +62,16 @@ export function setupSocketHandlers(io) {
           currentVideo: result.room.currentVideo,
           senderId: socket.id
         });
-        // We INTENTIONALLY do not call broadcastRoomState here. 
-        // Emitting 100 chat messages and member lists on every playback seek/pause is a huge performance bottleneck!
+        
+        // If the video actually changed (not just a pause/play/seek), broadcast the full room state 
+        // to everyone (including the sender) so their VideoDetailsCard and chat updates!
+        if (data.youtubeId && data.youtubeId !== result.room.currentVideo.youtubeId) {
+           broadcastRoomState(currentRoomId);
+        } else if (data.youtubeId) {
+           // If they passed a youtubeId, they intended to change the video.
+           // Even if it's the same video, we should just broadcast state to update the chat message.
+           broadcastRoomState(currentRoomId);
+        }
       }
     });
 

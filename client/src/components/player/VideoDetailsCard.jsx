@@ -34,37 +34,35 @@ export function VideoDetailsCard({
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
           <div 
             style={{
-              width: '46px',
-              height: '46px',
+              width: '42px',
+              height: '42px',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
+              background: 'var(--bg-input)',
+              border: '1px solid var(--border-subtle)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)'
+              flexShrink: 0
             }}
           >
-            <Film size={22} color="var(--accent-primary)" />
+            <Film size={20} color="var(--accent-primary)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 
               style={{ 
-                fontSize: '1.1rem', 
+                fontSize: '1.05rem', 
                 fontWeight: '700', 
                 color: 'var(--text-primary)', 
                 lineHeight: 1.3,
-                marginBottom: '6px',
+                marginBottom: '4px',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                letterSpacing: '-0.01em'
+                textOverflow: 'ellipsis'
               }}
             >
               {currentVideo?.title || 'YouTube Video'}
             </h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'ui-monospace, monospace', display: 'block' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace', display: 'block' }}>
               ID: {currentVideo?.youtubeId || 'dQw4w9WgXcQ'}
             </span>
           </div>
@@ -77,16 +75,16 @@ export function VideoDetailsCard({
             alignItems: 'center', 
             gap: '6px', 
             background: 'rgba(16, 185, 129, 0.1)', 
-            padding: '6px 12px', 
+            padding: '4px 10px', 
             borderRadius: 'var(--radius-full)', 
             border: '1px solid rgba(16, 185, 129, 0.2)', 
-            fontSize: '0.75rem', 
+            fontSize: '0.72rem', 
             fontWeight: '600',
             color: '#10b981',
             flexShrink: 0
           }}
         >
-          <Radio size={14} color="#10b981" />
+          <Radio size={12} color="#10b981" />
           <span className="hide-on-small">Live Synced</span>
         </div>
       </div>
@@ -98,33 +96,32 @@ export function VideoDetailsCard({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '12px',
-          padding: '14px 16px',
-          background: 'rgba(0, 0, 0, 0.2)',
+          padding: '12px 14px',
+          background: 'var(--bg-input)',
           borderRadius: 'var(--radius-md)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
-          marginBottom: '20px',
-          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
+          border: '1px solid var(--border-subtle)',
+          marginBottom: '20px'
         }}
       >
         {/* Playback Controller Badge */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <span style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Playback Controller</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Playback Controller</span>
           {controller ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {controller.isHost ? <Crown size={14} color="var(--accent-secondary)" /> : <Key size={14} color="var(--accent-primary)" />}
-              <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
                 {controller.nickname} {controller.socketId === currentSocketId ? <span style={{ color: 'var(--text-secondary)' }}>(You)</span> : ''}
               </span>
             </div>
           ) : (
-            <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-secondary)' }}>None</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>None</span>
           )}
         </div>
 
         {/* Room Code Badge */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-          <span style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Room Code</span>
-          <span className="badge badge-room" style={{ padding: '6px 12px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Room Code</span>
+          <span className="badge badge-room" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
             {roomState?.roomId}
           </span>
         </div>

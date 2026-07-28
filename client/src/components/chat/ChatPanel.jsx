@@ -2,13 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, Crown, Key, Radio } from 'lucide-react';
 import { EmojiReactions } from './EmojiReactions';
 
-export function ChatPanel({ chatHistory = [], currentSocketId, incomingReaction, onSendMessage, onSendReaction }) {
+export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendReaction }) {
   const [inputText, setInputText] = useState('');
-  const chatEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   // Auto-scroll chat to bottom on new messages
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [chatHistory]);
 
   const handleSend = (e) => {
@@ -43,8 +45,8 @@ export function ChatPanel({ chatHistory = [], currentSocketId, incomingReaction,
       {/* Header */}
       <div 
         style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+          padding: '12px 16px',
+          borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -53,124 +55,101 @@ export function ChatPanel({ chatHistory = [], currentSocketId, incomingReaction,
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <MessageSquare size={16} color="var(--accent-primary)" />
-          <h3 style={{ fontSize: '0.95rem', fontWeight: '700' }}>Room Chat</h3>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: '700' }}>Room Chat</h3>
         </div>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{chatHistory.length} messages</span>
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{chatHistory.length} messages</span>
       </div>
 
       {/* Message Stream */}
       <div 
-        className="scroll-y"
+        ref={chatContainerRef}
         style={{
           flex: 1,
-          padding: '16px',
+          padding: '14px',
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px'
+          gap: '10px'
         }}
       >
         {chatHistory.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 12px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            <Radio size={28} color="var(--text-tertiary)" style={{ marginBottom: '10px' }} />
+          <div style={{ textAlign: 'center', padding: '36px 12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+            <Radio size={24} color="var(--text-tertiary)" style={{ marginBottom: '6px' }} />
             <p>No messages yet. Say hi to start watching!</p>
           </div>
         ) : (
-          chatHistory.map((msg, index) => {
+          chatHistory.map((msg) => {
             if (msg.isSystem) {
               return (
                 <div 
                   key={msg.id} 
                   style={{
                     textAlign: 'center',
-                    margin: '8px 0',
-                    fontSize: '0.75rem',
+                    margin: '2px 0',
+                    fontSize: '0.72rem',
                     color: 'var(--text-secondary)',
-                    display: 'flex',
-                    justifyContent: 'center'
+                    background: 'var(--bg-input)',
+                    padding: '3px 10px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '1px solid var(--border-subtle)'
                   }}
                 >
-                  <span style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    padding: '4px 12px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid rgba(255, 255, 255, 0.03)'
-                  }}>
-                    {msg.text}
-                  </span>
+                  <span>{msg.text}</span>
                 </div>
               );
             }
 
-            const isSelf = msg.socketId === currentSocketId;
-            const showAvatar = !isSelf;
-
             return (
-              <div 
-                key={msg.id} 
-                style={{ 
-                  display: 'flex', 
-                  gap: '8px', 
-                  alignItems: 'flex-end',
-                  alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                  maxWidth: '85%'
-                }}
-              >
-                {/* Other User Avatar */}
-                {showAvatar && (
-                  <div 
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: 'var(--radius-full)',
-                      background: msg.color || 'var(--accent-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: '700',
-                      fontSize: '0.75rem',
-                      color: '#fff',
-                      flexShrink: 0,
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                    }}
-                  >
-                    {getAvatarLetter(msg.sender)}
-                  </div>
-                )}
+              <div key={msg.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                {/* User Avatar */}
+                <div 
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: msg.color || 'var(--accent-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: '700',
+                    fontSize: '0.8rem',
+                    color: '#fff',
+                    flexShrink: 0
+                  }}
+                >
+                  {getAvatarLetter(msg.sender)}
+                </div>
 
                 {/* Message Content */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isSelf ? 'flex-end' : 'flex-start' }}>
-                  {!isSelf && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', paddingLeft: '4px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '600', color: msg.color || 'var(--text-secondary)' }}>
-                        {msg.sender}
-                      </span>
-                      {msg.isHost && <Crown size={12} color="#f59e0b" />}
-                      {msg.hasControl && <Key size={11} color="#10b981" />}
-                    </div>
-                  )}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: msg.color || 'var(--text-primary)' }}>
+                      {msg.sender}
+                    </span>
+                    {msg.isHost && <Crown size={12} color="#f59e0b" />}
+                    {msg.hasControl && <Key size={11} color="#10b981" />}
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
                   <div 
                     style={{
-                      background: isSelf ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                      border: isSelf ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
-                      padding: '10px 14px',
-                      borderRadius: isSelf ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                      fontSize: '0.9rem',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-subtle)',
+                      padding: '7px 10px',
+                      borderRadius: '0 8px 8px 8px',
+                      fontSize: '0.85rem',
                       wordBreak: 'break-word',
-                      color: isSelf ? '#fff' : 'var(--text-primary)',
-                      boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      color: 'var(--text-primary)'
                     }}
                   >
                     {msg.text}
                   </div>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '4px', padding: '0 4px' }}>
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
                 </div>
               </div>
             );
           })
         )}
-        <div ref={chatEndRef} />
       </div>
 
       {/* Input */}

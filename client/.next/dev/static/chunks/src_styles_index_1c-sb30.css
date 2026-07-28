@@ -34,23 +34,9 @@
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  height: 100dvh;
+  min-height: 100dvh;
   font-family: Inter, system-ui, -apple-system, sans-serif;
   line-height: 1.5;
-  overflow: hidden;
-}
-
-.app-viewport {
-  background: var(--bg-primary);
-  flex-direction: column;
-  height: 100dvh;
-  display: flex;
-  position: relative;
-}
-
-.scroll-y {
-  scrollbar-width: thin;
-  overflow: hidden auto;
 }
 
 h1, h2, h3, h4, .font-heading {
@@ -76,11 +62,9 @@ h1, h2, h3, h4, .font-heading {
 }
 
 .panel {
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: #121620b3;
-  border: 1px solid #ffffff0d;
-  box-shadow: 0 4px 20px #00000026;
 }
 
 .panel-interactive {
@@ -99,6 +83,7 @@ h1, h2, h3, h4, .font-heading {
   min-height: var(--touch-target-min);
   border-radius: var(--radius-md);
   cursor: pointer;
+  transition: all var(--transition-fast);
   -webkit-user-select: none;
   user-select: none;
   white-space: nowrap;
@@ -110,12 +95,7 @@ h1, h2, h3, h4, .font-heading {
   font-family: Inter, sans-serif;
   font-size: .88rem;
   font-weight: 600;
-  transition: transform .1s, background .15s, box-shadow .15s;
   display: inline-flex;
-}
-
-.btn:active {
-  transform: scale(.97);
 }
 
 .btn-primary {
@@ -267,28 +247,11 @@ h1, h2, h3, h4, .font-heading {
   grid-template-columns: 1fr 360px;
   align-items: start;
   gap: 20px;
-  height: calc(100vh - 120px);
   display: grid;
-  overflow: hidden;
-}
-
-.left-column {
-  flex-direction: column;
-  gap: 16px;
-  height: 100%;
-  display: flex;
-}
-
-.left-scrollable {
-  flex: 1;
-  min-height: 0;
-  padding-right: 4px;
 }
 
 .chat-sidebar {
-  flex-direction: column;
   height: calc(100vh - 110px);
-  display: flex;
   position: sticky;
   top: 16px;
 }
@@ -303,16 +266,6 @@ h1, h2, h3, h4, .font-heading {
 @media (max-width: 900px) {
   .desktop-grid {
     grid-template-columns: 1fr;
-    height: auto;
-    overflow: visible;
-  }
-
-  .left-column {
-    height: auto;
-  }
-
-  .left-scrollable {
-    overflow: visible;
   }
 
   .chat-sidebar {
