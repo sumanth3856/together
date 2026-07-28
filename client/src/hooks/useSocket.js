@@ -2,14 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 const getSocketUrl = () => {
-  if (import.meta.env.VITE_SOCKET_SERVER_URL) {
-    return import.meta.env.VITE_SOCKET_SERVER_URL;
-  }
-  const { protocol, hostname, port } = window.location;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `${protocol}//${hostname}:4000`;
-  }
-  return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
+  if (typeof window === 'undefined') return '';
+  
+  // Use relative path for Next.js rewrites to proxy to backend
+  return '';
 };
 
 export function useSocket() {

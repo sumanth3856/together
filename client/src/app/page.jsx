@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { useSocket } from './hooks/useSocket';
-import { JoinRoomModal } from './components/room/JoinRoomModal';
-import { RoomHeader } from './components/room/RoomHeader';
-import { YouTubePlayer } from './components/player/YouTubePlayer';
-import { VideoDetailsCard } from './components/player/VideoDetailsCard';
-import { VideoQueue } from './components/player/VideoQueue';
-import { MemberList } from './components/room/MemberList';
-import { ChatPanel } from './components/chat/ChatPanel';
-import { ControlRequestModal } from './components/room/ControlRequestModal';
-import { MobileTabBar } from './components/room/MobileTabBar';
-import { AlertCircle, CheckCircle2, X } from 'lucide-react';
-import './styles/index.css';
+"use client";
 
-export function App() {
+import React, { useState, useEffect } from 'react';
+import { useSocket } from '../hooks/useSocket';
+import { JoinRoomModal } from '../components/room/JoinRoomModal';
+import { RoomHeader } from '../components/room/RoomHeader';
+import { YouTubePlayer } from '../components/player/YouTubePlayer';
+import { VideoDetailsCard } from '../components/player/VideoDetailsCard';
+import { VideoQueue } from '../components/player/VideoQueue';
+import { MemberList } from '../components/room/MemberList';
+import { ChatPanel } from '../components/chat/ChatPanel';
+import { ControlRequestModal } from '../components/room/ControlRequestModal';
+import { MobileTabBar } from '../components/room/MobileTabBar';
+import { AlertCircle, CheckCircle2, X } from 'lucide-react';
+
+export default function Page() {
   const {
     socket,
     isConnected,
@@ -35,10 +36,11 @@ export function App() {
 
   const [initialRoomId, setInitialRoomId] = useState('');
   const [mobileActiveTab, setMobileActiveTab] = useState('video');
-  const [isMobileScreen, setIsMobileScreen] = useState(() => window.innerWidth < 768);
+  const [isMobileScreen, setIsMobileScreen] = useState(false); // Default to false for SSR, update in useEffect
 
   // Responsive Window Listener
   useEffect(() => {
+    setIsMobileScreen(window.innerWidth < 768);
     const handleResize = () => {
       setIsMobileScreen(window.innerWidth < 768);
     };
@@ -287,5 +289,3 @@ export function App() {
     </div>
   );
 }
-
-export default App;
