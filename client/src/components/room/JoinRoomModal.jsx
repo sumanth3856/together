@@ -3,14 +3,14 @@ import { Tv, Plus, Users, ArrowRight, ShieldCheck, Zap, Smile } from 'lucide-rea
 
 export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
   const [activeTab, setActiveTab] = useState(initialRoomId ? 'join' : 'create');
-  const [nickname, setNickname] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('tg_nickname') || '';
-    }
-    return '';
-  });
+  const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState(initialRoomId || '');
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('tg_nickname');
+    if (saved) setNickname(saved);
+  }, []);
 
   const getAvatarLetter = (name) => {
     return name ? name.trim().charAt(0).toUpperCase() : '?';
