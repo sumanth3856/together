@@ -217,7 +217,7 @@ export default function Page() {
 
               {/* Mobile Active Tab View */}
               {mobileActiveTab === 'video' && (
-                <>
+                <div style={{ paddingBottom: '70px' }}>
                   <VideoDetailsCard 
                     currentVideo={roomState.currentVideo}
                     roomState={roomState}
@@ -226,15 +226,7 @@ export default function Page() {
                     hasControl={hasControl}
                     onRequestControl={requestControl}
                   />
-
-                  <MemberList 
-                    members={roomState.members}
-                    currentSocketId={socket?.id}
-                    isHost={isHost}
-                    onGrantControl={(targetId, approved) => respondControlRequest(targetId, approved)}
-                    onRevokeControl={(targetId) => revokeControl(targetId)}
-                  />
-                </>
+                </div>
               )}
 
               {mobileActiveTab === 'chat' && (

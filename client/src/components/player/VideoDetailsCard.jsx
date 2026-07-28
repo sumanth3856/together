@@ -28,15 +28,15 @@ export function VideoDetailsCard({
   };
 
   return (
-    <div className="panel" style={{ marginTop: '16px', padding: '16px 18px' }}>
+    <div className="panel" style={{ marginTop: '16px', padding: '18px 20px' }}>
       {/* Top Header: Video Title & Youtube ID */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
           <div 
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: 'var(--radius-sm)',
+              width: '42px',
+              height: '42px',
+              borderRadius: 'var(--radius-md)',
               background: 'var(--bg-input)',
               border: '1px solid var(--border-subtle)',
               display: 'flex',
@@ -45,22 +45,47 @@ export function VideoDetailsCard({
               flexShrink: 0
             }}
           >
-            <Film size={18} color="var(--accent-primary)" />
+            <Film size={20} color="var(--accent-primary)" />
           </div>
-          <div>
-            <h3 style={{ fontSize: '0.98rem', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.3 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 
+              style={{ 
+                fontSize: '1.05rem', 
+                fontWeight: '700', 
+                color: 'var(--text-primary)', 
+                lineHeight: 1.3,
+                marginBottom: '4px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
               {currentVideo?.title || 'YouTube Video'}
             </h3>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace', display: 'block' }}>
               ID: {currentVideo?.youtubeId || 'dQw4w9WgXcQ'}
             </span>
           </div>
         </div>
 
         {/* Sync Drift Indicator Pill */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-input)', padding: '4px 10px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-          <Radio size={12} color="var(--status-success)" />
-          <span>Live Synced</span>
+        <div 
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px', 
+            background: 'rgba(16, 185, 129, 0.1)', 
+            padding: '4px 10px', 
+            borderRadius: 'var(--radius-full)', 
+            border: '1px solid rgba(16, 185, 129, 0.2)', 
+            fontSize: '0.72rem', 
+            fontWeight: '600',
+            color: '#10b981',
+            flexShrink: 0
+          }}
+        >
+          <Radio size={12} color="#10b981" />
+          <span style={{ display: 'none', '@media (min-width: 400px)': { display: 'inline' } }}>Live Synced</span>
         </div>
       </div>
 
@@ -69,54 +94,62 @@ export function VideoDetailsCard({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          flexWrap: 'wrap',
-          padding: '10px 12px',
+          justifyContent: 'space-between',
+          gap: '12px',
+          padding: '12px 14px',
           background: 'var(--bg-input)',
           borderRadius: 'var(--radius-md)',
           border: '1px solid var(--border-subtle)',
-          marginBottom: '14px'
+          marginBottom: '20px'
         }}
       >
         {/* Playback Controller Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
-          <span style={{ color: 'var(--text-secondary)' }}>Playback Controller:</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Playback Controller</span>
           {controller ? (
-            <span className={controller.isHost ? 'badge badge-host' : 'badge badge-control'} style={{ padding: '3px 8px' }}>
-              {controller.isHost ? <Crown size={11} /> : <Key size={11} />}
-              <span>{controller.nickname} {controller.socketId === currentSocketId ? '(You)' : ''}</span>
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {controller.isHost ? <Crown size={14} color="var(--accent-secondary)" /> : <Key size={14} color="var(--accent-primary)" />}
+              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                {controller.nickname} {controller.socketId === currentSocketId ? <span style={{ color: 'var(--text-secondary)' }}>(You)</span> : ''}
+              </span>
+            </div>
           ) : (
-            <span style={{ color: 'var(--text-secondary)' }}>None</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>None</span>
           )}
         </div>
 
         {/* Room Code Badge */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
-          <span style={{ color: 'var(--text-secondary)' }}>Room:</span>
-          <span className="badge badge-room" style={{ padding: '3px 8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Room Code</span>
+          <span className="badge badge-room" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
             {roomState?.roomId}
           </span>
         </div>
       </div>
 
-      {/* Quick Action Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      {/* Quick Action Bar (Responsive Grid) */}
+      <div 
+        style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+          gap: '10px' 
+        }}
+      >
         <button 
           onClick={handleCopyCode}
           className="btn btn-secondary"
-          style={{ minHeight: '34px', padding: '0 12px', fontSize: '0.78rem', flex: 1 }}
+          style={{ minHeight: '40px', padding: '0 12px', fontSize: '0.85rem', width: '100%' }}
         >
-          {copiedCode ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+          {copiedCode ? <Check size={16} color="#10b981" /> : <Copy size={16} />}
           <span>{copiedCode ? 'Code Copied' : 'Copy Code'}</span>
         </button>
 
         <button 
           onClick={handleCopyShareLink}
           className="btn btn-secondary"
-          style={{ minHeight: '34px', padding: '0 12px', fontSize: '0.78rem', flex: 1 }}
+          style={{ minHeight: '40px', padding: '0 12px', fontSize: '0.85rem', width: '100%' }}
         >
-          {copiedLink ? <Check size={13} color="#10b981" /> : <Share2 size={13} />}
+          {copiedLink ? <Check size={16} color="#10b981" /> : <Share2 size={16} />}
           <span>{copiedLink ? 'Link Copied' : 'Share Link'}</span>
         </button>
 
@@ -124,9 +157,17 @@ export function VideoDetailsCard({
           <button 
             onClick={onRequestControl}
             className="btn btn-secondary"
-            style={{ minHeight: '34px', padding: '0 12px', fontSize: '0.78rem', borderColor: 'rgba(245, 158, 11, 0.4)', color: '#fbbf24', flex: 1 }}
+            style={{ 
+              minHeight: '40px', 
+              padding: '0 12px', 
+              fontSize: '0.85rem', 
+              width: '100%',
+              background: 'rgba(245, 158, 11, 0.05)',
+              borderColor: 'rgba(245, 158, 11, 0.3)', 
+              color: '#fbbf24' 
+            }}
           >
-            <Unlock size={13} />
+            <Unlock size={16} />
             <span>Request Control</span>
           </button>
         )}

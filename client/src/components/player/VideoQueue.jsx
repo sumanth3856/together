@@ -16,9 +16,11 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
 
   const extractVideoId = (input) => {
     if (!input) return '';
-    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const match = input.match(regex);
-    return match ? match[1] : input.length === 11 ? input : '';
+    const cleanInput = input.trim();
+    if (cleanInput.length === 11) return cleanInput;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
+    const match = cleanInput.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : '';
   };
 
   const handleLoadVideo = (e) => {
