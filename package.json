@@ -4,6 +4,7 @@
   "description": "Together - YouTube Co-Watching Web App with Host Control Permissions & Real-time Chat",
   "private": true,
   "scripts": {
+    "postinstall": "npm install --prefix client && npm install --prefix server",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client",
     "start:server": "npm start --prefix server",
     "start:client": "npm run dev --prefix client",
