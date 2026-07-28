@@ -182,9 +182,9 @@ h1, h2, h3, h4, .font-heading {
 }
 
 .mobile-tab-bar {
+  height: calc(62px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border-subtle);
   z-index: 90;
-  height: 62px;
   padding-bottom: env(safe-area-inset-bottom);
   background: #0d1017;
   display: none;
@@ -233,7 +233,7 @@ h1, h2, h3, h4, .font-heading {
   }
 
   .room-container {
-    padding-bottom: 74px !important;
+    padding-bottom: calc(74px + env(safe-area-inset-bottom)) !important;
   }
 
   .mobile-sticky-player {

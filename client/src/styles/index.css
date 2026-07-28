@@ -202,7 +202,7 @@ h1, h2, h3, h4, .font-heading {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 62px;
+  height: calc(62px + env(safe-area-inset-bottom));
   background: #0d1017;
   border-top: 1px solid var(--border-subtle);
   z-index: 90;
@@ -247,7 +247,7 @@ h1, h2, h3, h4, .font-heading {
     display: flex;
   }
   .room-container {
-    padding-bottom: 74px !important;
+    padding-bottom: calc(74px + env(safe-area-inset-bottom)) !important;
   }
   .mobile-sticky-player {
     position: sticky;
