@@ -42,13 +42,16 @@ if (fs.existsSync(clientDistPath)) {
   });
 }
 
-// Configure Socket.io
+// Configure Socket.io for Vercel Serverless
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
   },
-  transports: ['polling', 'websocket']
+  transports: ['polling', 'websocket'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 setupSocketHandlers(io);
