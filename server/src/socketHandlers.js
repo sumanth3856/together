@@ -62,7 +62,8 @@ export function setupSocketHandlers(io) {
           currentVideo: result.room.currentVideo,
           senderId: socket.id
         });
-        broadcastRoomState(currentRoomId);
+        // We INTENTIONALLY do not call broadcastRoomState here. 
+        // Emitting 100 chat messages and member lists on every playback seek/pause is a huge performance bottleneck!
       }
     });
 

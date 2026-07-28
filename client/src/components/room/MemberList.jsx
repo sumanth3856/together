@@ -46,7 +46,7 @@ export function MemberList({
                     width: '32px',
                     height: '32px',
                     borderRadius: 'var(--radius-full)',
-                    background: m.isHost ? '#d97706' : 'var(--accent-primary)',
+                    background: m.isHost ? '#d97706' : (m.color || 'var(--accent-primary)'),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

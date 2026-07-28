@@ -5,16 +5,7 @@ export function ControlRequestModal({ requestNotice, onRespond }) {
   if (!requestNotice) return null;
 
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        bottom: '24px',
-        right: '24px',
-        zIndex: 100,
-        maxWidth: '360px',
-        width: 'calc(100% - 48px)'
-      }}
-    >
+    <div className="toast-container">
       <div 
         className="panel" 
         style={{

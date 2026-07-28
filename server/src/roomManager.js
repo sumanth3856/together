@@ -1,5 +1,5 @@
 // In-memory room manager for Together watch party app
-const rooms = new Map();
+export const rooms = new Map();
 
 // Helper to generate readable random room ID (e.g. TOG-8492)
 function generateRoomCode() {
@@ -70,14 +70,19 @@ export const RoomManager = {
     const room = this.getRoom(roomId);
     if (!room) return { error: 'Room not found' };
 
+    const isFirstMember = room.members.size === 0;
     const member = {
       socketId,
       nickname: nickname || `Guest_${Math.floor(1000 + Math.random() * 9000)}`,
       color: getRandomColor(),
-      isHost: false,
-      hasControl: false,
+      isHost: isFirstMember,
+      hasControl: isFirstMember,
       joinedAt: Date.now()
     };
+
+    if (isFirstMember) {
+      room.hostId = socketId;
+    }
 
     room.members.set(socketId, member);
 
@@ -258,6 +263,8 @@ export const RoomManager = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: member.nickname,
       color: member.color,
+      isHost: member.isHost,
+      hasControl: member.hasControl,
       text: text.trim(),
       isSystem: false,
       timestamp: Date.now()
@@ -282,3 +289,18 @@ export const RoomManager = {
     };
   }
 };
+
+// Global Memory Sweeper (Runs every 10 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [roomId, room] of rooms.entries()) {
+    // Delete abandoned rooms with 0 members instantly during sweeps
+    if (room.members.size === 0) {
+      rooms.delete(roomId);
+    } else {
+      // Hard expiration: Delete rooms older than 24 hours to prevent memory leaks on Render free tier
+      const isExpired = room.chatHistory[0] && (now - room.chatHistory[0].timestamp > 86400000);
+      if (isExpired) rooms.delete(roomId);
+    }
+  }
+}, 600000);

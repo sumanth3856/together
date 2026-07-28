@@ -104,7 +104,7 @@ export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, o
                     width: '30px',
                     height: '30px',
                     borderRadius: 'var(--radius-sm)',
-                    background: 'var(--accent-primary)',
+                    background: msg.color || 'var(--accent-primary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -114,14 +114,14 @@ export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, o
                     flexShrink: 0
                   }}
                 >
-                  {getAvatarLetter(msg.senderName)}
+                  {getAvatarLetter(msg.sender)}
                 </div>
 
                 {/* Message Content */}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                      {msg.senderName}
+                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: msg.color || 'var(--text-primary)' }}>
+                      {msg.sender}
                     </span>
                     {msg.isHost && <Crown size={12} color="#f59e0b" />}
                     {msg.hasControl && <Key size={11} color="#10b981" />}

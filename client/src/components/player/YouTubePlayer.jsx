@@ -18,7 +18,7 @@ export function YouTubePlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
-  const isSelfSyncing = useRef(false);
+  const isSelfSyncing = useRef(0);
 
   // Helper to extract YouTube video ID from various URL formats
   const extractVideoId = (input) => {
@@ -58,8 +58,8 @@ export function YouTubePlayer({
             setDuration(event.target.getDuration() || 0);
           },
           onStateChange: (event) => {
-            if (isSelfSyncing.current) {
-              isSelfSyncing.current = false;
+            // Ignore state changes if a sync/seek occurred in the last 1500ms
+            if (Date.now() - isSelfSyncing.current < 1500) {
               return;
             }
 
@@ -108,7 +108,7 @@ export function YouTubePlayer({
       const targetId = extractVideoId(youtubeId);
 
       if (currentIdInPlayer !== targetId && targetId) {
-        isSelfSyncing.current = true;
+        isSelfSyncing.current = Date.now();
         playerRef.current.loadVideoById(targetId, playback?.currentTime || 0);
       }
     }
@@ -126,7 +126,7 @@ export function YouTubePlayer({
     const targetTime = serverPlayback.currentTime;
     const drift = Math.abs(localTime - targetTime);
 
-    isSelfSyncing.current = true;
+    isSelfSyncing.current = Date.now();
 
     // Auto-seek if drift is greater than 1.5 seconds
     if (drift > 1.5) {
@@ -179,7 +179,7 @@ export function YouTubePlayer({
     const newTime = parseFloat(e.target.value);
     setCurrentTime(newTime);
     if (playerRef.current && (isHost || hasControl)) {
-      isSelfSyncing.current = true;
+      isSelfSyncing.current = Date.now();
       playerRef.current.seekTo(newTime, true);
       onPlaybackChange({ isPlaying: localPlaying, currentTime: newTime });
     }
@@ -250,6 +250,42 @@ export function YouTubePlayer({
           >
             <Lock size={12} color="var(--status-warning)" />
             <span>Host Controls Playback</span>
+          </div>
+        )}
+
+        {/* Autoplay Blocked / Out of Sync Overlay */}
+        {isPlayerReady && playback?.isPlaying && !localPlaying && (
+          <div 
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(9, 11, 16, 0.7)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff'
+            }}
+          >
+            <button 
+              onClick={() => {
+                if (playerRef.current) {
+                  playerRef.current.unMute();
+                  setIsMuted(false);
+                  playerRef.current.playVideo();
+                }
+              }}
+              className="btn btn-primary"
+              style={{ padding: '12px 24px', fontSize: '1rem', borderRadius: 'var(--radius-full)', boxShadow: '0 4px 12px rgba(88, 80, 236, 0.3)' }}
+            >
+              <Play size={20} />
+              <span>Click to Sync & Unmute</span>
+            </button>
+            <span style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Browser blocked autoplay. Click to resume.
+            </span>
           </div>
         )}
       </div>

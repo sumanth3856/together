@@ -48,14 +48,23 @@ export default function Page() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Extract ?room=TOG-XXXX from URL parameters
+  // Auto-join room on reload if URL parameters exist and nickname is saved
   useEffect(() => {
+    if (!isConnected) return; // Wait until socket connects
+
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
     if (roomParam) {
-      setInitialRoomId(roomParam.toUpperCase());
+      const savedNickname = localStorage.getItem('tg_nickname');
+      if (savedNickname && !roomState) {
+        // Auto-join
+        handleJoinRoom(roomParam.toUpperCase(), savedNickname);
+      } else if (!roomState) {
+        // Just set the input field for them to manually enter nickname
+        setInitialRoomId(roomParam.toUpperCase());
+      }
     }
-  }, []);
+  }, [isConnected]); // Run when socket connects
 
   // Update browser URL query string when room state changes
   useEffect(() => {
@@ -151,7 +160,7 @@ export default function Page() {
 
           {!isMobileScreen ? (
             /* Desktop / Tablet Grid View */
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '16px', alignItems: 'start' }}>
+            <div className="desktop-grid">
               {/* Left Column: Player, Video Details Hub & Queue */}
               <div>
                 <YouTubePlayer 
@@ -190,7 +199,7 @@ export default function Page() {
               </div>
 
               {/* Right Column: Live Chat Panel */}
-              <div style={{ position: 'sticky', top: '16px', height: 'calc(100vh - 110px)' }}>
+              <div className="chat-sidebar">
                 <ChatPanel 
                   chatHistory={roomState.chatHistory}
                   incomingReaction={incomingReaction}
