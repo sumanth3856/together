@@ -252,7 +252,7 @@ h1, h2, h3, h4, .font-heading {
   .mobile-sticky-player {
     position: sticky;
     top: 8px;
-    z-index: 80;
+    z-index: 10;
   }
 }
 
