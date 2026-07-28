@@ -63,7 +63,19 @@ export const RoomManager = {
 
   getRoom(roomId) {
     if (!roomId) return null;
-    return rooms.get(roomId.toUpperCase()) || null;
+    // Strip everything except letters, numbers, and dashes
+    let normalized = roomId.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+    
+    // Add prefix if they just typed the 4-character code
+    if (normalized.length === 4) {
+      normalized = `TOG-${normalized}`;
+    } 
+    // Add dash if they typed TOG1234 instead of TOG-1234
+    else if (normalized.length === 7 && normalized.startsWith('TOG') && !normalized.includes('-')) {
+      normalized = `TOG-${normalized.substring(3)}`;
+    }
+    
+    return rooms.get(normalized) || null;
   },
 
   joinRoom(roomId, socketId, nickname) {
