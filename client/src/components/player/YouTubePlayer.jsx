@@ -58,6 +58,17 @@ export function YouTubePlayer({
             setDuration(event.target.getDuration() || 0);
           },
           onStateChange: (event) => {
+            const player = event.target;
+            const state = event.data;
+            const nowTime = player.getCurrentTime();
+
+            // Always update local UI state immediately, regardless of control permissions!
+            if (state === window.YT.PlayerState.PLAYING) {
+              setLocalPlaying(true);
+            } else if (state === window.YT.PlayerState.PAUSED) {
+              setLocalPlaying(false);
+            }
+
             // Ignore state changes if a sync/seek occurred in the last 1500ms
             if (Date.now() - isSelfSyncing.current < 1500) {
               return;
@@ -66,15 +77,9 @@ export function YouTubePlayer({
             // Only user with control triggers sync broadcasts
             if (!isHost && !hasControl) return;
 
-            const player = event.target;
-            const state = event.data;
-            const nowTime = player.getCurrentTime();
-
             if (state === window.YT.PlayerState.PLAYING) {
-              setLocalPlaying(true);
               onPlaybackChange({ isPlaying: true, currentTime: nowTime });
             } else if (state === window.YT.PlayerState.PAUSED) {
-              setLocalPlaying(false);
               onPlaybackChange({ isPlaying: false, currentTime: nowTime });
             }
           }
