@@ -1148,6 +1148,16 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                 }
             });
         };
+        if (!window.YT) {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            if (firstScriptTag && firstScriptTag.parentNode) {
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            } else {
+                document.head.appendChild(tag);
+            }
+        }
         if (window.YT && window.YT.Player) {
             initPlayer();
         } else {
@@ -1298,7 +1308,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 226,
+                        lineNumber: 237,
                         columnNumber: 9
                     }, this),
                     !isHost && !hasControl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1324,20 +1334,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 color: "var(--status-warning)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 251,
+                                lineNumber: 262,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: "Host Controls Playback"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 252,
+                                lineNumber: 263,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 233,
+                        lineNumber: 244,
                         columnNumber: 11
                     }, this),
                     isPlayerReady && playback?.isPlaying && !localPlaying && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1374,20 +1384,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                         size: 20
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 283,
+                                        lineNumber: 294,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: "Click to Sync & Unmute"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 284,
+                                        lineNumber: 295,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 272,
+                                lineNumber: 283,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1399,19 +1409,19 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: "Browser blocked autoplay. Click to resume."
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 286,
+                                lineNumber: 297,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 258,
+                        lineNumber: 269,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                lineNumber: 214,
+                lineNumber: 225,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1440,7 +1450,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: formatTime(currentTime)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 297,
+                                lineNumber: 308,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1460,7 +1470,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 }
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 300,
+                                lineNumber: 311,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1473,13 +1483,13 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: formatTime(duration)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 316,
+                                lineNumber: 327,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 296,
+                        lineNumber: 307,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1511,7 +1521,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             size: 16
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 330,
+                                            lineNumber: 341,
                                             columnNumber: 33
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$play$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Play$3e$__["Play"], {
                                             size: 16,
@@ -1520,12 +1530,12 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 330,
+                                            lineNumber: 341,
                                             columnNumber: 55
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 325,
+                                        lineNumber: 336,
                                         columnNumber: 15
                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                         className: "btn btn-secondary",
@@ -1541,20 +1551,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 size: 14
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 338,
+                                                lineNumber: 349,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "Request Control"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 339,
+                                                lineNumber: 350,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 333,
+                                        lineNumber: 344,
                                         columnNumber: 15
                                     }, this),
                                     (isHost || hasControl) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1567,20 +1577,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 size: 10
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 345,
+                                                lineNumber: 356,
                                                 columnNumber: 17
                                             }, this),
                                             " Control Unlocked"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 344,
+                                        lineNumber: 355,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 323,
+                                lineNumber: 334,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1605,19 +1615,19 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             color: "var(--status-danger)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 359,
+                                            lineNumber: 370,
                                             columnNumber: 17
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$2$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Volume2$3e$__["Volume2"], {
                                             size: 16,
                                             color: "var(--text-secondary)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 361,
+                                            lineNumber: 372,
                                             columnNumber: 17
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 352,
+                                        lineNumber: 363,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1634,7 +1644,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                         }
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 364,
+                                        lineNumber: 375,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1652,44 +1662,44 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 color: "var(--status-success)"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 378,
+                                                lineNumber: 389,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "Sync"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 379,
+                                                lineNumber: 390,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 377,
+                                        lineNumber: 388,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 351,
+                                lineNumber: 362,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 322,
+                        lineNumber: 333,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                lineNumber: 294,
+                lineNumber: 305,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-        lineNumber: 212,
+        lineNumber: 223,
         columnNumber: 5
     }, this);
 }
