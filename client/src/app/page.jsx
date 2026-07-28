@@ -99,7 +99,7 @@ export default function Page() {
   const hasControl = currentMember?.hasControl || false;
 
   return (
-    <div style={{ minHeight: '100dvh', position: 'relative', background: 'var(--bg-primary)' }}>
+    <main className="app-viewport">
       {/* Toast Notification */}
       {toastNotification && (
         <div 
@@ -120,7 +120,8 @@ export default function Page() {
               justifyContent: 'space-between',
               gap: '10px',
               border: toastNotification.type === 'error' ? '1px solid #ef4444' : '1px solid var(--accent-primary)',
-              background: '#0d1017'
+              background: 'rgba(13, 16, 23, 0.9)',
+              backdropFilter: 'blur(8px)'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -150,19 +151,21 @@ export default function Page() {
         />
       ) : (
         /* Main Co-Watching Room View */
-        <div className="room-container" style={{ maxWidth: '1360px', margin: '0 auto', padding: isMobileScreen ? '10px' : '16px 20px', minHeight: '100vh' }}>
-          <RoomHeader 
-            roomId={roomState.roomId}
-            memberCount={roomState.members.length}
-            isHost={isHost}
-            onLeaveRoom={handleLeaveRoom}
-          />
+        <div className="room-container" style={{ maxWidth: '1360px', margin: '0 auto', padding: isMobileScreen ? '10px' : '16px 20px', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <header>
+            <RoomHeader 
+              roomId={roomState.roomId}
+              memberCount={roomState.members.length}
+              isHost={isHost}
+              onLeaveRoom={handleLeaveRoom}
+            />
+          </header>
 
           {!isMobileScreen ? (
             /* Desktop / Tablet Grid View */
             <div className="desktop-grid">
               {/* Left Column: Player, Video Details Hub & Queue */}
-              <div>
+              <section className="left-column">
                 <YouTubePlayer 
                   youtubeId={roomState.currentVideo?.youtubeId}
                   playback={roomState.playback}
@@ -173,40 +176,43 @@ export default function Page() {
                   onRequestControl={requestControl}
                 />
 
-                <VideoDetailsCard 
-                  currentVideo={roomState.currentVideo}
-                  roomState={roomState}
-                  currentSocketId={socket?.id}
-                  isHost={isHost}
-                  hasControl={hasControl}
-                  onRequestControl={requestControl}
-                />
+                <div className="left-scrollable scroll-y">
+                  <VideoDetailsCard 
+                    currentVideo={roomState.currentVideo}
+                    roomState={roomState}
+                    currentSocketId={socket?.id}
+                    isHost={isHost}
+                    hasControl={hasControl}
+                    onRequestControl={requestControl}
+                  />
 
-                <VideoQueue 
-                  isHost={isHost}
-                  hasControl={hasControl}
-                  currentVideo={roomState.currentVideo}
-                  onChangeVideo={(vData) => syncPlayback(vData)}
-                />
+                  <VideoQueue 
+                    isHost={isHost}
+                    hasControl={hasControl}
+                    currentVideo={roomState.currentVideo}
+                    onChangeVideo={(vData) => syncPlayback(vData)}
+                  />
 
-                <MemberList 
-                  members={roomState.members}
-                  currentSocketId={socket?.id}
-                  isHost={isHost}
-                  onGrantControl={(targetId, approved) => respondControlRequest(targetId, approved)}
-                  onRevokeControl={(targetId) => revokeControl(targetId)}
-                />
-              </div>
+                  <MemberList 
+                    members={roomState.members}
+                    currentSocketId={socket?.id}
+                    isHost={isHost}
+                    onGrantControl={(targetId, approved) => respondControlRequest(targetId, approved)}
+                    onRevokeControl={(targetId) => revokeControl(targetId)}
+                  />
+                </div>
+              </section>
 
               {/* Right Column: Live Chat Panel */}
-              <div className="chat-sidebar">
+              <aside className="chat-sidebar">
                 <ChatPanel 
                   chatHistory={roomState.chatHistory}
+                  currentSocketId={socket?.id}
                   incomingReaction={incomingReaction}
                   onSendMessage={sendChatMessage}
                   onSendReaction={sendReaction}
                 />
-              </div>
+              </aside>
             </div>
           ) : (
             /* Mobile View (< 768px) */
@@ -242,6 +248,7 @@ export default function Page() {
                 <div style={{ height: 'calc(100dvh - 280px)' }}>
                   <ChatPanel 
                     chatHistory={roomState.chatHistory}
+                    currentSocketId={socket?.id}
                     incomingReaction={incomingReaction}
                     onSendMessage={sendChatMessage}
                     onSendReaction={sendReaction}
@@ -287,6 +294,6 @@ export default function Page() {
           )}
         </div>
       )}
-    </div>
+    </main>
   );
 }

@@ -48,8 +48,25 @@ body {
   color: var(--text-primary);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden; /* Prevent full-page scroll */
+}
+
+/* App Viewport & Scrolling Utilities */
+.app-viewport {
+  height: 100vh;
+  height: 100dvh;
+  position: relative;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll-y {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin; /* Firefox */
 }
 
 h1, h2, h3, h4, .font-heading {
@@ -72,11 +89,14 @@ h1, h2, h3, h4, .font-heading {
   background: #475569;
 }
 
-/* Minimalist Surface Panel */
+/* Premium Surface Panel */
 .panel {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background: rgba(18, 22, 32, 0.7); /* Subtle transparency */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .panel-interactive {
@@ -91,7 +111,7 @@ h1, h2, h3, h4, .font-heading {
   background: var(--bg-surface-hover);
 }
 
-/* Minimalist Button System */
+/* Premium Button System */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -105,9 +125,13 @@ h1, h2, h3, h4, .font-heading {
   border-radius: var(--radius-md);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: transform 0.1s ease, background 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
   white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.97);
 }
 
 .btn-primary {
@@ -262,6 +286,27 @@ h1, h2, h3, h4, .font-heading {
   grid-template-columns: 1fr 360px;
   gap: 20px;
   align-items: start;
+  height: calc(100vh - 120px); /* Fill remaining height */
+  overflow: hidden;
+}
+
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.left-scrollable {
+  flex: 1;
+  min-height: 0; /* Important for flex children to scroll */
+  padding-right: 4px;
+}
+
+.chat-sidebar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-sidebar {
@@ -280,6 +325,14 @@ h1, h2, h3, h4, .font-heading {
 @media (max-width: 900px) {
   .desktop-grid {
     grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
+  }
+  .left-column {
+    height: auto;
+  }
+  .left-scrollable {
+    overflow: visible;
   }
   .chat-sidebar {
     position: relative;
