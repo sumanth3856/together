@@ -99,14 +99,22 @@ export function useSocket() {
   const joinRoom = useCallback((roomId, nickname) => {
     return new Promise((resolve, reject) => {
       if (!socketRef.current) return reject('Socket not connected');
-      socketRef.current.emit('join_room', { roomId, nickname }, (response) => {
-        if (response.success) {
-          setRoomState(response.roomState);
-          resolve(response.roomState);
-        } else {
-          reject(response.error);
-        }
-      });
+
+      const attempt = (retriesLeft) => {
+        socketRef.current.emit('join_room', { roomId, nickname }, (response) => {
+          if (response.success) {
+            setRoomState(response.roomState);
+            resolve(response.roomState);
+          } else if (response.error === 'Room not found' && retriesLeft > 0) {
+            // Server may be waking up (Render free tier cold-start) — retry after 2s
+            setTimeout(() => attempt(retriesLeft - 1), 2000);
+          } else {
+            reject(response.error);
+          }
+        });
+      };
+
+      attempt(3); // Up to 3 retries
     });
   }, []);
 

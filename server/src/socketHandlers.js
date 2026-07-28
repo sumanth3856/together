@@ -49,28 +49,32 @@ export function setupSocketHandlers(io) {
     socket.on('sync_playback', (data) => {
       if (!currentRoomId) return;
 
-      const result = RoomManager.updatePlayback(currentRoomId, socket.id, data);
+      // When loading a new video, force isPlaying:true so it auto-plays for everyone
+      const enrichedData = { ...data };
+      if (data.youtubeId) {
+        enrichedData.isPlaying = true;
+        enrichedData.currentTime = 0;
+      }
+
+      const result = RoomManager.updatePlayback(currentRoomId, socket.id, enrichedData);
       if (result && result.error) {
         socket.emit('error_message', { message: result.error });
         return;
       }
 
       if (result && result.room) {
-        // Broadcast sync to everyone else in room immediately
-        socket.to(currentRoomId).emit('playback_synced', {
-          playback: result.room.playback,
-          currentVideo: result.room.currentVideo,
-          senderId: socket.id
-        });
-        
-        // If the video actually changed (not just a pause/play/seek), broadcast the full room state 
-        // to everyone (including the sender) so their VideoDetailsCard and chat updates!
-        if (data.youtubeId && data.youtubeId !== result.room.currentVideo.youtubeId) {
-           broadcastRoomState(currentRoomId);
-        } else if (data.youtubeId) {
-           // If they passed a youtubeId, they intended to change the video.
-           // Even if it's the same video, we should just broadcast state to update the chat message.
-           broadcastRoomState(currentRoomId);
+        if (data.youtubeId) {
+          // Video changed: broadcast full state to ALL users (including sender) immediately
+          io.to(currentRoomId).emit('room_state_updated', RoomManager.getRoomStateDTO(result.room));
+        } else {
+          // Regular play/pause/seek: push lightweight sync event to peers only
+          socket.to(currentRoomId).emit('playback_synced', {
+            playback: result.room.playback,
+            currentVideo: result.room.currentVideo,
+            senderId: socket.id
+          });
+          // Also update full room state so member list / chat stays accurate
+          broadcastRoomState(currentRoomId);
         }
       }
     });

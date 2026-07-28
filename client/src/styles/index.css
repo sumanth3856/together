@@ -195,19 +195,29 @@ h1, h2, h3, h4, .font-heading {
   border: 1px solid rgba(88, 80, 236, 0.25);
 }
 
-/* Mobile Bottom Tab Bar */
+/* Mobile Bottom Tab Bar — fully fixed, viewport-aware */
 .mobile-tab-bar {
-  display: none;
+  display: none; /* Hidden by default, shown in media query */
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  width: 100%;
-  height: calc(62px + env(safe-area-inset-bottom));
-  background: #0d1017;
+  width: 100vw;
+  /* Base height + safe area for iPhone notch */
+  height: calc(58px + env(safe-area-inset-bottom, 0px));
+  background: rgba(13, 16, 23, 0.98);
   border-top: 1px solid var(--border-subtle);
   z-index: 9999;
-  padding-bottom: env(safe-area-inset-bottom);
+  /* Safe area padding at bottom */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Flex inside the bar */
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: stretch;
+  /* Prevent content from going behind keyboard on iOS */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .mobile-tab-item {
@@ -216,14 +226,17 @@ h1, h2, h3, h4, .font-heading {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 500;
   cursor: pointer;
+  padding: 0;
   min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s ease;
   position: relative;
 }
 
@@ -232,28 +245,32 @@ h1, h2, h3, h4, .font-heading {
   font-weight: 700;
 }
 
-.mobile-tab-item.active::after {
+.mobile-tab-item.active::before {
   content: '';
   position: absolute;
   top: 0;
   left: 20%;
   right: 20%;
-  height: 3px;
+  height: 2px;
   background: var(--accent-primary);
-  border-radius: 0 0 3px 3px;
+  border-radius: 0 0 2px 2px;
 }
 
 @media (max-width: 767px) {
   .mobile-tab-bar {
-    display: flex;
+    display: flex; /* Show on mobile */
   }
+
   .room-container {
-    padding-bottom: calc(74px + env(safe-area-inset-bottom)) !important;
+    /* Reserve space at bottom for the fixed tab bar */
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
   }
+
   .mobile-sticky-player {
     position: sticky;
-    top: 8px;
-    z-index: 10;
+    top: 0;
+    z-index: 50;
+    background: var(--bg-primary);
   }
 }
 

@@ -138,19 +138,29 @@ function useSocket() {
             return new Promise({
                 "useSocket.useCallback[joinRoom]": (resolve, reject)=>{
                     if (!socketRef.current) return reject('Socket not connected');
-                    socketRef.current.emit('join_room', {
-                        roomId,
-                        nickname
-                    }, {
-                        "useSocket.useCallback[joinRoom]": (response)=>{
-                            if (response.success) {
-                                setRoomState(response.roomState);
-                                resolve(response.roomState);
-                            } else {
-                                reject(response.error);
-                            }
+                    const attempt = {
+                        "useSocket.useCallback[joinRoom].attempt": (retriesLeft)=>{
+                            socketRef.current.emit('join_room', {
+                                roomId,
+                                nickname
+                            }, {
+                                "useSocket.useCallback[joinRoom].attempt": (response)=>{
+                                    if (response.success) {
+                                        setRoomState(response.roomState);
+                                        resolve(response.roomState);
+                                    } else if (response.error === 'Room not found' && retriesLeft > 0) {
+                                        // Server may be waking up (Render free tier cold-start) — retry after 2s
+                                        setTimeout({
+                                            "useSocket.useCallback[joinRoom].attempt": ()=>attempt(retriesLeft - 1)
+                                        }["useSocket.useCallback[joinRoom].attempt"], 2000);
+                                    } else {
+                                        reject(response.error);
+                                    }
+                                }
+                            }["useSocket.useCallback[joinRoom].attempt"]);
                         }
-                    }["useSocket.useCallback[joinRoom]"]);
+                    }["useSocket.useCallback[joinRoom].attempt"];
+                    attempt(3); // Up to 3 retries
                 }
             }["useSocket.useCallback[joinRoom]"]);
         }
@@ -259,6 +269,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
     const [nickname, setNickname] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('');
     const [roomId, setRoomId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(initialRoomId || '');
     const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [retrying, setRetrying] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].useEffect({
         "JoinRoomModal.useEffect": ()=>{
             const saved = localStorage.getItem('tg_nickname');
@@ -276,12 +287,16 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
         }
         localStorage.setItem('tg_nickname', nickname.trim());
         setLoading(true);
+        setRetrying(false);
+        // Show 'Retrying...' after 2.5s if still loading (server cold-start)
+        const retryTimer = setTimeout(()=>setRetrying(true), 2500);
         try {
             if (activeTab === 'create') {
                 await onCreateRoom(nickname.trim());
             } else {
                 if (!roomId.trim()) {
                     alert('Please enter a Room Code');
+                    clearTimeout(retryTimer);
                     setLoading(false);
                     return;
                 }
@@ -290,7 +305,9 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
         } catch (err) {
             alert('Error: ' + err);
         } finally{
+            clearTimeout(retryTimer);
             setLoading(false);
+            setRetrying(false);
         }
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -331,12 +348,12 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                 color: "#ffffff"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                lineNumber: 79,
+                                lineNumber: 87,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 67,
+                            lineNumber: 75,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
@@ -349,7 +366,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                             children: "Together"
                         }, void 0, false, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 82,
+                            lineNumber: 90,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -360,13 +377,13 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                             children: "Watch YouTube videos in synchronized playback"
                         }, void 0, false, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 92,
+                            lineNumber: 100,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                    lineNumber: 66,
+                    lineNumber: 74,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -394,20 +411,20 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     size: 16
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 116,
+                                    lineNumber: 124,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                     children: "Create Room"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 117,
+                                    lineNumber: 125,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 110,
+                            lineNumber: 118,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -423,26 +440,26 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     size: 16
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 125,
+                                    lineNumber: 133,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                     children: "Join Room"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 126,
+                                    lineNumber: 134,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 119,
+                            lineNumber: 127,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                    lineNumber: 98,
+                    lineNumber: 106,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -466,7 +483,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     children: "NICKNAME"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 134,
+                                    lineNumber: 142,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -493,7 +510,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                             children: getAvatarLetter(nickname)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                            lineNumber: 138,
+                                            lineNumber: 146,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -506,19 +523,19 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                             required: true
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                            lineNumber: 155,
+                                            lineNumber: 163,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 137,
+                                    lineNumber: 145,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 133,
+                            lineNumber: 141,
                             columnNumber: 11
                         }, this),
                         activeTab === 'join' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -534,7 +551,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     children: "ROOM CODE"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 170,
+                                    lineNumber: 178,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -551,13 +568,13 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     required: true
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 173,
+                                    lineNumber: 181,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 169,
+                            lineNumber: 177,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -571,10 +588,10 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                 fontSize: '0.9rem'
                             },
                             children: loading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                children: "Connecting..."
+                                children: retrying ? '⏳ Retrying...' : 'Connecting...'
                             }, void 0, false, {
                                 fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                lineNumber: 193,
+                                lineNumber: 201,
                                 columnNumber: 15
                             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
                                 children: [
@@ -582,27 +599,27 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                         children: activeTab === 'create' ? 'Create Room' : 'Join Room'
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                        lineNumber: 196,
+                                        lineNumber: 204,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$arrow$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ArrowRight$3e$__["ArrowRight"], {
                                         size: 16
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                        lineNumber: 197,
+                                        lineNumber: 205,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true)
                         }, void 0, false, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 186,
+                            lineNumber: 194,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                    lineNumber: 131,
+                    lineNumber: 139,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -629,7 +646,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     color: "var(--accent-secondary)"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 216,
+                                    lineNumber: 224,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -640,13 +657,13 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     children: "Synced Video"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 217,
+                                    lineNumber: 225,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 215,
+                            lineNumber: 223,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -662,7 +679,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     color: "var(--status-warning)"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 220,
+                                    lineNumber: 228,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -673,13 +690,13 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     children: "Host Controls"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 221,
+                                    lineNumber: 229,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 219,
+                            lineNumber: 227,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -695,7 +712,7 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     color: "var(--status-success)"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 224,
+                                    lineNumber: 232,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -706,34 +723,34 @@ function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                                     children: "Live Reactions"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                                    lineNumber: 225,
+                                    lineNumber: 233,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                            lineNumber: 223,
+                            lineNumber: 231,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-                    lineNumber: 204,
+                    lineNumber: 212,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-            lineNumber: 57,
+            lineNumber: 65,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/components/room/JoinRoomModal.jsx",
-        lineNumber: 48,
+        lineNumber: 56,
         columnNumber: 5
     }, this);
 }
-_s(JoinRoomModal, "DJJ5lmfyeE48GsADXZYcUaL0Fss=");
+_s(JoinRoomModal, "Z0auIOXkS4OpjFmJYWH9EckxJgM=");
 _c = JoinRoomModal;
 var _c;
 __turbopack_context__.k.register(_c, "JoinRoomModal");
@@ -1187,7 +1204,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
             })["YouTubePlayer.useEffect"];
         }
     }["YouTubePlayer.useEffect"], []);
-    // Update video when youtubeId changes
+    // Update video when youtubeId changes — auto-play immediately after loading
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "YouTubePlayer.useEffect": ()=>{
             if (isPlayerReady && playerRef.current) {
@@ -1195,7 +1212,11 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                 const targetId = extractVideoId(youtubeId);
                 if (currentIdInPlayer !== targetId && targetId) {
                     isSelfSyncing.current = Date.now();
-                    playerRef.current.loadVideoById(targetId, playback?.currentTime || 0);
+                    // loadVideoById auto-plays the video; seekTo beginning
+                    playerRef.current.loadVideoById({
+                        videoId: targetId,
+                        startSeconds: playback?.currentTime || 0
+                    });
                 }
             }
         }
@@ -1203,35 +1224,51 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
         youtubeId,
         isPlayerReady
     ]);
-    // Handle incoming playback sync state
+    // ONE-SHOT join sync: when player becomes ready, seek to where the room is
+    const hasJoinSyncedRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(false);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "YouTubePlayer.useEffect": ()=>{
-            if (!playback || !isPlayerReady || !playerRef.current) return;
-            const serverPlayback = playback;
+            if (!isPlayerReady || !playerRef.current || !playback || hasJoinSyncedRef.current) return;
+            hasJoinSyncedRef.current = true;
+            const player = playerRef.current;
+            const targetTime = playback.currentTime;
+            if (targetTime > 2) {
+                isSelfSyncing.current = Date.now();
+                player.seekTo(targetTime, true);
+            }
+        // Don't auto-play here; let the browser-block overlay handle it gracefully
+        }
+    }["YouTubePlayer.useEffect"], [
+        isPlayerReady,
+        playback
+    ]);
+    // ONGOING peer sync: handle playback_synced events pushed from server
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "YouTubePlayer.useEffect": ()=>{
+            if (!syncedPlaybackEvent || !isPlayerReady || !playerRef.current) return;
+            const { playback: serverPlayback } = syncedPlaybackEvent;
             if (!serverPlayback) return;
             const player = playerRef.current;
             const localTime = player.getCurrentTime() || 0;
             const targetTime = serverPlayback.currentTime;
             const drift = Math.abs(localTime - targetTime);
-            // Auto-seek if drift is greater than 1.5 seconds
-            if (drift > 1.5) {
-                isSelfSyncing.current = Date.now();
+            isSelfSyncing.current = Date.now();
+            // Seek if drifted more than 2 seconds
+            if (drift > 2) {
                 player.seekTo(targetTime, true);
             }
             if (serverPlayback.isPlaying) {
                 if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) {
-                    isSelfSyncing.current = Date.now();
                     player.playVideo();
                 }
             } else {
                 if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) {
-                    isSelfSyncing.current = Date.now();
                     player.pauseVideo();
                 }
             }
         }
     }["YouTubePlayer.useEffect"], [
-        playback,
+        syncedPlaybackEvent,
         isPlayerReady
     ]);
     // Progress Bar Time Update Loop
@@ -1330,7 +1367,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 241,
+                        lineNumber: 256,
                         columnNumber: 9
                     }, this),
                     !isHost && !hasControl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1356,20 +1393,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 color: "var(--status-warning)"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 266,
+                                lineNumber: 281,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: "Host Controls Playback"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 267,
+                                lineNumber: 282,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 248,
+                        lineNumber: 263,
                         columnNumber: 11
                     }, this),
                     isPlayerReady && playback?.isPlaying && !localPlaying && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1406,20 +1443,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                         size: 20
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 298,
+                                        lineNumber: 313,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: "Click to Sync & Unmute"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 299,
+                                        lineNumber: 314,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 287,
+                                lineNumber: 302,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1431,19 +1468,19 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: "Browser blocked autoplay. Click to resume."
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 301,
+                                lineNumber: 316,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 273,
+                        lineNumber: 288,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                lineNumber: 229,
+                lineNumber: 244,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1472,7 +1509,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: formatTime(currentTime)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 312,
+                                lineNumber: 327,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1492,7 +1529,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 }
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 315,
+                                lineNumber: 330,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1505,13 +1542,13 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                 children: formatTime(duration)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 331,
+                                lineNumber: 346,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 311,
+                        lineNumber: 326,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1543,7 +1580,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             size: 16
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 345,
+                                            lineNumber: 360,
                                             columnNumber: 33
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$play$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Play$3e$__["Play"], {
                                             size: 16,
@@ -1552,12 +1589,12 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 345,
+                                            lineNumber: 360,
                                             columnNumber: 55
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 340,
+                                        lineNumber: 355,
                                         columnNumber: 15
                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                         className: "btn btn-secondary",
@@ -1573,20 +1610,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 size: 14
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 353,
+                                                lineNumber: 368,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "Request Control"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 354,
+                                                lineNumber: 369,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 348,
+                                        lineNumber: 363,
                                         columnNumber: 15
                                     }, this),
                                     (isHost || hasControl) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1599,20 +1636,20 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 size: 10
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 360,
+                                                lineNumber: 375,
                                                 columnNumber: 17
                                             }, this),
                                             " Control Unlocked"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 359,
+                                        lineNumber: 374,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 338,
+                                lineNumber: 353,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1637,19 +1674,19 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                             color: "var(--status-danger)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 374,
+                                            lineNumber: 389,
                                             columnNumber: 17
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$volume$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Volume2$3e$__["Volume2"], {
                                             size: 16,
                                             color: "var(--text-secondary)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                            lineNumber: 376,
+                                            lineNumber: 391,
                                             columnNumber: 17
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 367,
+                                        lineNumber: 382,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1666,7 +1703,7 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                         }
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 379,
+                                        lineNumber: 394,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1684,48 +1721,48 @@ function YouTubePlayer({ youtubeId, playback, isHost, hasControl, syncedPlayback
                                                 color: "var(--status-success)"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 393,
+                                                lineNumber: 408,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "Sync"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                                lineNumber: 394,
+                                                lineNumber: 409,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                        lineNumber: 392,
+                                        lineNumber: 407,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                                lineNumber: 366,
+                                lineNumber: 381,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                        lineNumber: 337,
+                        lineNumber: 352,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-                lineNumber: 309,
+                lineNumber: 324,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/player/YouTubePlayer.jsx",
-        lineNumber: 227,
+        lineNumber: 242,
         columnNumber: 5
     }, this);
 }
-_s(YouTubePlayer, "vLLU816wWCpVIqN8NF1Uub/MRVI=");
+_s(YouTubePlayer, "bMCz2zuL0R28SPqQAfwMVCidJyw=");
 _c = YouTubePlayer;
 var _c;
 __turbopack_context__.k.register(_c, "YouTubePlayer");

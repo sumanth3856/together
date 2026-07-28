@@ -117,7 +117,7 @@ export function YouTubePlayer({
     };
   }, []);
 
-  // Update video when youtubeId changes
+  // Update video when youtubeId changes — auto-play immediately after loading
   useEffect(() => {
     if (isPlayerReady && playerRef.current) {
       const currentIdInPlayer = playerRef.current.getVideoData ? playerRef.current.getVideoData().video_id : '';
@@ -125,16 +125,32 @@ export function YouTubePlayer({
 
       if (currentIdInPlayer !== targetId && targetId) {
         isSelfSyncing.current = Date.now();
-        playerRef.current.loadVideoById(targetId, playback?.currentTime || 0);
+        // loadVideoById auto-plays the video; seekTo beginning
+        playerRef.current.loadVideoById({ videoId: targetId, startSeconds: playback?.currentTime || 0 });
       }
     }
   }, [youtubeId, isPlayerReady]);
 
-  // Handle incoming playback sync state
+  // ONE-SHOT join sync: when player becomes ready, seek to where the room is
+  const hasJoinSyncedRef = useRef(false);
   useEffect(() => {
-    if (!playback || !isPlayerReady || !playerRef.current) return;
+    if (!isPlayerReady || !playerRef.current || !playback || hasJoinSyncedRef.current) return;
+    hasJoinSyncedRef.current = true;
 
-    const serverPlayback = playback;
+    const player = playerRef.current;
+    const targetTime = playback.currentTime;
+    if (targetTime > 2) {
+      isSelfSyncing.current = Date.now();
+      player.seekTo(targetTime, true);
+    }
+    // Don't auto-play here; let the browser-block overlay handle it gracefully
+  }, [isPlayerReady, playback]);
+
+  // ONGOING peer sync: handle playback_synced events pushed from server
+  useEffect(() => {
+    if (!syncedPlaybackEvent || !isPlayerReady || !playerRef.current) return;
+
+    const { playback: serverPlayback } = syncedPlaybackEvent;
     if (!serverPlayback) return;
 
     const player = playerRef.current;
@@ -142,24 +158,23 @@ export function YouTubePlayer({
     const targetTime = serverPlayback.currentTime;
     const drift = Math.abs(localTime - targetTime);
 
-    // Auto-seek if drift is greater than 1.5 seconds
-    if (drift > 1.5) {
-      isSelfSyncing.current = Date.now();
+    isSelfSyncing.current = Date.now();
+
+    // Seek if drifted more than 2 seconds
+    if (drift > 2) {
       player.seekTo(targetTime, true);
     }
 
     if (serverPlayback.isPlaying) {
       if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) {
-        isSelfSyncing.current = Date.now();
         player.playVideo();
       }
     } else {
       if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) {
-        isSelfSyncing.current = Date.now();
         player.pauseVideo();
       }
     }
-  }, [playback, isPlayerReady]);
+  }, [syncedPlaybackEvent, isPlayerReady]);
 
   // Progress Bar Time Update Loop
   useEffect(() => {

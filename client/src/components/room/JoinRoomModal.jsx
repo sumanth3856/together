@@ -6,6 +6,7 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
   const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState(initialRoomId || '');
   const [loading, setLoading] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   React.useEffect(() => {
     const saved = localStorage.getItem('tg_nickname');
@@ -25,6 +26,10 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
 
     localStorage.setItem('tg_nickname', nickname.trim());
     setLoading(true);
+    setRetrying(false);
+
+    // Show 'Retrying...' after 2.5s if still loading (server cold-start)
+    const retryTimer = setTimeout(() => setRetrying(true), 2500);
 
     try {
       if (activeTab === 'create') {
@@ -32,6 +37,7 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
       } else {
         if (!roomId.trim()) {
           alert('Please enter a Room Code');
+          clearTimeout(retryTimer);
           setLoading(false);
           return;
         }
@@ -40,7 +46,9 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
     } catch (err) {
       alert('Error: ' + err);
     } finally {
+      clearTimeout(retryTimer);
       setLoading(false);
+      setRetrying(false);
     }
   };
 
@@ -190,7 +198,7 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
             style={{ width: '100%', marginTop: '4px', minHeight: '44px', fontSize: '0.9rem' }}
           >
             {loading ? (
-              <span>Connecting...</span>
+              <span>{retrying ? '⏳ Retrying...' : 'Connecting...'}</span>
             ) : (
               <>
                 <span>{activeTab === 'create' ? 'Create Room' : 'Join Room'}</span>
