@@ -21,6 +21,17 @@ export function YouTubePlayer({
   const isSelfSyncing = useRef(0);
   const hasJoinSyncedRef = useRef(false);
 
+  // Use refs to avoid stale closures in YouTube iframe event listeners
+  const isHostRef = useRef(isHost);
+  const hasControlRef = useRef(hasControl);
+  const onPlaybackChangeRef = useRef(onPlaybackChange);
+
+  useEffect(() => {
+    isHostRef.current = isHost;
+    hasControlRef.current = hasControl;
+    onPlaybackChangeRef.current = onPlaybackChange;
+  }, [isHost, hasControl, onPlaybackChange]);
+
   const extractVideoId = (input) => {
     if (!input) return 'dQw4w9WgXcQ';
     const cleanInput = input.trim();
@@ -74,12 +85,12 @@ export function YouTubePlayer({
             if (Date.now() - isSelfSyncing.current < 1500) return;
 
             // Only broadcast if user has control
-            if (!isHost && !hasControl) return;
+            if (!isHostRef.current && !hasControlRef.current) return;
 
             if (state === window.YT.PlayerState.PLAYING) {
-              onPlaybackChange({ isPlaying: true, currentTime: nowTime });
+              onPlaybackChangeRef.current({ isPlaying: true, currentTime: nowTime });
             } else if (state === window.YT.PlayerState.PAUSED) {
-              onPlaybackChange({ isPlaying: false, currentTime: nowTime });
+              onPlaybackChangeRef.current({ isPlaying: false, currentTime: nowTime });
             }
           }
         }

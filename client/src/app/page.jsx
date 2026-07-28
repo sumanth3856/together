@@ -16,6 +16,7 @@ import { AlertCircle, CheckCircle2, X, Wifi, WifiOff } from 'lucide-react';
 export default function Page() {
   const {
     socket,
+    socketId,
     isConnected,
     isReconnecting,
     roomState,
@@ -95,7 +96,7 @@ export default function Page() {
   };
 
   // ---------- Derived State ----------
-  const currentMember = roomState?.members?.find((m) => m.socketId === socket?.id);
+  const currentMember = roomState?.members?.find((m) => m.socketId === socketId);
   const isHost = currentMember?.isHost || false;
   const hasControl = currentMember?.hasControl || false;
 
@@ -271,7 +272,7 @@ export default function Page() {
                 <VideoDetailsCard
                   currentVideo={roomState.currentVideo}
                   roomState={roomState}
-                  currentSocketId={socket?.id}
+                  currentSocketId={socketId}
                   isHost={isHost}
                   hasControl={hasControl}
                   onRequestControl={requestControl}
@@ -284,7 +285,7 @@ export default function Page() {
                 />
                 <MemberList
                   members={roomState.members}
-                  currentSocketId={socket?.id}
+                  currentSocketId={socketId}
                   isHost={isHost}
                   onGrantControl={(targetId, approved) => respondControlRequest(targetId, approved)}
                   onRevokeControl={(targetId) => revokeControl(targetId)}
@@ -319,7 +320,7 @@ export default function Page() {
                 <VideoDetailsCard
                   currentVideo={roomState.currentVideo}
                   roomState={roomState}
-                  currentSocketId={socket?.id}
+                  currentSocketId={socketId}
                   isHost={isHost}
                   hasControl={hasControl}
                   onRequestControl={requestControl}
@@ -340,7 +341,7 @@ export default function Page() {
               {mobileActiveTab === 'members' && (
                 <MemberList
                   members={roomState.members}
-                  currentSocketId={socket?.id}
+                  currentSocketId={socketId}
                   isHost={isHost}
                   onGrantControl={(targetId, approved) => respondControlRequest(targetId, approved)}
                   onRevokeControl={(targetId) => revokeControl(targetId)}

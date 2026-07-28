@@ -56,6 +56,7 @@ export function useSocket() {
   const [syncedPlaybackEvent, setSyncedPlaybackEvent] = useState(null);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [socketId, setSocketId] = useState(null);
 
   // Track the active session locally so reconnect logic can access it
   const activeSessionRef = useRef(null);
@@ -74,6 +75,7 @@ export function useSocket() {
 
     socket.on('connect', () => {
       console.log('⚡ Socket Connected:', socket.id);
+      setSocketId(socket.id);
       setIsConnected(true);
       setIsReconnecting(false);
 
@@ -264,6 +266,7 @@ export function useSocket() {
 
   return {
     socket: socketRef.current,
+    socketId,
     isConnected,
     isReconnecting,
     roomState,
