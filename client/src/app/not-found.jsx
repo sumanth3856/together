@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { Compass, Home, ArrowLeft } from 'lucide-react';
 
