@@ -13,20 +13,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  process.env.FRONTEND_URL
-].filter(Boolean);
-
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: '*',
   methods: ['GET', 'POST']
 }));
 
@@ -57,7 +45,7 @@ if (fs.existsSync(clientDistPath)) {
 // Configure Socket.io for Vercel Serverless
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
+    origin: '*',
     methods: ['GET', 'POST']
   },
   transports: ['polling', 'websocket'],
