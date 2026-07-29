@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Lock } from 'lucide-react';
+import { Play, Pause } from 'lucide-react';
 import throttle from 'lodash/throttle';
 import { PlaybackControls } from './PlaybackControls';
 
