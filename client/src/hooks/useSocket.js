@@ -213,6 +213,19 @@ export function useSocket() {
   const syncPlayback = useCallback((playbackData) => {
     if (socketRef.current) {
       socketRef.current.emit('sync_playback', playbackData);
+
+      // Optimistically update local roomState so the sender immediately sees their own action (e.g. Live/Paused badge)
+      const currentState = useRoomStore.getState().roomState;
+      if (currentState) {
+        useRoomStore.getState().setRoomState({
+          ...currentState,
+          playback: {
+            ...currentState.playback,
+            ...playbackData,
+            updatedAt: Date.now()
+          }
+        });
+      }
     }
   }, []);
 

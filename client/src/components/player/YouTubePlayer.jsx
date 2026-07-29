@@ -214,7 +214,19 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
 
   const handleManualPlayPause = () => {
     if (!playerRef.current) return;
-    localPlaying ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
+    
+    // Explicitly lock the echo-blocker so onStateChange doesn't double-fire
+    isSelfSyncing.current = Date.now();
+    
+    const nowTime = playerRef.current.getCurrentTime() || 0;
+    const newIsPlaying = !localPlaying;
+    
+    newIsPlaying ? playerRef.current.playVideo() : playerRef.current.pauseVideo();
+    
+    // Force the broadcast immediately bypassing onStateChange
+    if (onPlaybackChangeRef.current) {
+      onPlaybackChangeRef.current({ isPlaying: newIsPlaying, currentTime: nowTime });
+    }
   };
 
   const handleSeekChange = (e) => {
