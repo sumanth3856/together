@@ -1,17 +1,26 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { MessageSquare, Send, Crown, Key, Hash } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import Avatar from 'boring-avatars';
 import { EmojiReactions } from './EmojiReactions';
 
-export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendReaction }) {
+export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendReaction }) {
   const [inputText, setInputText] = useState('');
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
 
+  const rowVirtualizer = useVirtualizer({
+    count: chatHistory.length,
+    getScrollElement: () => chatContainerRef.current,
+    estimateSize: () => 65,
+    overscan: 10,
+  });
+
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    if (chatContainerRef.current && chatHistory.length > 0) {
+      rowVirtualizer.scrollToIndex(chatHistory.length - 1, { align: 'end' });
     }
-  }, [chatHistory]);
+  }, [chatHistory, rowVirtualizer]);
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -19,8 +28,6 @@ export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, o
     onSendMessage(inputText.trim());
     setInputText('');
   };
-
-  const getAvatarLetter = (name) => name ? name.trim().charAt(0).toUpperCase() : '?';
 
   return (
     <div
@@ -84,50 +91,77 @@ export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, o
             <p style={{ fontSize: '0.82rem', lineHeight: 1.5 }}>No messages yet.<br />Be the first to say hi!</p>
           </div>
         ) : (
-          chatHistory.map((msg) => {
-            if (msg.isSystem) {
-              return (
-                <div key={msg.id} style={{ display: 'flex', justifyContent: 'center', margin: '2px 0' }}>
-                  <span className="chat-system-pill">{msg.text}</span>
-                </div>
-              );
-            }
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const msg = chatHistory[virtualRow.index];
 
-            return (
-              <div key={msg.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                {/* Avatar */}
+              if (msg.isSystem) {
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute', top: 0, left: 0, width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                      display: 'flex', justifyContent: 'center',
+                      padding: '4px 0'
+                    }}
+                  >
+                    <span className="chat-system-pill">{msg.text}</span>
+                  </div>
+                );
+              }
+
+              return (
                 <div
-                  className="avatar"
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
                   style={{
-                    width: '28px', height: '28px',
-                    background: msg.color || 'var(--accent-primary)',
-                    fontSize: '0.75rem',
-                    boxShadow: `0 2px 8px ${msg.color || 'rgba(99,102,241,0.4)'}40`
+                    position: 'absolute', top: 0, left: 0, width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                    display: 'flex', gap: '10px', alignItems: 'flex-start',
+                    padding: '6px 0'
                   }}
                 >
-                  {getAvatarLetter(msg.sender)}
-                </div>
-
-                {/* Content */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                    <span style={{
-                      fontSize: '0.78rem', fontWeight: '700',
-                      color: msg.color || 'var(--text-primary)',
-                    }}>
-                      {msg.sender}
-                    </span>
-                    {msg.isHost && <Crown size={11} color="var(--accent-amber)" title="Host" />}
-                    {msg.hasControl && !msg.isHost && <Key size={10} color="var(--accent-emerald)" title="Has Control" />}
-                    <span style={{ fontSize: '0.63rem', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                  {/* Avatar */}
+                  <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                    <Avatar
+                      size={28}
+                      name={msg.sender}
+                      variant="beam"
+                      colors={['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b']}
+                    />
                   </div>
-                  <div className="chat-bubble">{msg.text}</div>
+
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: '0.78rem', fontWeight: '700',
+                        color: msg.color || 'var(--text-primary)',
+                      }}>
+                        {msg.sender}
+                      </span>
+                      {msg.isHost && <Crown size={11} color="var(--accent-amber)" title="Host" />}
+                      {msg.hasControl && !msg.isHost && <Key size={10} color="var(--accent-emerald)" title="Has Control" />}
+                      <span style={{ fontSize: '0.63rem', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <div className="chat-bubble">{msg.text}</div>
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -151,17 +185,19 @@ export function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, o
           placeholder="Type a message…"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
+          aria-label="Chat message input"
           style={{ minHeight: '38px', fontSize: '0.875rem', flex: 1, background: 'var(--bg-input)' }}
         />
         <button
           type="submit"
           className="btn btn-primary"
           disabled={!inputText.trim()}
+          aria-label="Send message"
           style={{ minHeight: '38px', width: '38px', padding: 0, borderRadius: 'var(--radius-md)', flexShrink: 0 }}
         >
-          <Send size={15} />
+          <Send size={15} aria-hidden="true" />
         </button>
       </form>
     </div>
   );
-}
+});

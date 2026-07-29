@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
+import { useRoomStore } from '../store/useRoomStore';
+import { useUIStore } from '../store/useUIStore';
 
 const getSocketUrl = () => {
   if (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL) {
@@ -48,16 +50,7 @@ function clearSession() {
 
 export function useSocket() {
   const socketRef = useRef(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [roomState, setRoomState] = useState(null);
-  const [toastNotification, setToastNotification] = useState(null);
-  const [controlRequestNotice, setControlRequestNotice] = useState(null);
-  const [incomingReaction, setIncomingReaction] = useState(null);
-  const [syncedPlaybackEvent, setSyncedPlaybackEvent] = useState(null);
-  const [sessionEnded, setSessionEnded] = useState(false);
-  const [isReconnecting, setIsReconnecting] = useState(false);
-  const [socketId, setSocketId] = useState(null);
-
+  
   // Track the active session locally so reconnect logic can access it
   const activeSessionRef = useRef(null);
 
@@ -75,13 +68,14 @@ export function useSocket() {
 
     socket.on('connect', () => {
       console.log('⚡ Socket Connected:', socket.id);
-      setSocketId(socket.id);
-      setIsConnected(true);
-      setIsReconnecting(false);
+      useRoomStore.getState().setSocketId(socket.id);
+      useRoomStore.getState().setIsConnected(true);
+      useRoomStore.getState().setIsReconnecting(false);
 
       // Auto-rejoin if we have a saved session and aren't in a room yet
       const session = activeSessionRef.current || loadSession();
-      if (session && !roomState) {
+      const currentRoomState = useRoomStore.getState().roomState;
+      if (session && !currentRoomState) {
         console.log('🔄 Auto-rejoining room:', session.roomId);
         attemptRejoin(socket, session.roomId, session.nickname);
       }
@@ -89,60 +83,49 @@ export function useSocket() {
 
     socket.on('disconnect', (reason) => {
       console.log('❌ Socket Disconnected:', reason);
-      setIsConnected(false);
+      useRoomStore.getState().setIsConnected(false);
       // Only show reconnecting if it was an unexpected disconnect
       if (reason !== 'io client disconnect') {
-        setIsReconnecting(true);
+        useRoomStore.getState().setIsReconnecting(true);
       }
     });
 
     socket.on('reconnecting', () => {
-      setIsReconnecting(true);
+      useRoomStore.getState().setIsReconnecting(true);
     });
 
     socket.on('room_state_updated', (newRoomState) => {
-      setRoomState(newRoomState);
+      useRoomStore.getState().setRoomState(newRoomState);
     });
 
     socket.on('playback_synced', (data) => {
-      setSyncedPlaybackEvent(data);
+      useRoomStore.getState().setSyncedPlaybackEvent(data);
     });
 
-    socket.on('control_request_received', (requestData) => {
-      setControlRequestNotice(requestData);
-    });
 
-    socket.on('control_status_changed', ({ hasControl, message }) => {
-      setToastNotification({ type: hasControl ? 'success' : 'warning', message });
-    });
 
     socket.on('toast_notification', (data) => {
-      setToastNotification(data);
+      useUIStore.getState().setToastNotification(data);
     });
 
     socket.on('reaction_triggered', (reaction) => {
-      setIncomingReaction(reaction);
+      useUIStore.getState().setIncomingReaction(reaction);
     });
 
     socket.on('error_message', ({ message }) => {
-      setToastNotification({ type: 'error', message });
+      useUIStore.getState().setToastNotification({ type: 'error', message });
     });
 
     socket.on('session_ended', () => {
       clearSession();
       activeSessionRef.current = null;
-      setSessionEnded(true);
-      setRoomState(null);
-      setIsReconnecting(false);
+      useRoomStore.getState().setSessionEnded(true);
+      useRoomStore.getState().setRoomState(null);
+      useRoomStore.getState().setIsReconnecting(false);
     });
 
     socket.on('chat_received', (message) => {
-      setRoomState(prev => {
-        if (!prev) return prev;
-        const alreadyExists = prev.chatHistory.some(m => m.id === message.id);
-        if (alreadyExists) return prev;
-        return { ...prev, chatHistory: [...prev.chatHistory, message] };
-      });
+      useRoomStore.getState().updateChatHistory(message);
     });
 
     return () => {
@@ -154,10 +137,10 @@ export function useSocket() {
   const attemptRejoin = (socket, roomId, nickname, retriesLeft = 4) => {
     socket.emit('join_room', { roomId, nickname }, (response) => {
       if (response.success) {
-        setRoomState(response.roomState);
+        useRoomStore.getState().setRoomState(response.roomState);
         activeSessionRef.current = { roomId, nickname };
         saveSession(roomId, nickname);
-        setIsReconnecting(false);
+        useRoomStore.getState().setIsReconnecting(false);
       } else if (response.error === 'Room not found' && retriesLeft > 0) {
         // Server may be cold-starting — retry
         setTimeout(() => attemptRejoin(socket, roomId, nickname, retriesLeft - 1), 2000);
@@ -165,8 +148,8 @@ export function useSocket() {
         // Truly not found — clear session and let user re-enter
         clearSession();
         activeSessionRef.current = null;
-        setIsReconnecting(false);
-        setRoomState(null);
+        useRoomStore.getState().setIsReconnecting(false);
+        useRoomStore.getState().setRoomState(null);
       }
     });
   };
@@ -176,7 +159,7 @@ export function useSocket() {
       if (!socketRef.current) return reject('Socket not connected');
       socketRef.current.emit('create_room', { nickname }, (response) => {
         if (response.success) {
-          setRoomState(response.roomState);
+          useRoomStore.getState().setRoomState(response.roomState);
           const roomId = response.roomState.roomId;
           activeSessionRef.current = { roomId, nickname };
           saveSession(roomId, nickname);
@@ -195,7 +178,7 @@ export function useSocket() {
       const attempt = (retriesLeft) => {
         socketRef.current.emit('join_room', { roomId, nickname }, (response) => {
           if (response.success) {
-            setRoomState(response.roomState);
+            useRoomStore.getState().setRoomState(response.roomState);
             activeSessionRef.current = { roomId, nickname };
             saveSession(roomId, nickname);
             resolve(response.roomState);
@@ -217,7 +200,7 @@ export function useSocket() {
     return new Promise((resolve) => {
       clearSession();
       activeSessionRef.current = null;
-      setRoomState(null);
+      useRoomStore.getState().setRoomState(null);
 
       if (!socketRef.current) { resolve(); return; }
 
@@ -233,24 +216,7 @@ export function useSocket() {
     }
   }, []);
 
-  const requestControl = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.emit('request_control');
-    }
-  }, []);
 
-  const respondControlRequest = useCallback((targetSocketId, approved) => {
-    if (socketRef.current) {
-      socketRef.current.emit('respond_control_request', { targetSocketId, approved });
-      setControlRequestNotice(null);
-    }
-  }, []);
-
-  const revokeControl = useCallback((targetSocketId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('revoke_control', { targetSocketId });
-    }
-  }, []);
 
   const sendChatMessage = useCallback((text) => {
     if (socketRef.current) {
@@ -266,24 +232,10 @@ export function useSocket() {
 
   return {
     socket: socketRef.current,
-    socketId,
-    isConnected,
-    isReconnecting,
-    roomState,
-    sessionEnded,
-    toastNotification,
-    setToastNotification,
-    controlRequestNotice,
-    setControlRequestNotice,
-    incomingReaction,
-    syncedPlaybackEvent,
     createRoom,
     joinRoom,
     leaveRoom,
     syncPlayback,
-    requestControl,
-    respondControlRequest,
-    revokeControl,
     sendChatMessage,
     sendReaction
   };

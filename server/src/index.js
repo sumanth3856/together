@@ -13,8 +13,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: '*',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST']
 }));
 
@@ -45,7 +57,7 @@ if (fs.existsSync(clientDistPath)) {
 // Configure Socket.io for Vercel Serverless
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   },
   transports: ['polling', 'websocket'],
@@ -61,6 +73,14 @@ const PORT = process.env.PORT || 4000;
 if (!process.env.VERCEL) {
   httpServer.listen(PORT, () => {
     console.log(`🚀 Together Server running on http://localhost:${PORT}`);
+    
+    // Keep-alive cron ping to prevent Render from sleeping
+    const SERVER_URL = process.env.SERVER_URL || 'https://watch-together-f0xv.onrender.com';
+    setInterval(() => {
+      fetch(`${SERVER_URL}/api/health`)
+        .then(res => console.log(`[Keep-Alive] Pinged ${SERVER_URL} - Status: ${res.status}`))
+        .catch(err => console.error(`[Keep-Alive] Ping failed:`, err.message));
+    }, 14 * 60 * 1000); // 14 minutes
   });
 }
 

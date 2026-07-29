@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Tv, Plus, Users, ArrowRight, Zap, ShieldCheck, Smile, Monitor } from 'lucide-react';
+import { Tv, Plus, Users, ArrowRight, Zap, ShieldCheck, Smile, Monitor, X } from 'lucide-react';
 
-export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
+export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom, onCancel }) {
   const [activeTab, setActiveTab] = useState(initialRoomId ? 'join' : 'create');
   const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState(initialRoomId || '');
@@ -46,8 +46,29 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
   };
 
   return (
-    <div className="landing-bg">
-      <div className="landing-card">
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(255, 255, 255, 0.85)',
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '24px 16px',
+      animation: 'fadeIn 0.3s ease'
+    }}>
+      <div className="landing-card" style={{ position: 'relative' }}>
+        
+        {/* Close Button */}
+        {onCancel && (
+          <button 
+            onClick={onCancel}
+            style={{ 
+              position: 'absolute', top: '16px', right: '16px', 
+              background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-secondary)',
+              width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+            }}
+          >
+            <X size={18} />
+          </button>
+        )}
 
         {/* Logo & Brand */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
@@ -61,7 +82,7 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
           }}>
             <Monitor size={30} color="#fff" />
           </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#fff', marginBottom: '6px', letterSpacing: '-0.02em' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
             Together
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
@@ -134,7 +155,7 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom }) {
                 placeholder="e.g. TOG-X7HF"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                style={{ letterSpacing: '0.1em', fontFamily: "'Outfit', monospace", fontWeight: '700', fontSize: '1rem' }}
+                style={{ letterSpacing: '0.1em', fontFamily: "var(--font-outfit), monospace", fontWeight: '700', fontSize: '1rem' }}
                 required
               />
             </div>

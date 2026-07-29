@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Play, Youtube, Check, Film, Music, Compass, Loader } from 'lucide-react';
+import React, { memo, useState } from 'react';
+import { Play, Youtube, Film, Loader } from 'lucide-react';
 
 const CATEGORIZED_PRESETS = [
   { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Beats', category: 'Music', emoji: '🎵' },
@@ -9,7 +9,7 @@ const CATEGORIZED_PRESETS = [
   { id: '5qap5aO4i9A', title: 'Lofi Girl - Chill Beats', category: 'Music', emoji: '☕' },
 ];
 
-export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) {
+export const VideoQueue = memo(function VideoQueue({ currentVideo, onChangeVideo }) {
   const [urlInput, setUrlInput] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [loadingPreset, setLoadingPreset] = useState(null);
@@ -44,7 +44,6 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
     ? CATEGORIZED_PRESETS
     : CATEGORIZED_PRESETS.filter((p) => p.category === activeCategory);
 
-  const canControl = isHost || hasControl;
 
   return (
     <div className="panel" style={{ marginTop: '14px', overflow: 'hidden' }}>
@@ -65,15 +64,6 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
           </div>
           <span style={{ fontSize: '0.88rem', fontWeight: '700' }}>Load Video</span>
         </div>
-        {!canControl && (
-          <span style={{
-            fontSize: '0.68rem', color: 'var(--text-tertiary)',
-            background: 'var(--bg-input)', border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-full)', padding: '2px 8px'
-          }}>
-            Host only
-          </span>
-        )}
       </div>
 
       <div style={{ padding: '14px 14px' }}>
@@ -85,19 +75,40 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
             placeholder="Paste YouTube URL or video ID…"
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
-            disabled={!canControl}
-            style={{ fontSize: '0.875rem', background: canControl ? 'var(--bg-input)' : 'rgba(255,255,255,0.02)' }}
+            disabled={false}
+            style={{ fontSize: '0.875rem', background: 'var(--bg-input)' }}
           />
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={!canControl || !urlInput.trim()}
+            disabled={!urlInput.trim()}
             style={{ minHeight: '44px', padding: '0 14px', flexShrink: 0, borderRadius: 'var(--radius-md)' }}
           >
             <Play size={15} />
             <span>Load</span>
           </button>
         </form>
+
+        {/* Empty State Banner */}
+        {(!currentVideo?.youtubeId || currentVideo.youtubeId === 'dQw4w9WgXcQ') && (
+          <div style={{
+            background: 'var(--bg-surface-3)', borderRadius: 'var(--radius-lg)',
+            padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+            textAlign: 'center', marginBottom: '16px', border: '1px dashed var(--border-strong)'
+          }}>
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(99,102,241,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px',
+              border: '1px solid rgba(99,102,241,0.2)'
+            }}>
+              <Film size={22} color="var(--accent-primary)" />
+            </div>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: '700', marginBottom: '6px' }}>Start the Party</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', maxWidth: '240px', lineHeight: 1.5 }}>
+              Paste a YouTube link above or pick a preset below to begin co-watching.
+            </p>
+          </div>
+        )}
 
         {/* Category Chips */}
         <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -136,7 +147,6 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
               <button
                 key={preset.id}
                 onClick={() => handleSelectPreset(preset)}
-                disabled={!canControl}
                 className={`preset-chip${isPlaying ? ' active' : ''}`}
                 style={{ fontSize: '0.76rem' }}
               >
@@ -150,7 +160,6 @@ export function VideoQueue({ isHost, hasControl, currentVideo, onChangeVideo }) 
           })}
         </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-}
+});

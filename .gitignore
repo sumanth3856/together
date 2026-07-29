@@ -7,6 +7,9 @@ server/node_modules/
 dist/
 client/dist/
 
+# Next.js Build Output
+client/.next/
+
 # Logs & Temporary Files
 *.log
 npm-debug.log*

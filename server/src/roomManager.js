@@ -31,16 +31,13 @@ export const RoomManager = {
     const roomId = generateRoomCode();
     const hostUser = {
       socketId: hostSocketId,
-      nickname: hostNickname || 'Host',
+      nickname: hostNickname || 'Guest',
       color: getRandomColor(),
-      isHost: true,
-      hasControl: true,
       joinedAt: Date.now()
     };
 
     const room = {
       roomId,
-      hostId: hostSocketId,
       currentVideo: {
         youtubeId: 'dQw4w9WgXcQ',
         title: 'Rick Astley - Never Gonna Give You Up (Official Music Video)'
@@ -51,7 +48,6 @@ export const RoomManager = {
         updatedAt: Date.now()
       },
       members: new Map([[hostSocketId, hostUser]]),
-      controlRequests: new Map(),
       chatHistory: [
         {
           id: 'sys-init',
@@ -105,22 +101,33 @@ export const RoomManager = {
       }
     }
 
+    // Fallback: If not in pendingReconnects, they might still be a "ghost" in the room 
+    // due to the server not processing their disconnect yet (e.g. rapid page reload).
+    if (!existingMemberData) {
+      for (const [existingSocketId, m] of room.members.entries()) {
+        if (m.nickname === nickname) {
+          existingMemberData = m;
+          // Eject the old ghost socket immediately
+          room.members.delete(existingSocketId);
+          
+          // Remove them from pendingReconnects if they somehow get added later
+          if (pendingReconnects.has(existingSocketId)) {
+            clearTimeout(pendingReconnects.get(existingSocketId).timer);
+            pendingReconnects.delete(existingSocketId);
+          }
+          break;
+        }
+      }
+    }
+
     let member;
     if (existingMemberData) {
-      // Restore previous session with original role (host/control)
       member = {
         socketId, // new socket ID after reconnect
         nickname: existingMemberData.nickname,
         color: existingMemberData.color,
-        isHost: existingMemberData.isHost,
-        hasControl: existingMemberData.hasControl || existingMemberData.isHost,
         joinedAt: existingMemberData.joinedAt || Date.now()
       };
-
-      // If this was the host reconnecting, restore host status
-      if (existingMemberData.isHost) {
-        room.hostId = socketId;
-      }
 
       room.chatHistory.push({
         id: `sys-rejoin-${Date.now()}`,
@@ -131,19 +138,12 @@ export const RoomManager = {
       });
     } else {
       // Fresh join
-      const isFirstMember = room.members.size === 0;
       member = {
         socketId,
         nickname: nickname || `Guest_${Math.floor(1000 + Math.random() * 9000)}`,
         color: getRandomColor(),
-        isHost: isFirstMember,
-        hasControl: isFirstMember,
         joinedAt: Date.now()
       };
-
-      if (isFirstMember) {
-        room.hostId = socketId;
-      }
 
       room.chatHistory.push({
         id: `sys-join-${Date.now()}`,
@@ -171,7 +171,6 @@ export const RoomManager = {
       if (room.members.has(socketId)) {
         const member = room.members.get(socketId);
         room.members.delete(socketId);
-        room.controlRequests.delete(socketId);
 
         // Schedule grace-period deletion
         const timer = setTimeout(() => {
@@ -181,12 +180,12 @@ export const RoomManager = {
           const currentRoom = rooms.get(roomId);
           if (!currentRoom) return; // Already deleted
 
-          if (member.isHost) {
-            // Host truly left — disband the room
+          if (currentRoom.members.size === 0) {
+            // Room is completely empty — disband the room
             rooms.delete(roomId);
             return { roomId, sessionEnded: true };
           }
-          // Regular member truly left — room stays, nothing special needed
+          // Regular member truly left and room not empty — room stays
         }, RECONNECT_GRACE_MS);
 
         // Store disconnect data for potential reconnect
@@ -194,8 +193,6 @@ export const RoomManager = {
           roomId,
           nickname: member.nickname,
           color: member.color,
-          isHost: member.isHost,
-          hasControl: member.hasControl,
           joinedAt: member.joinedAt,
           timer,
           disconnectedAt: Date.now()
@@ -231,12 +228,11 @@ export const RoomManager = {
       if (room.members.has(socketId)) {
         const member = room.members.get(socketId);
         room.members.delete(socketId);
-        room.controlRequests.delete(socketId);
 
         let sessionEnded = false;
 
-        if (room.hostId === socketId) {
-          // Host intentionally left — disband immediately
+        if (room.members.size === 0) {
+          // Last member intentionally left — disband immediately
           rooms.delete(roomId);
           sessionEnded = true;
         } else {
@@ -260,8 +256,8 @@ export const RoomManager = {
     if (!room) return null;
 
     const member = room.members.get(socketId);
-    if (!member || (!member.isHost && !member.hasControl)) {
-      return { error: 'Permission denied. Only host or users with control can manage playback.' };
+    if (!member) {
+      return { error: 'User not found in room.' };
     }
 
     if (youtubeId && youtubeId !== room.currentVideo.youtubeId) {
@@ -287,77 +283,6 @@ export const RoomManager = {
     return { room };
   },
 
-  requestControl(roomId, socketId) {
-    const room = this.getRoom(roomId);
-    if (!room) return null;
-
-    const member = room.members.get(socketId);
-    if (!member) return null;
-
-    if (member.isHost || member.hasControl) {
-      return { status: 'already_has_control' };
-    }
-
-    const requestData = {
-      socketId,
-      nickname: member.nickname,
-      requestedAt: Date.now()
-    };
-
-    room.controlRequests.set(socketId, requestData);
-    return { room, hostSocketId: room.hostId, requestData };
-  },
-
-  handleControlResponse(roomId, hostSocketId, targetSocketId, approved) {
-    const room = this.getRoom(roomId);
-    if (!room) return null;
-
-    if (room.hostId !== hostSocketId) {
-      return { error: 'Only the host can respond to control requests.' };
-    }
-
-    room.controlRequests.delete(targetSocketId);
-    const targetMember = room.members.get(targetSocketId);
-
-    if (!targetMember) return null;
-
-    if (approved) {
-      targetMember.hasControl = true;
-      room.chatHistory.push({
-        id: `sys-ctrl-grant-${Date.now()}`,
-        sender: 'System',
-        text: `${room.members.get(hostSocketId)?.nickname || 'Host'} granted playback control to ${targetMember.nickname}.`,
-        isSystem: true,
-        timestamp: Date.now()
-      });
-    } else {
-      targetMember.hasControl = false;
-    }
-
-    return { room, targetMember, approved };
-  },
-
-  revokeControl(roomId, hostSocketId, targetSocketId) {
-    const room = this.getRoom(roomId);
-    if (!room) return null;
-
-    if (room.hostId !== hostSocketId) return { error: 'Only the host can revoke controls.' };
-
-    const targetMember = room.members.get(targetSocketId);
-    if (targetMember && !targetMember.isHost) {
-      targetMember.hasControl = false;
-      room.chatHistory.push({
-        id: `sys-ctrl-revoke-${Date.now()}`,
-        sender: 'System',
-        text: `Host revoked playback control from ${targetMember.nickname}.`,
-        isSystem: true,
-        timestamp: Date.now()
-      });
-    }
-
-    return { room, targetMember };
-  },
-
   addChatMessage(roomId, socketId, text) {
     const room = this.getRoom(roomId);
     if (!room) return null;
@@ -369,8 +294,6 @@ export const RoomManager = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: member.nickname,
       color: member.color,
-      isHost: member.isHost,
-      hasControl: member.hasControl,
       text: text.trim(),
       isSystem: false,
       timestamp: Date.now()
@@ -394,14 +317,12 @@ export const RoomManager = {
 
     return {
       roomId: room.roomId,
-      hostId: room.hostId,
       currentVideo: room.currentVideo,
       playback: {
         ...room.playback,
         currentTime: liveCurrentTime
       },
       members: Array.from(room.members.values()),
-      controlRequests: Array.from(room.controlRequests.values()),
       chatHistory: room.chatHistory
     };
   }

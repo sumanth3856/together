@@ -1,8 +1,8 @@
-import React from 'react';
-import { Users, Crown, Key, Check, X, UserCheck } from 'lucide-react';
+import React, { memo } from 'react';
+import { UserCheck } from 'lucide-react';
+import Avatar from 'boring-avatars';
 
-export function MemberList({ members = [], currentSocketId, isHost, onGrantControl, onRevokeControl }) {
-  const getAvatarLetter = (name) => name ? name.trim().charAt(0).toUpperCase() : '?';
+export const MemberList = memo(function MemberList({ members = [], currentSocketId }) {
 
   return (
     <div className="panel" style={{ marginTop: '14px', overflow: 'hidden' }}>
@@ -16,12 +16,12 @@ export function MemberList({ members = [], currentSocketId, isHost, onGrantContr
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
             width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
-            background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)',
+            background: 'var(--accent-primary-dim)', border: '1px solid rgba(1,69,242,0.1)',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <UserCheck size={14} color="var(--accent-cyan)" />
+            <UserCheck size={14} color="var(--accent-primary)" />
           </div>
-          <span style={{ fontSize: '0.88rem', fontWeight: '700' }}>Watching Together</span>
+          <span style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--text-primary)' }}>Watching Together</span>
         </div>
         <span style={{
           fontSize: '0.68rem', fontWeight: '600',
@@ -46,22 +46,17 @@ export function MemberList({ members = [], currentSocketId, isHost, onGrantContr
               className={`member-row${isYou ? ' you' : ''}`}
             >
               {/* Avatar */}
-              <div
-                className="avatar"
-                style={{
-                  width: '34px', height: '34px',
-                  background: m.isHost
-                    ? 'linear-gradient(135deg, #d97706, #f59e0b)'
-                    : (m.color || 'var(--accent-primary)'),
-                  fontSize: '0.85rem',
-                  boxShadow: isYou ? `0 2px 8px ${m.color || 'rgba(99,102,241,0.5)'}60` : 'none',
-                }}
-              >
-                {getAvatarLetter(m.nickname)}
+              <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                <Avatar
+                  size={34}
+                  name={m.nickname}
+                  variant="beam"
+                  colors={['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b']}
+                />
               </div>
 
               {/* Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, paddingLeft: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                   <span style={{
                     fontSize: '0.84rem', fontWeight: '700',
@@ -73,42 +68,15 @@ export function MemberList({ members = [], currentSocketId, isHost, onGrantContr
                   {isYou && (
                     <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: '700' }}>(You)</span>
                   )}
-                  {m.isHost && <Crown size={11} color="var(--accent-amber)" />}
-                  {m.hasControl && !m.isHost && <Key size={10} color="var(--accent-emerald)" />}
                 </div>
-                <span style={{ fontSize: '0.67rem', color: 'var(--text-tertiary)', fontWeight: '500' }}>
-                  {m.isHost ? '👑 Room Host' : m.hasControl ? '🎮 Has Control' : 'Viewer'}
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: '500' }}>
+                  Viewer
                 </span>
               </div>
-
-              {/* Host Controls */}
-              {isHost && !m.isHost && (
-                m.hasControl ? (
-                  <button
-                    onClick={() => onRevokeControl(m.socketId)}
-                    className="btn btn-danger"
-                    style={{ minHeight: '28px', padding: '0 8px', fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }}
-                    title="Revoke control"
-                  >
-                    <X size={12} />
-                    <span>Revoke</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => onGrantControl(m.socketId, true)}
-                    className="btn btn-success"
-                    style={{ minHeight: '28px', padding: '0 8px', fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }}
-                    title="Grant control"
-                  >
-                    <Check size={12} />
-                    <span>Grant</span>
-                  </button>
-                )
-              )}
             </div>
           );
         })}
       </div>
     </div>
   );
-}
+});

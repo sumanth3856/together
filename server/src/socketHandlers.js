@@ -1,5 +1,21 @@
 import { RoomManager } from './roomManager.js';
 
+const rateLimits = new Map();
+
+const checkRateLimit = (socketId, action, limitMs) => {
+  const key = `${socketId}:${action}`;
+  const now = Date.now();
+  const lastAction = rateLimits.get(key) || 0;
+  if (now - lastAction < limitMs) return false; // Rate limited
+  rateLimits.set(key, now);
+  return true;
+};
+
+const sanitizeStr = (str, maxLen = 50) => {
+  if (typeof str !== 'string') return '';
+  return str.trim().substring(0, maxLen);
+};
+
 export function setupSocketHandlers(io) {
   io.on('connection', (socket) => {
     let currentRoomId = null;
@@ -14,7 +30,18 @@ export function setupSocketHandlers(io) {
 
     // 1. Create Room
     socket.on('create_room', ({ nickname }, callback) => {
-      const room = RoomManager.createRoom(socket.id, nickname);
+      const cleanName = sanitizeStr(nickname, 20);
+      if (!cleanName) {
+        if (typeof callback === 'function') callback({ success: false, error: 'Nickname is required.' });
+        return;
+      }
+      
+      if (!checkRateLimit(socket.id, 'create', 5000)) {
+        if (typeof callback === 'function') callback({ success: false, error: 'You are doing that too fast.' });
+        return;
+      }
+
+      const room = RoomManager.createRoom(socket.id, cleanName);
       currentRoomId = room.roomId;
       socket.join(room.roomId);
 
@@ -27,7 +54,20 @@ export function setupSocketHandlers(io) {
 
     // 2. Join Room (handles both fresh joins and seamless reconnects)
     socket.on('join_room', ({ roomId, nickname }, callback) => {
-      const result = RoomManager.joinRoom(roomId, socket.id, nickname);
+      const cleanRoomId = sanitizeStr(roomId, 10).toUpperCase();
+      const cleanName = sanitizeStr(nickname, 20);
+
+      if (!cleanRoomId || !cleanName) {
+        if (typeof callback === 'function') callback({ success: false, error: 'Room ID and Nickname required.' });
+        return;
+      }
+
+      if (!checkRateLimit(socket.id, 'join', 1000)) {
+        if (typeof callback === 'function') callback({ success: false, error: 'Too many join attempts.' });
+        return;
+      }
+
+      const result = RoomManager.joinRoom(cleanRoomId, socket.id, cleanName);
 
       if (result.error) {
         if (typeof callback === 'function') callback({ success: false, error: result.error });
@@ -73,6 +113,8 @@ export function setupSocketHandlers(io) {
     socket.on('sync_playback', (data) => {
       if (!currentRoomId) return;
 
+      if (!checkRateLimit(socket.id, 'sync', 100)) return; // Allow 10 syncs per second max
+
       // When loading a new video, force isPlaying:true so it auto-plays for everyone
       const enrichedData = { ...data };
       if (data.youtubeId) {
@@ -91,84 +133,39 @@ export function setupSocketHandlers(io) {
           // Video changed: broadcast full state to ALL users immediately
           io.to(currentRoomId).emit('room_state_updated', RoomManager.getRoomStateDTO(result.room));
         } else {
-          // Regular play/pause/seek: lightweight sync event to peers only
+          // Regular play/pause/seek: lightweight sync to peers only (no full state broadcast)
           socket.to(currentRoomId).emit('playback_synced', {
             playback: result.room.playback,
             currentVideo: result.room.currentVideo,
             senderId: socket.id
           });
-          broadcastRoomState(currentRoomId);
         }
       }
     });
 
-    // 5. Request Playback Control Permission
-    socket.on('request_control', () => {
-      if (!currentRoomId) return;
-
-      const result = RoomManager.requestControl(currentRoomId, socket.id);
-      if (!result) return;
-
-      if (result.status === 'already_has_control') {
-        socket.emit('toast_notification', { type: 'info', message: 'You already have playback control.' });
-        return;
-      }
-
-      const { hostSocketId, requestData } = result;
-      io.to(hostSocketId).emit('control_request_received', requestData);
-      socket.emit('toast_notification', { type: 'info', message: 'Request sent to host.' });
-      broadcastRoomState(currentRoomId);
-    });
-
-    // 6. Host Responds to Permission Request (Approve / Deny)
-    socket.on('respond_control_request', ({ targetSocketId, approved }) => {
-      if (!currentRoomId) return;
-
-      const result = RoomManager.handleControlResponse(currentRoomId, socket.id, targetSocketId, approved);
-      if (result && result.error) {
-        socket.emit('error_message', { message: result.error });
-        return;
-      }
-
-      if (result) {
-        io.to(targetSocketId).emit('control_status_changed', {
-          hasControl: approved,
-          message: approved
-            ? 'Host granted you playback control!'
-            : 'Host declined your control request.'
-        });
-        broadcastRoomState(currentRoomId);
-      }
-    });
-
-    // 7. Host Revokes Permission
-    socket.on('revoke_control', ({ targetSocketId }) => {
-      if (!currentRoomId) return;
-
-      const result = RoomManager.revokeControl(currentRoomId, socket.id, targetSocketId);
-      if (result && result.room) {
-        io.to(targetSocketId).emit('control_status_changed', {
-          hasControl: false,
-          message: 'Host revoked playback control.'
-        });
-        broadcastRoomState(currentRoomId);
-      }
-    });
-
-    // 8. Live Text Chat
+    // 5. Live Text Chat
     socket.on('send_chat', ({ text }) => {
-      if (!currentRoomId || !text || !text.trim()) return;
+      const cleanText = sanitizeStr(text, 500);
+      if (!currentRoomId || !cleanText) return;
 
-      const result = RoomManager.addChatMessage(currentRoomId, socket.id, text);
-      if (result && result.room) {
+      if (!checkRateLimit(socket.id, 'chat', 500)) {
+        socket.emit('toast_notification', { type: 'warning', message: 'You are typing too fast!' });
+        return;
+      }
+
+      const result = RoomManager.addChatMessage(currentRoomId, socket.id, cleanText);
+      if (result && result.message) {
+        // chat_received is lightweight — no need to also broadcast full room state
         io.to(currentRoomId).emit('chat_received', result.message);
-        broadcastRoomState(currentRoomId);
       }
     });
 
     // 9. Floating Emoji Reaction Bursts
     socket.on('send_reaction', ({ emoji }) => {
-      if (!currentRoomId || !emoji) return;
+      const cleanEmoji = sanitizeStr(emoji, 10);
+      if (!currentRoomId || !cleanEmoji) return;
+
+      if (!checkRateLimit(socket.id, 'reaction', 300)) return; // Prevents extreme emoji spam
 
       const room = RoomManager.getRoom(currentRoomId);
       const member = room?.members.get(socket.id);
@@ -184,6 +181,11 @@ export function setupSocketHandlers(io) {
 
     // 10. Socket Disconnect (accidental — could be a reload)
     socket.on('disconnect', () => {
+      // Cleanup rate limits to prevent memory leaks
+      for (const key of rateLimits.keys()) {
+        if (key.startsWith(`${socket.id}:`)) rateLimits.delete(key);
+      }
+
       if (currentRoomId) {
         // Use grace-period leaveRoom (does NOT immediately disband)
         const result = RoomManager.leaveRoom(socket.id);

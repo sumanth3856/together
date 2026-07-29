@@ -1,46 +1,59 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useSocket } from '../hooks/useSocket';
-import { JoinRoomModal } from '../components/room/JoinRoomModal';
+import { useRoomStore } from '../store/useRoomStore';
+import { useUIStore } from '../store/useUIStore';
+
+const LandingPage = dynamic(() => import('../components/landing/LandingPage').then((mod) => mod.LandingPage), { ssr: false });
+
 import { RoomHeader } from '../components/room/RoomHeader';
 import { YouTubePlayer } from '../components/player/YouTubePlayer';
 import { VideoDetailsCard } from '../components/player/VideoDetailsCard';
 import { VideoQueue } from '../components/player/VideoQueue';
 import { MemberList } from '../components/room/MemberList';
 import { ChatPanel } from '../components/chat/ChatPanel';
-import { ControlRequestModal } from '../components/room/ControlRequestModal';
 import { MobileTabBar } from '../components/room/MobileTabBar';
+import { LeaveConfirmationModal } from '../components/room/LeaveConfirmationModal';
 import { AlertCircle, CheckCircle2, X, Wifi, WifiOff } from 'lucide-react';
 
 export default function Page() {
   const {
-    socket,
-    socketId,
-    isConnected,
-    isReconnecting,
-    roomState,
-    sessionEnded,
-    toastNotification,
-    setToastNotification,
-    controlRequestNotice,
-    setControlRequestNotice,
-    incomingReaction,
-    syncedPlaybackEvent,
     createRoom,
     joinRoom,
     leaveRoom,
     syncPlayback,
-    requestControl,
-    respondControlRequest,
-    revokeControl,
     sendChatMessage,
     sendReaction
   } = useSocket();
 
+  const actions = useMemo(() => ({
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    syncPlayback,
+    sendChatMessage,
+    sendReaction
+  }), [createRoom, joinRoom, leaveRoom, syncPlayback, sendChatMessage, sendReaction]);
+
+  const roomState = useRoomStore(state => state.roomState);
+  const isConnected = useRoomStore(state => state.isConnected);
+  const isReconnecting = useRoomStore(state => state.isReconnecting);
+  const socketId = useRoomStore(state => state.socketId);
+  const sessionEnded = useRoomStore(state => state.sessionEnded);
+  const syncedPlaybackEvent = useRoomStore(state => state.syncedPlaybackEvent);
+
+  const toasts = useUIStore(state => state.toasts);
+  const setToastNotification = useUIStore(state => state.setToastNotification);
+  const removeToast = useUIStore(state => state.removeToast);
+  const incomingReaction = useUIStore(state => state.incomingReaction);
+
   const [initialRoomId, setInitialRoomId] = useState('');
   const [mobileActiveTab, setMobileActiveTab] = useState('video');
   const [isMobileScreen, setIsMobileScreen] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [hasCheckedSession, setHasCheckedSession] = useState(false);
 
   // Responsive listener
   useEffect(() => {
@@ -53,6 +66,12 @@ export default function Page() {
   // Pre-fill room ID from URL if no session active (for invite links with no saved nickname)
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const session = sessionStorage.getItem('tg_session');
+    if (session) {
+      setTimeout(() => setHasCheckedSession(true), 400); // Wait for socket to start reconnecting
+    } else {
+      setHasCheckedSession(true);
+    }
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
     if (roomParam) {
@@ -70,35 +89,36 @@ export default function Page() {
 
   // ---------- Handlers ----------
 
-  const handleCreateRoom = async (nickname) => {
+  const handleCreateRoom = useCallback(async (nickname) => {
     try {
-      await createRoom(nickname);
+      await actions.createRoom(nickname);
     } catch (err) {
       setToastNotification({ type: 'error', message: `Failed to create room: ${err}` });
     }
-  };
+  }, [actions, setToastNotification]);
 
-  const handleJoinRoom = async (roomId, nickname) => {
+  const handleJoinRoom = useCallback(async (roomId, nickname) => {
     try {
-      await joinRoom(roomId, nickname);
+      await actions.joinRoom(roomId, nickname);
     } catch (err) {
-      // Show a friendly toast instead of browser alert
       setToastNotification({ type: 'error', message: `Room not found. Check the code and try again.` });
     }
-  };
+  }, [actions, setToastNotification]);
 
-  const handleLeaveRoom = async () => {
+  const handleLeaveRoom = useCallback(() => {
+    setShowLeaveModal(true);
+  }, []);
+
+  const confirmLeaveRoom = useCallback(async () => {
+    setShowLeaveModal(false);
     try {
-      await leaveRoom();
+      await actions.leaveRoom();
     } catch (_) {}
-    // Navigate home, clearing the room param from the URL
     window.location.href = window.location.pathname;
-  };
+  }, [actions]);
 
   // ---------- Derived State ----------
   const currentMember = roomState?.members?.find((m) => m.socketId === socketId);
-  const isHost = currentMember?.isHost || false;
-  const hasControl = currentMember?.hasControl || false;
 
   // ---------- Render ----------
   return (
@@ -137,47 +157,52 @@ export default function Page() {
         </div>
       )}
 
-      {/* ── Toast Notification ── */}
-      {toastNotification && (
-        <div style={{
-          position: 'fixed',
-          top: isReconnecting ? '48px' : '16px',
-          right: '16px',
-          left: isMobileScreen ? '16px' : 'auto',
-          zIndex: 10000,
-          maxWidth: '380px',
-          animation: 'slideInRight 0.25s ease',
-        }}>
-          <div style={{
+      {/* ── Toast Notifications Stack ── */}
+      <div style={{
+        position: 'fixed',
+        top: isReconnecting ? '48px' : '16px',
+        right: '16px',
+        left: isMobileScreen ? '16px' : 'auto',
+        zIndex: 10000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        pointerEvents: 'none',
+      }}>
+        {toasts.map((toast) => (
+          <div key={toast.id} style={{
+            pointerEvents: 'auto',
+            maxWidth: '380px',
+            animation: 'slideInRight 0.25s ease',
             display: 'flex', alignItems: 'center', gap: '10px',
             padding: '12px 14px',
             background: 'var(--bg-surface-2)',
-            border: `1px solid ${toastNotification.type === 'error' ? 'rgba(244,63,94,0.35)' : 'rgba(99,102,241,0.35)'}`,
+            border: `1px solid ${toast.type === 'error' ? 'rgba(244,63,94,0.35)' : 'rgba(99,102,241,0.35)'}`,
             borderRadius: 'var(--radius-lg)',
             boxShadow: 'var(--shadow-lg)',
           }}>
             <div style={{
               width: '30px', height: '30px', borderRadius: 'var(--radius-md)', flexShrink: 0,
-              background: toastNotification.type === 'error' ? 'rgba(244,63,94,0.12)' : 'var(--accent-primary-dim)',
-              border: `1px solid ${toastNotification.type === 'error' ? 'rgba(244,63,94,0.22)' : 'rgba(99,102,241,0.22)'}`,
+              background: toast.type === 'error' ? 'rgba(244,63,94,0.12)' : 'var(--accent-primary-dim)',
+              border: `1px solid ${toast.type === 'error' ? 'rgba(244,63,94,0.22)' : 'rgba(99,102,241,0.22)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              {toastNotification.type === 'error'
+              {toast.type === 'error'
                 ? <AlertCircle size={15} color="var(--status-danger)" />
                 : <CheckCircle2 size={15} color="var(--accent-primary)" />}
             </div>
             <span style={{ fontSize: '0.84rem', color: 'var(--text-primary)', flex: 1, lineHeight: 1.4 }}>
-              {toastNotification.message}
+              {toast.message}
             </span>
             <button
-              onClick={() => setToastNotification(null)}
+              onClick={() => removeToast(toast.id)}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '4px', borderRadius: 'var(--radius-sm)', display: 'flex', flexShrink: 0 }}
             >
               <X size={14} />
             </button>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
 
       {/* ── Reconnecting full-screen overlay (no room, no session ended) ── */}
       {isReconnecting && !roomState && !sessionEnded && (
@@ -205,7 +230,11 @@ export default function Page() {
       )}
 
       {/* ── Main Content ── */}
-      {!roomState ? (
+      {!hasCheckedSession && !roomState ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
+          <div className="pulse-dot" style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-primary)' }} />
+        </div>
+      ) : !roomState ? (
         sessionEnded ? (
           /* Session Ended Screen */
           <div style={{
@@ -220,7 +249,7 @@ export default function Page() {
             }}>
               <AlertCircle size={36} color="var(--status-danger)" />
             </div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', fontFamily: "'Outfit', sans-serif" }}>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', fontFamily: "var(--font-outfit), sans-serif" }}>
               Session Ended
             </h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', maxWidth: '300px', lineHeight: 1.6, fontSize: '0.9rem' }}>
@@ -235,8 +264,8 @@ export default function Page() {
             </button>
           </div>
         ) : !isReconnecting ? (
-          /* Landing / Join Page — only show if NOT reconnecting */
-          <JoinRoomModal
+          /* Landing Page — only show if NOT reconnecting */
+          <LandingPage
             initialRoomId={initialRoomId}
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
@@ -249,11 +278,8 @@ export default function Page() {
           style={{ maxWidth: '1380px', margin: '0 auto', padding: isMobileScreen ? '10px' : '14px 20px', minHeight: '100dvh' }}
         >
           <RoomHeader
-            roomId={roomState.roomId}
-            memberCount={roomState.members.length}
-            isHost={isHost}
-            isConnected={isConnected}
             onLeaveRoom={handleLeaveRoom}
+            roomId={roomState.roomId}
           />
 
           {!isMobileScreen ? (
@@ -263,32 +289,21 @@ export default function Page() {
                 <YouTubePlayer
                   youtubeId={roomState.currentVideo?.youtubeId}
                   playback={roomState.playback}
-                  isHost={isHost}
-                  hasControl={hasControl}
                   syncedPlaybackEvent={syncedPlaybackEvent}
-                  onPlaybackChange={(pData) => syncPlayback(pData)}
-                  onRequestControl={requestControl}
+                  onPlaybackChange={(pData) => actions.syncPlayback(pData)}
                 />
                 <VideoDetailsCard
                   currentVideo={roomState.currentVideo}
                   roomState={roomState}
                   currentSocketId={socketId}
-                  isHost={isHost}
-                  hasControl={hasControl}
-                  onRequestControl={requestControl}
                 />
                 <VideoQueue
-                  isHost={isHost}
-                  hasControl={hasControl}
                   currentVideo={roomState.currentVideo}
-                  onChangeVideo={(vData) => syncPlayback(vData)}
+                  onChangeVideo={(vData) => actions.syncPlayback(vData)}
                 />
                 <MemberList
                   members={roomState.members}
                   currentSocketId={socketId}
-                  isHost={isHost}
-                  onGrantControl={(targetId, approved) => respondControlRequest(targetId, approved)}
-                  onRevokeControl={(targetId) => revokeControl(targetId)}
                 />
               </div>
 
@@ -296,8 +311,8 @@ export default function Page() {
                 <ChatPanel
                   chatHistory={roomState.chatHistory}
                   incomingReaction={incomingReaction}
-                  onSendMessage={sendChatMessage}
-                  onSendReaction={sendReaction}
+                  onSendMessage={actions.sendChatMessage}
+                  onSendReaction={actions.sendReaction}
                 />
               </div>
             </div>
@@ -308,11 +323,8 @@ export default function Page() {
                 <YouTubePlayer
                   youtubeId={roomState.currentVideo?.youtubeId}
                   playback={roomState.playback}
-                  isHost={isHost}
-                  hasControl={hasControl}
                   syncedPlaybackEvent={syncedPlaybackEvent}
-                  onPlaybackChange={(pData) => syncPlayback(pData)}
-                  onRequestControl={requestControl}
+                  onPlaybackChange={(pData) => actions.syncPlayback(pData)}
                 />
               </div>
 
@@ -321,9 +333,6 @@ export default function Page() {
                   currentVideo={roomState.currentVideo}
                   roomState={roomState}
                   currentSocketId={socketId}
-                  isHost={isHost}
-                  hasControl={hasControl}
-                  onRequestControl={requestControl}
                 />
               )}
 
@@ -332,8 +341,8 @@ export default function Page() {
                   <ChatPanel
                     chatHistory={roomState.chatHistory}
                     incomingReaction={incomingReaction}
-                    onSendMessage={sendChatMessage}
-                    onSendReaction={sendReaction}
+                    onSendMessage={actions.sendChatMessage}
+                    onSendReaction={actions.sendReaction}
                   />
                 </div>
               )}
@@ -342,18 +351,13 @@ export default function Page() {
                 <MemberList
                   members={roomState.members}
                   currentSocketId={socketId}
-                  isHost={isHost}
-                  onGrantControl={(targetId, approved) => respondControlRequest(targetId, approved)}
-                  onRevokeControl={(targetId) => revokeControl(targetId)}
                 />
               )}
 
               {mobileActiveTab === 'queue' && (
                 <VideoQueue
-                  isHost={isHost}
-                  hasControl={hasControl}
                   currentVideo={roomState.currentVideo}
-                  onChangeVideo={(vData) => syncPlayback(vData)}
+                  onChangeVideo={(vData) => actions.syncPlayback(vData)}
                 />
               )}
 
@@ -366,11 +370,11 @@ export default function Page() {
             </div>
           )}
 
-          {/* Host Control Request Modal */}
-          {isHost && (
-            <ControlRequestModal
-              requestNotice={controlRequestNotice}
-              onRespond={(targetId, approved) => respondControlRequest(targetId, approved)}
+          {/* Leave Confirmation Modal */}
+          {showLeaveModal && (
+            <LeaveConfirmationModal
+              onConfirm={confirmLeaveRoom}
+              onCancel={() => setShowLeaveModal(false)}
             />
           )}
         </div>

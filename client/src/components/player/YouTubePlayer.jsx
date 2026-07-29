@@ -1,14 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Lock, Unlock, CheckCircle2, Signal, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Lock } from 'lucide-react';
+import throttle from 'lodash/throttle';
+import { PlaybackControls } from './PlaybackControls';
 
-export function YouTubePlayer({
+export const YouTubePlayer = React.memo(function YouTubePlayer({
   youtubeId,
   playback,
-  isHost,
-  hasControl,
   syncedPlaybackEvent,
-  onPlaybackChange,
-  onRequestControl
+  onPlaybackChange
 }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
@@ -16,21 +15,42 @@ export function YouTubePlayer({
   const [localPlaying, setLocalPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(100);
-  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('together_volume');
+      return saved ? parseInt(saved, 10) : 100;
+    }
+    return 100;
+  });
+  const [isMuted, setIsMuted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('together_isMuted');
+      return saved === 'true';
+    }
+    return false;
+  });
   const isSelfSyncing = useRef(0);
   const hasJoinSyncedRef = useRef(false);
 
   // Use refs to avoid stale closures in YouTube iframe event listeners
-  const isHostRef = useRef(isHost);
-  const hasControlRef = useRef(hasControl);
   const onPlaybackChangeRef = useRef(onPlaybackChange);
 
+  // Throttled sync specifically for aggressive slider dragging
+  const throttledSyncRef = useRef(
+    throttle((isPlaying, newTime) => {
+      if (onPlaybackChangeRef.current) {
+        onPlaybackChangeRef.current({ isPlaying, currentTime: newTime });
+      }
+    }, 250)
+  );
+
   useEffect(() => {
-    isHostRef.current = isHost;
-    hasControlRef.current = hasControl;
     onPlaybackChangeRef.current = onPlaybackChange;
-  }, [isHost, hasControl, onPlaybackChange]);
+  }, [onPlaybackChange]);
+
+  useEffect(() => {
+    return () => throttledSyncRef.current.cancel();
+  }, []);
 
   const extractVideoId = (input) => {
     if (!input) return 'dQw4w9WgXcQ';
@@ -55,8 +75,8 @@ export function YouTubePlayer({
         host: 'https://www.youtube.com',
         playerVars: {
           autoplay: 0,
-          controls: isHost || hasControl ? 1 : 0,
-          disablekb: isHost || hasControl ? 0 : 1,
+          controls: 1,
+          disablekb: 0,
           enablejsapi: 1,
           origin: window.location.origin,
           widget_referrer: window.location.origin,
@@ -68,6 +88,8 @@ export function YouTubePlayer({
           onReady: (event) => {
             setIsPlayerReady(true);
             setDuration(event.target.getDuration() || 0);
+            event.target.setVolume(volume);
+            if (isMuted) event.target.mute();
           },
           onStateChange: (event) => {
             const player = event.target;
@@ -84,9 +106,7 @@ export function YouTubePlayer({
             // Skip if we triggered this state change ourselves
             if (Date.now() - isSelfSyncing.current < 1500) return;
 
-            // Only broadcast if user has control
-            if (!isHostRef.current && !hasControlRef.current) return;
-
+            // Removed permission check — everyone can broadcast playback
             if (state === window.YT.PlayerState.PLAYING) {
               onPlaybackChangeRef.current({ isPlaying: true, currentTime: nowTime });
             } else if (state === window.YT.PlayerState.PAUSED) {
@@ -193,34 +213,64 @@ export function YouTubePlayer({
   };
 
   const handleManualPlayPause = () => {
-    if (!playerRef.current || (!isHost && !hasControl)) return;
+    if (!playerRef.current) return;
     localPlaying ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
   };
 
   const handleSeekChange = (e) => {
     const newTime = parseFloat(e.target.value);
     setCurrentTime(newTime);
-    if (playerRef.current && (isHost || hasControl)) {
+    if (playerRef.current) {
       isSelfSyncing.current = Date.now();
       playerRef.current.seekTo(newTime, true);
-      onPlaybackChange({ isPlaying: localPlaying, currentTime: newTime });
+      throttledSyncRef.current(localPlaying, newTime);
     }
   };
 
   const handleVolumeChange = (e) => {
     const newVol = parseInt(e.target.value, 10);
     setVolume(newVol);
+    if (typeof window !== 'undefined') localStorage.setItem('together_volume', newVol.toString());
     if (playerRef.current) {
       playerRef.current.setVolume(newVol);
-      if (newVol > 0 && isMuted) { playerRef.current.unMute(); setIsMuted(false); }
+      if (newVol > 0 && isMuted) {
+        playerRef.current.unMute();
+        setIsMuted(false);
+        if (typeof window !== 'undefined') localStorage.setItem('together_isMuted', 'false');
+      }
     }
   };
 
   const handleMuteToggle = () => {
     if (!playerRef.current) return;
-    if (isMuted) { playerRef.current.unMute(); setIsMuted(false); }
-    else { playerRef.current.mute(); setIsMuted(true); }
+    if (isMuted) {
+      playerRef.current.unMute();
+      setIsMuted(false);
+      if (typeof window !== 'undefined') localStorage.setItem('together_isMuted', 'false');
+    } else {
+      playerRef.current.mute();
+      setIsMuted(true);
+      if (typeof window !== 'undefined') localStorage.setItem('together_isMuted', 'true');
+    }
   };
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handleManualPlayPause();
+      } else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        handleMuteToggle();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [localPlaying, isMuted]);
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -245,159 +295,47 @@ export function YouTubePlayer({
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         />
 
-        {/* Guest Lock Indicator */}
-        {!isHost && !hasControl && (
-          <div style={{
-            position: 'absolute', top: '10px', right: '10px', zIndex: 10,
-            display: 'flex', alignItems: 'center', gap: '5px',
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            padding: '4px 10px', borderRadius: 'var(--radius-full)',
-            fontSize: '0.72rem', color: 'var(--accent-amber)', fontWeight: '600'
-          }}>
-            <Lock size={11} color="var(--accent-amber)" />
-            <span>Host Controls</span>
-          </div>
-        )}
-
         {/* Autoplay Blocked Overlay */}
         {isPlayerReady && playback?.isPlaying && !localPlaying && (
-          <div className="player-overlay">
+          <div style={{
+            position: 'absolute', top: '16px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 20, animation: 'fadeIn 0.3s ease',
+          }}>
             <button
               onClick={() => {
                 if (playerRef.current) {
-                  playerRef.current.unMute();
-                  setIsMuted(false);
                   playerRef.current.playVideo();
                 }
               }}
               className="btn btn-primary"
               style={{
-                padding: '12px 28px', fontSize: '1rem',
+                padding: '8px 18px', fontSize: '0.85rem',
                 borderRadius: 'var(--radius-full)',
-                boxShadow: '0 4px 24px rgba(99,102,241,0.5)',
+                boxShadow: '0 4px 16px rgba(1,69,242,0.4)',
+                background: 'rgba(1, 69, 242, 0.95)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
               }}
             >
-              <Play size={20} />
-              <span>Sync &amp; Unmute</span>
+              <Play size={16} />
+              <span>Click to Sync</span>
             </button>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-              Browser blocked autoplay. Click to join the stream.
-            </span>
           </div>
         )}
       </div>
 
       {/* Control Bar */}
-      <div className="panel" style={{
-        marginTop: '10px',
-        padding: '12px 14px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        background: 'var(--bg-surface)',
-      }}>
-        {/* Progress Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', minWidth: '38px', fontVariantNumeric: 'tabular-nums' }}>
-            {formatTime(currentTime)}
-          </span>
-          <div style={{ flex: 1, position: 'relative', height: '4px' }}>
-            {/* Track background */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'rgba(255,255,255,0.08)',
-              borderRadius: '2px',
-            }} />
-            {/* Progress fill */}
-            <div style={{
-              position: 'absolute', top: 0, left: 0, bottom: 0,
-              width: `${progressPercent}%`,
-              background: 'var(--accent-primary)',
-              borderRadius: '2px',
-              transition: 'width 0.5s linear',
-              boxShadow: '0 0 6px rgba(99,102,241,0.5)',
-            }} />
-            {/* Invisible range input */}
-            <input
-              type="range"
-              min={0} max={duration || 100} step={0.5}
-              value={currentTime}
-              onChange={handleSeekChange}
-              disabled={!isHost && !hasControl}
-              style={{
-                position: 'absolute', inset: '-6px 0',
-                width: '100%', opacity: 0,
-                cursor: isHost || hasControl ? 'pointer' : 'default',
-                height: '16px',
-              }}
-            />
-          </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', minWidth: '38px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-            {formatTime(duration)}
-          </span>
-        </div>
-
-        {/* Controls Row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-          {/* Left — Play/Pause & Control Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {(isHost || hasControl) ? (
-              <button
-                className="btn btn-primary"
-                onClick={handleManualPlayPause}
-                style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-full)', padding: 0, boxShadow: '0 2px 10px rgba(99,102,241,0.4)' }}
-                title={localPlaying ? 'Pause' : 'Play'}
-              >
-                {localPlaying ? <Pause size={15} /> : <Play size={15} style={{ marginLeft: '1px' }} />}
-              </button>
-            ) : (
-              <button
-                className="btn btn-secondary"
-                onClick={onRequestControl}
-                style={{
-                  minHeight: '36px', fontSize: '0.78rem',
-                  borderColor: 'rgba(245,158,11,0.25)',
-                  color: 'var(--accent-amber)',
-                  background: 'rgba(245,158,11,0.06)',
-                }}
-              >
-                <Unlock size={13} />
-                <span>Request Control</span>
-              </button>
-            )}
-            {(isHost || hasControl) && (
-              <span className="badge badge-control" style={{ fontSize: '0.62rem' }}>
-                <CheckCircle2 size={9} /> Controlling
-              </span>
-            )}
-          </div>
-
-          {/* Right — Volume */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              onClick={handleMuteToggle}
-              className="btn btn-ghost"
-              style={{ padding: 0, width: '30px', height: '30px', minHeight: '30px', borderRadius: 'var(--radius-full)' }}
-              title={isMuted ? 'Unmute' : 'Mute'}
-            >
-              {isMuted || volume === 0
-                ? <VolumeX size={15} color="var(--status-danger)" />
-                : <Volume2 size={15} color="var(--text-secondary)" />}
-            </button>
-            <input
-              type="range" min={0} max={100}
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeChange}
-              style={{ width: '68px', height: '3px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-              <Signal size={11} color="var(--status-success)" />
-              <span>Synced</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PlaybackControls
+        currentTime={currentTime}
+        duration={duration}
+        volume={volume}
+        isMuted={isMuted}
+        localPlaying={localPlaying}
+        onManualPlayPause={handleManualPlayPause}
+        onSeekChange={handleSeekChange}
+        onVolumeChange={handleVolumeChange}
+        onMuteToggle={handleMuteToggle}
+      />
     </div>
   );
-}
+});
