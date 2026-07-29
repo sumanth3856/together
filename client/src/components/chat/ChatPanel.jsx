@@ -82,7 +82,7 @@ export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingRea
       {/* Messages */}
       <div
         ref={chatContainerRef}
-        className="scroll-area"
+        className="scroll-area chat-messages-scroll-area"
         style={{ flex: 1, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}
       >
         {chatHistory.length === 0 ? (
@@ -168,6 +168,7 @@ export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingRea
       {/* Input */}
       <form
         onSubmit={handleSend}
+        className="chat-input-form"
         style={{
           padding: '10px 12px',
           borderTop: '1px solid var(--border-subtle)',
