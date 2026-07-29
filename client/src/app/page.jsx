@@ -63,21 +63,32 @@ export default function Page() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Pre-fill room ID from URL if no session active (for invite links with no saved nickname)
+  // Pre-fill room ID from URL (for invite links)
+  // hasCheckedSession stays false until the socket has had a chance to
+  // attempt a rejoin, so we never flash the LandingPage mid-reconnect.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const session = localStorage.getItem('tg_session');
-    if (session) {
-      setTimeout(() => setHasCheckedSession(true), 400); // Wait for socket to start reconnecting
-    } else {
+    if (!session) {
+      // No saved session — show LandingPage immediately
       setHasCheckedSession(true);
     }
+    // If session exists, hasCheckedSession stays false;
+    // it will be set to true once isReconnecting flips to false (see effect below).
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
     if (roomParam) {
       setInitialRoomId(roomParam.toUpperCase());
     }
   }, []);
+
+  // Once the rejoin attempt finishes (isReconnecting→false), unlock the UI.
+  // This covers both: successful rejoin (roomState set) and failed rejoin (show LandingPage).
+  useEffect(() => {
+    if (!isReconnecting) {
+      setHasCheckedSession(true);
+    }
+  }, [isReconnecting]);
 
   // Update URL when room state changes (keeps URL in sync)
   useEffect(() => {

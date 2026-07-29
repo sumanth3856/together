@@ -70,14 +70,19 @@ export function useSocket() {
       console.log('⚡ Socket Connected:', socket.id);
       useRoomStore.getState().setSocketId(socket.id);
       useRoomStore.getState().setIsConnected(true);
-      useRoomStore.getState().setIsReconnecting(false);
 
       // Auto-rejoin if we have a saved session and aren't in a room yet
       const session = activeSessionRef.current || loadSession();
       const currentRoomState = useRoomStore.getState().roomState;
       if (session && !currentRoomState) {
         console.log('🔄 Auto-rejoining room:', session.roomId);
+        // Keep isReconnecting=true for the full duration of the rejoin attempt
+        // (do NOT clear it here — attemptRejoin will clear it on success or failure)
+        useRoomStore.getState().setIsReconnecting(true);
         attemptRejoin(socket, session.roomId, session.nickname);
+      } else {
+        // No session to restore — safe to stop the reconnecting banner
+        useRoomStore.getState().setIsReconnecting(false);
       }
     });
 
