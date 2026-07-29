@@ -11,7 +11,7 @@ const LandingPage = dynamic(() => import('../components/landing/LandingPage').th
 import { RoomHeader } from '../components/room/RoomHeader';
 import { YouTubePlayer } from '../components/player/YouTubePlayer';
 import { VideoDetailsCard } from '../components/player/VideoDetailsCard';
-import { VideoQueue } from '../components/player/VideoQueue';
+
 import { MemberList } from '../components/room/MemberList';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { MobileTabBar } from '../components/room/MobileTabBar';
@@ -66,7 +66,7 @@ export default function Page() {
   // Pre-fill room ID from URL if no session active (for invite links with no saved nickname)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const session = sessionStorage.getItem('tg_session');
+    const session = localStorage.getItem('tg_session');
     if (session) {
       setTimeout(() => setHasCheckedSession(true), 400); // Wait for socket to start reconnecting
     } else {
@@ -296,11 +296,9 @@ export default function Page() {
                   currentVideo={roomState.currentVideo}
                   roomState={roomState}
                   currentSocketId={socketId}
+                  onLoadVideo={(vData) => actions.syncPlayback(vData)}
                 />
-                <VideoQueue
-                  currentVideo={roomState.currentVideo}
-                  onChangeVideo={(vData) => actions.syncPlayback(vData)}
-                />
+
                 <MemberList
                   members={roomState.members}
                   currentSocketId={socketId}
@@ -333,6 +331,7 @@ export default function Page() {
                   currentVideo={roomState.currentVideo}
                   roomState={roomState}
                   currentSocketId={socketId}
+                  onLoadVideo={(vData) => actions.syncPlayback(vData)}
                 />
               )}
 
@@ -354,12 +353,7 @@ export default function Page() {
                 />
               )}
 
-              {mobileActiveTab === 'queue' && (
-                <VideoQueue
-                  currentVideo={roomState.currentVideo}
-                  onChangeVideo={(vData) => actions.syncPlayback(vData)}
-                />
-              )}
+
 
               <MobileTabBar
                 activeTab={mobileActiveTab}

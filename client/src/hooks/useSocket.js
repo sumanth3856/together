@@ -17,24 +17,24 @@ const getSocketUrl = () => {
 };
 
 // ---------- Session Persistence Helpers ----------
-// We use sessionStorage so the session survives page reloads
-// but is cleared when the tab is closed (correct UX).
+// localStorage survives hard reloads AND tab closes — intentional for this app.
+// Sessions expire after 24 hours or on explicit leave.
 const SESSION_KEY = 'tg_session';
 
 function saveSession(roomId, nickname) {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ roomId, nickname, savedAt: Date.now() }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ roomId, nickname, savedAt: Date.now() }));
   } catch (_) {}
 }
 
 function loadSession() {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    // Expire after 2 hours to avoid stale sessions
-    if (Date.now() - data.savedAt > 7200000) {
-      sessionStorage.removeItem(SESSION_KEY);
+    // Expire after 24 hours to avoid stale sessions
+    if (Date.now() - data.savedAt > 86400000) {
+      localStorage.removeItem(SESSION_KEY);
       return null;
     }
     return data;
@@ -44,7 +44,7 @@ function loadSession() {
 }
 
 function clearSession() {
-  try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
+  try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
 }
 // -------------------------------------------------
 

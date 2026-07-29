@@ -104,7 +104,7 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
             }
 
             // Skip if we triggered this state change ourselves
-            if (Date.now() - isSelfSyncing.current < 1500) return;
+            if (Date.now() - isSelfSyncing.current < 800) return;
 
             // Removed permission check — everyone can broadcast playback
             if (state === window.YT.PlayerState.PLAYING) {
@@ -186,7 +186,7 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
 
     isSelfSyncing.current = Date.now();
 
-    if (drift > 2) player.seekTo(targetTime, true);
+    if (!serverPlayback.isPlaying || drift > 0.5) player.seekTo(targetTime, true);
 
     if (serverPlayback.isPlaying) {
       if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) player.playVideo();

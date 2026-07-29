@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tv, MessageSquare, Users, Youtube } from 'lucide-react';
+import { Tv, MessageSquare, Users } from 'lucide-react';
 
 export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount }) {
   return (
@@ -44,14 +44,6 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
       >
         <Users size={20} />
         <span>Guests ({memberCount})</span>
-      </button>
-
-      <button 
-        className={`mobile-tab-item ${activeTab === 'queue' ? 'active' : ''}`}
-        onClick={() => onSelectTab('queue')}
-      >
-        <Youtube size={20} />
-        <span>Queue</span>
       </button>
     </nav>
   );

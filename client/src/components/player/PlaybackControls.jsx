@@ -31,8 +31,7 @@ export const PlaybackControls = memo(function PlaybackControls({
       background: 'var(--bg-surface)',
       borderRadius: '30px',
       boxShadow: 'var(--shadow-md), 0 0 0 1px var(--border-subtle)',
-      maxWidth: '800px',
-      margin: '16px auto 0',
+      width: '100%',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
         
