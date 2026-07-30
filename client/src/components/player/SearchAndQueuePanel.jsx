@@ -9,9 +9,10 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
   const [error, setError] = useState(null);
 
   const roomState = useRoomStore((s) => s.roomState);
-  const userId = useRoomStore((s) => s.userId);
+  const socketId = useRoomStore((s) => s.socketId);
 
-  const isHost = roomState?.hostId === userId;
+  const currentMember = roomState?.members?.find((m) => m.socketIds?.includes(socketId));
+  const isHost = roomState?.hostId === currentMember?.userId;
   const queue = roomState?.videoQueue || [];
 
   const handleSearch = async (e) => {
@@ -61,7 +62,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
   };
 
   return (
-    <div className="panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div className="panel" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-surface-2)' }}>

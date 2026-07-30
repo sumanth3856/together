@@ -160,7 +160,9 @@ export default function Page() {
 
   const handleVideoEnded = useCallback(() => {
     if (isHost && videoQueueLength > 0) {
-      playNext();
+      setTimeout(() => {
+        playNext();
+      }, 500);
     }
   }, [isHost, videoQueueLength, playNext]);
 

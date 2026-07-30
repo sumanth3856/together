@@ -297,6 +297,9 @@ export const RoomManager = {
     const member = this.getMemberBySocketId(room, socketId);
     if (!member) return null;
 
+    // Only the host can automatically trigger playNext
+    if (room.hostId !== member.userId) return null;
+
     if (room.videoQueue.length === 0) return { room }; // Nothing to play
 
     const nextVideo = room.videoQueue.shift();
