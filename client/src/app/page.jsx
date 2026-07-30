@@ -117,17 +117,17 @@ export default function Page() {
 
   // ---------- Handlers ----------
 
-  const handleCreateRoom = useCallback(async (nickname) => {
+  const handleCreateRoom = useCallback(async (userId, nickname, avatar) => {
     try {
-      await actions.createRoom(nickname);
+      await actions.createRoom(userId, nickname, avatar);
     } catch (err) {
       setToastNotification({ type: 'error', message: `Failed to create room: ${err}` });
     }
   }, [actions, setToastNotification]);
 
-  const handleJoinRoom = useCallback(async (roomId, nickname) => {
+  const handleJoinRoom = useCallback(async (roomId, userId, nickname, avatar) => {
     try {
-      await actions.joinRoom(roomId, nickname);
+      await actions.joinRoom(roomId, userId, nickname, avatar);
     } catch (err) {
       setToastNotification({ type: 'error', message: `Room not found. Check the code and try again.` });
     }
