@@ -60,7 +60,7 @@ export function SearchAndQueuePanel() {
             flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '600',
             color: activeTab === 'search' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
             borderBottom: activeTab === 'search' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+            background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
           }}
         >
           <Search size={16} /> Search
@@ -71,7 +71,7 @@ export function SearchAndQueuePanel() {
             flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '600',
             color: activeTab === 'queue' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
             borderBottom: activeTab === 'queue' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+            background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
           }}
         >
           <ListVideo size={16} /> Queue ({queue.length})
