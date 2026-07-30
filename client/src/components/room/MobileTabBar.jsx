@@ -39,14 +39,6 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
       </button>
 
       <button 
-        className={`mobile-tab-item ${activeTab === 'search' ? 'active' : ''}`}
-        onClick={() => onSelectTab('search')}
-      >
-        <Search size={20} />
-        <span>Search</span>
-      </button>
-
-      <button 
         className={`mobile-tab-item ${activeTab === 'members' ? 'active' : ''}`}
         onClick={() => onSelectTab('members')}
       >

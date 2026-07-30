@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ListVideo, Plus, Play, Trash2, Loader, Youtube } from 'lucide-react';
 import { useRoomStore } from '../../store/useRoomStore';
-import { useSocket } from '../../hooks/useSocket';
-
-export function SearchAndQueuePanel() {
+export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) {
   const [activeTab, setActiveTab] = useState('search'); // 'search' or 'queue'
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -12,7 +10,6 @@ export function SearchAndQueuePanel() {
 
   const roomState = useRoomStore((s) => s.roomState);
   const userId = useRoomStore((s) => s.userId);
-  const { addToQueue, removeFromQueue, syncPlayback, socket } = useSocket();
 
   const isHost = roomState?.hostId === userId;
   const queue = roomState?.videoQueue || [];
@@ -50,17 +47,17 @@ export function SearchAndQueuePanel() {
   };
 
   const handleAddToQueue = (video) => {
-    addToQueue(video);
+    if (onAddVideo) onAddVideo(video);
     // Switch to queue tab to show it was added
     setActiveTab('queue');
   };
 
   const handlePlayNow = (video) => {
-    syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 });
+    if (onPlayVideo) onPlayVideo(video);
   };
 
   const handleRemoveFromQueue = (queueId) => {
-    removeFromQueue(queueId);
+    if (onRemoveVideo) onRemoveVideo(queueId);
   };
 
   return (
@@ -126,10 +123,10 @@ export function SearchAndQueuePanel() {
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>{v.author} • {v.duration}</div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
-                    <button onClick={() => handleAddToQueue(v)} style={{ background: 'var(--bg-surface-3)', border: 'none', borderRadius: '4px', padding: '6px', cursor: 'pointer', color: 'var(--accent-primary)' }} title="Add to Queue">
+                    <button type="button" onClick={() => handleAddToQueue(v)} style={{ background: 'var(--bg-surface-3)', border: 'none', borderRadius: '4px', padding: '6px', cursor: 'pointer', color: 'var(--accent-primary)' }} title="Add to Queue">
                       <Plus size={14} />
                     </button>
-                    <button onClick={() => handlePlayNow(v)} style={{ background: 'var(--accent-primary)', border: 'none', borderRadius: '4px', padding: '6px', cursor: 'pointer', color: '#fff' }} title="Play Now">
+                    <button type="button" onClick={() => handlePlayNow(v)} style={{ background: 'var(--accent-primary)', border: 'none', borderRadius: '4px', padding: '6px', cursor: 'pointer', color: '#fff' }} title="Play Now">
                       <Play size={14} />
                     </button>
                   </div>
@@ -161,7 +158,7 @@ export function SearchAndQueuePanel() {
                   </div>
                   {isHost && (
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <button onClick={() => handleRemoveFromQueue(v.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', borderRadius: '4px', padding: '8px', cursor: 'pointer', color: '#ef4444' }} title="Remove">
+                      <button type="button" onClick={() => handleRemoveFromQueue(v.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', borderRadius: '4px', padding: '8px', cursor: 'pointer', color: '#ef4444' }} title="Remove">
                         <Trash2 size={16} />
                       </button>
                     </div>

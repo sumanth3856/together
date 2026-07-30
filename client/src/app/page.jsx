@@ -28,7 +28,9 @@ export default function Page() {
     syncPlayback,
     sendChatMessage,
     sendReaction,
-    playNext
+    playNext,
+    addToQueue,
+    removeFromQueue
   } = useSocket();
 
   const actions = useMemo(() => ({
@@ -37,8 +39,10 @@ export default function Page() {
     leaveRoom,
     syncPlayback,
     sendChatMessage,
-    sendReaction
-  }), [createRoom, joinRoom, leaveRoom, syncPlayback, sendChatMessage, sendReaction]);
+    sendReaction,
+    addToQueue,
+    removeFromQueue
+  }), [createRoom, joinRoom, leaveRoom, syncPlayback, sendChatMessage, sendReaction, addToQueue, removeFromQueue]);
 
   const EMPTY_ARRAY = useMemo(() => [], []);
   const roomId = useRoomStore(state => state.roomState?.roomId);
@@ -344,7 +348,11 @@ export default function Page() {
                 />
                 
                 <div style={{ height: '400px', marginTop: '14px' }}>
-                  <SearchAndQueuePanel />
+                  <SearchAndQueuePanel
+                    onAddVideo={(video) => actions.addToQueue(video)}
+                    onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
+                    onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
+                  />
                 </div>
               </div>
 
@@ -363,12 +371,21 @@ export default function Page() {
               </div>
 
               {mobileActiveTab === 'video' && (
-                <VideoDetailsCard
-                  currentVideo={currentVideo}
-                  roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
-                  currentSocketId={socketId}
-                  onLoadVideo={(vData) => actions.syncPlayback(vData)}
-                />
+                <>
+                  <VideoDetailsCard
+                    currentVideo={currentVideo}
+                    roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
+                    currentSocketId={socketId}
+                    onLoadVideo={(vData) => actions.syncPlayback(vData)}
+                  />
+                  <div style={{ minHeight: '400px', flex: 1, marginTop: '14px' }}>
+                    <SearchAndQueuePanel
+                      onAddVideo={(video) => actions.addToQueue(video)}
+                      onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
+                      onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
+                    />
+                  </div>
+                </>
               )}
 
               {mobileActiveTab === 'chat' && (
@@ -382,12 +399,6 @@ export default function Page() {
                   members={members}
                   currentSocketId={socketId}
                 />
-              )}
-
-              {mobileActiveTab === 'search' && (
-                <div style={{ height: 'calc(100dvh - 280px)', minHeight: '300px' }}>
-                  <SearchAndQueuePanel />
-                </div>
               )}
 
               <MobileTabBar
