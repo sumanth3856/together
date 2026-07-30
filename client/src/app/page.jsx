@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useSocket } from '../hooks/useSocket';
 import { useRoomStore } from '../store/useRoomStore';
 import { useUIStore } from '../store/useUIStore';
+import { supabase } from '../lib/supabase';
 
 const LandingPage = dynamic(() => import('../components/landing/LandingPage').then((mod) => mod.LandingPage), { ssr: false });
 
@@ -54,6 +55,20 @@ export default function Page() {
   const [isMobileScreen, setIsMobileScreen] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
+  const [user, setUser] = useState(null);
+
+  // Check Supabase Auth
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Responsive listener
   useEffect(() => {
@@ -280,6 +295,7 @@ export default function Page() {
             initialRoomId={initialRoomId}
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
+            user={user}
           />
         ) : null
       ) : (

@@ -29,7 +29,7 @@ export function setupSocketHandlers(io) {
     };
 
     // 1. Create Room
-    socket.on('create_room', ({ nickname }, callback) => {
+    socket.on('create_room', ({ userId, nickname, avatar }, callback) => {
       const cleanName = sanitizeStr(nickname, 20);
       if (!cleanName) {
         if (typeof callback === 'function') callback({ success: false, error: 'Nickname is required.' });
@@ -41,7 +41,7 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      const room = RoomManager.createRoom(socket.id, cleanName);
+      const room = RoomManager.createRoom(userId, socket.id, cleanName, avatar);
       currentRoomId = room.roomId;
       socket.join(room.roomId);
 
@@ -53,7 +53,7 @@ export function setupSocketHandlers(io) {
     });
 
     // 2. Join Room (handles both fresh joins and seamless reconnects)
-    socket.on('join_room', ({ roomId, nickname }, callback) => {
+    socket.on('join_room', ({ roomId, userId, nickname, avatar }, callback) => {
       const cleanRoomId = sanitizeStr(roomId, 10).toUpperCase();
       const cleanName = sanitizeStr(nickname, 20);
 
@@ -67,7 +67,7 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      const result = RoomManager.joinRoom(cleanRoomId, socket.id, cleanName);
+      const result = RoomManager.joinRoom(cleanRoomId, userId, socket.id, cleanName, avatar);
 
       if (result.error) {
         if (typeof callback === 'function') callback({ success: false, error: result.error });
@@ -168,13 +168,13 @@ export function setupSocketHandlers(io) {
       if (!checkRateLimit(socket.id, 'reaction', 300)) return; // Prevents extreme emoji spam
 
       const room = RoomManager.getRoom(currentRoomId);
-      const member = room?.members.get(socket.id);
+      const member = RoomManager.getMemberBySocketId(room, socket.id);
 
       io.to(currentRoomId).emit('reaction_triggered', {
         id: `react-${Date.now()}-${Math.random()}`,
         emoji,
         senderName: member?.nickname || 'Guest',
-        senderColor: member?.color || '#FF5733',
+        senderColor: '#FF5733',
         xPos: Math.floor(15 + Math.random() * 70)
       });
     });

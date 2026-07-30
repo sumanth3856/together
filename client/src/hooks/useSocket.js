@@ -21,9 +21,9 @@ const getSocketUrl = () => {
 // Sessions expire after 24 hours or on explicit leave.
 const SESSION_KEY = 'tg_session';
 
-function saveSession(roomId, nickname) {
+function saveSession(roomId, userId, nickname, avatar) {
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ roomId, nickname, savedAt: Date.now() }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ roomId, userId, nickname, avatar, savedAt: Date.now() }));
   } catch (_) {}
 }
 
@@ -79,7 +79,7 @@ export function useSocket() {
         // Keep isReconnecting=true for the full duration of the rejoin attempt
         // (do NOT clear it here — attemptRejoin will clear it on success or failure)
         useRoomStore.getState().setIsReconnecting(true);
-        attemptRejoin(socket, session.roomId, session.nickname);
+        attemptRejoin(socket, session.roomId, session.userId, session.nickname, session.avatar);
       } else {
         // No session to restore — safe to stop the reconnecting banner
         useRoomStore.getState().setIsReconnecting(false);
@@ -139,16 +139,16 @@ export function useSocket() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Attempt rejoin with retry logic (handles Render cold-start)
-  const attemptRejoin = (socket, roomId, nickname, retriesLeft = 4) => {
-    socket.emit('join_room', { roomId, nickname }, (response) => {
+  const attemptRejoin = (socket, roomId, userId, nickname, avatar, retriesLeft = 4) => {
+    socket.emit('join_room', { roomId, userId, nickname, avatar }, (response) => {
       if (response.success) {
         useRoomStore.getState().setRoomState(response.roomState);
-        activeSessionRef.current = { roomId, nickname };
-        saveSession(roomId, nickname);
+        activeSessionRef.current = { roomId, userId, nickname, avatar };
+        saveSession(roomId, userId, nickname, avatar);
         useRoomStore.getState().setIsReconnecting(false);
       } else if (response.error === 'Room not found' && retriesLeft > 0) {
         // Server may be cold-starting — retry
-        setTimeout(() => attemptRejoin(socket, roomId, nickname, retriesLeft - 1), 2000);
+        setTimeout(() => attemptRejoin(socket, roomId, userId, nickname, avatar, retriesLeft - 1), 2000);
       } else {
         // Truly not found — clear session and let user re-enter
         clearSession();
@@ -159,15 +159,15 @@ export function useSocket() {
     });
   };
 
-  const createRoom = useCallback((nickname) => {
+  const createRoom = useCallback((userId, nickname, avatar) => {
     return new Promise((resolve, reject) => {
       if (!socketRef.current) return reject('Socket not connected');
-      socketRef.current.emit('create_room', { nickname }, (response) => {
+      socketRef.current.emit('create_room', { userId, nickname, avatar }, (response) => {
         if (response.success) {
           useRoomStore.getState().setRoomState(response.roomState);
           const roomId = response.roomState.roomId;
-          activeSessionRef.current = { roomId, nickname };
-          saveSession(roomId, nickname);
+          activeSessionRef.current = { roomId, userId, nickname, avatar };
+          saveSession(roomId, userId, nickname, avatar);
           resolve(response.roomState);
         } else {
           reject(response.error);
@@ -176,16 +176,16 @@ export function useSocket() {
     });
   }, []);
 
-  const joinRoom = useCallback((roomId, nickname) => {
+  const joinRoom = useCallback((roomId, userId, nickname, avatar) => {
     return new Promise((resolve, reject) => {
       if (!socketRef.current) return reject('Socket not connected');
 
       const attempt = (retriesLeft) => {
-        socketRef.current.emit('join_room', { roomId, nickname }, (response) => {
+        socketRef.current.emit('join_room', { roomId, userId, nickname, avatar }, (response) => {
           if (response.success) {
             useRoomStore.getState().setRoomState(response.roomState);
-            activeSessionRef.current = { roomId, nickname };
-            saveSession(roomId, nickname);
+            activeSessionRef.current = { roomId, userId, nickname, avatar };
+            saveSession(roomId, userId, nickname, avatar);
             resolve(response.roomState);
           } else if (response.error === 'Room not found' && retriesLeft > 0) {
             // Render free tier cold-start — retry silently

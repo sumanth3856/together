@@ -1,32 +1,43 @@
 import React, { useState } from 'react';
 import { Tv, Plus, Users, ArrowRight, Zap, ShieldCheck, Smile, Monitor, X } from 'lucide-react';
 
-export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom, onCancel }) {
+import { supabase } from '../../lib/supabase';
+
+export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom, onCancel, user }) {
   const [activeTab, setActiveTab] = useState(initialRoomId ? 'join' : 'create');
-  const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState(initialRoomId || '');
   const [loading, setLoading] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
-  React.useEffect(() => {
-    const saved = localStorage.getItem('tg_nickname');
-    if (saved) setNickname(saved);
-  }, []);
+  const handleGoogleSignIn = async () => {
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.href,
+        },
+      });
+    } catch (error) {
+      console.error('Error signing in:', error);
+    }
+  };
 
   const getAvatarLetter = (name) => name ? name.trim().charAt(0).toUpperCase() : '?';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!nickname.trim()) { alert('Please enter a nickname'); return; }
+    if (!user) return;
+    
+    const nickname = user.user_metadata.full_name || 'Guest';
+    const avatar = user.user_metadata.avatar_url || null;
 
-    localStorage.setItem('tg_nickname', nickname.trim());
     setLoading(true);
     setRetrying(false);
     const retryTimer = setTimeout(() => setRetrying(true), 2500);
 
     try {
       if (activeTab === 'create') {
-        await onCreateRoom(nickname.trim());
+        await onCreateRoom(user.id, nickname, avatar);
       } else {
         if (!roomId.trim()) {
           alert('Please enter a Room Code');
@@ -34,7 +45,7 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom, onCance
           setLoading(false);
           return;
         }
-        await onJoinRoom(roomId.trim(), nickname.trim());
+        await onJoinRoom(roomId.trim(), user.id, nickname, avatar);
       }
     } catch (err) {
       alert('Error: ' + err);
@@ -113,37 +124,42 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom, onCance
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Nickname Input */}
-          <div>
-            <span className="section-label">Your Nickname</span>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              {/* Avatar Preview */}
-              <div
-                className="avatar"
-                style={{
-                  width: '44px', height: '44px', flexShrink: 0,
-                  background: nickname
-                    ? `hsl(${(nickname.charCodeAt(0) * 37) % 360}, 65%, 50%)`
-                    : 'var(--bg-surface-3)',
-                  fontSize: '1.1rem',
-                  transition: 'background var(--transition-base)',
-                  boxShadow: nickname ? '0 2px 8px rgba(0,0,0,0.4)' : 'none'
-                }}
+          {/* User Profile / Auth */}
+          {!user ? (
+            <div style={{ textAlign: 'center', margin: '10px 0 20px' }}>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                className="btn btn-secondary"
+                style={{ width: '100%', minHeight: '48px', borderRadius: 'var(--radius-md)', display: 'flex', gap: '10px', justifyContent: 'center' }}
               >
-                {getAvatarLetter(nickname)}
-              </div>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. Sumanth"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                maxLength={20}
-                required
-                autoFocus
-              />
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                </svg>
+                Continue with Google
+              </button>
             </div>
-          </div>
+          ) : (
+            <div>
+              <span className="section-label">Signed in as</span>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--bg-surface-2)', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                {user.user_metadata.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                ) : (
+                  <div className="avatar" style={{ width: '40px', height: '40px', background: 'var(--accent-primary-dim)' }}>
+                    {getAvatarLetter(user.user_metadata.full_name)}
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.user_metadata.full_name}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{user.email}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Room Code Input */}
           {activeTab === 'join' && (
@@ -162,26 +178,28 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom, onCance
           )}
 
           {/* Submit */}
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-            style={{ width: '100%', marginTop: '4px', minHeight: '48px', fontSize: '0.95rem', borderRadius: 'var(--radius-md)' }}
-          >
-            {loading ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                </svg>
-                {retrying ? 'Retrying...' : 'Connecting...'}
-              </span>
-            ) : (
-              <>
-                <span>{activeTab === 'create' ? 'Create Room' : 'Join Room'}</span>
-                <ArrowRight size={16} />
-              </>
-            )}
-          </button>
+          {user && (
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+              style={{ width: '100%', marginTop: '4px', minHeight: '48px', fontSize: '0.95rem', borderRadius: 'var(--radius-md)' }}
+            >
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  {retrying ? 'Retrying...' : 'Connecting...'}
+                </span>
+              ) : (
+                <>
+                  <span>{activeTab === 'create' ? 'Create Room' : 'Join Room'}</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          )}
         </form>
 
         {/* Feature Highlights */}

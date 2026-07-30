@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Monitor, Zap, ShieldCheck, Smile, ArrowRight, Play, Users } from 'lucide-react';
 import { JoinRoomModal } from '../room/JoinRoomModal';
 
-export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom }) {
+export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   const [isModalOpen, setIsModalOpen] = useState(!!initialRoomId);
 
   return (
@@ -25,13 +25,26 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom }) {
           <span style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Together</span>
         </div>
         
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="btn btn-secondary"
-          style={{ borderRadius: 'var(--radius-full)' }}
-        >
-          Sign In
-        </button>
+        {user ? (
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="btn btn-secondary"
+            style={{ borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            {user.user_metadata.avatar_url ? (
+              <img src={user.user_metadata.avatar_url} alt="avatar" style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+            ) : null}
+            <span>{user.user_metadata.full_name || 'Get Started'}</span>
+          </button>
+        ) : (
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="btn btn-secondary"
+            style={{ borderRadius: 'var(--radius-full)' }}
+          >
+            Sign In
+          </button>
+        )}
       </nav>
 
       {/* ── Hero Section ── */}
@@ -136,6 +149,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom }) {
           onCreateRoom={onCreateRoom} 
           onJoinRoom={onJoinRoom} 
           onCancel={() => setIsModalOpen(false)}
+          user={user}
         />
       )}
     </div>

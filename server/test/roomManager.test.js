@@ -18,16 +18,16 @@ function clearRooms() {
 
 test('createRoom — initialises a room correctly', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-1', 'Alice');
+  const room = RoomManager.createRoom('u-1', 's-1', 'Alice', 'avatar.jpg');
 
   assert.ok(room.roomId.startsWith('TOG-'), 'roomId must be prefixed TOG-');
   assert.equal(room.roomId.length, 8, 'roomId must be 8 chars (TOG-XXXX)');
   assert.equal(room.members.size, 1, 'should have exactly 1 member after creation');
 
-  const host = room.members.get('s-1');
+  const host = room.members.get('u-1');
   assert.equal(host.nickname, 'Alice');
-  assert.equal(host.socketId, 's-1');
-  assert.ok(host.color, 'member should have a colour');
+  assert.ok(host.socketIds.includes('s-1'));
+  assert.equal(host.avatar, 'avatar.jpg');
 
   // Egalitarian model: no isHost / hasControl fields
   assert.equal(host.isHost, undefined, 'isHost field should NOT exist in egalitarian model');
@@ -47,7 +47,7 @@ test('createRoom — initialises a room correctly', (t) => {
 
 test('getRoom — resolves normalised room codes', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-2', 'Bob');
+  const room = RoomManager.createRoom('u-2', 's-2', 'Bob');
   const code = room.roomId; // e.g. TOG-AB12
 
   // Exact match
@@ -70,8 +70,8 @@ test('getRoom — resolves normalised room codes', (t) => {
 
 test('joinRoom — fresh join adds member', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-3', 'Host');
-  const result = RoomManager.joinRoom(room.roomId, 's-4', 'Charlie');
+  const room = RoomManager.createRoom('u-3', 's-3', 'Host');
+  const result = RoomManager.joinRoom(room.roomId, 'u-4', 's-4', 'Charlie');
 
   assert.ok(!result.error, 'should not return an error');
   assert.equal(result.room.members.size, 2, 'should have 2 members after join');
@@ -86,39 +86,43 @@ test('joinRoom — fresh join adds member', (t) => {
 
 test('joinRoom — returns error for non-existent room', (t) => {
   clearRooms();
-  const result = RoomManager.joinRoom('TOG-ZZZZ', 's-5', 'Dan');
+  const result = RoomManager.joinRoom('TOG-ZZZZ', 'u-5', 's-5', 'Dan');
   assert.equal(result.error, 'Room not found');
 });
 
-test('joinRoom — ejecting ghost (rapid reload scenario)', (t) => {
+test('joinRoom — multiple tabs for same user', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-6', 'Host');
-  RoomManager.joinRoom(room.roomId, 's-7', 'Ghost');
+  const room = RoomManager.createRoom('u-6', 's-6', 'Host');
+  RoomManager.joinRoom(room.roomId, 'u-7', 's-7', 'Ghost');
 
-  // Ghost is still in the room map (simulating a rapid reload before disconnect fires)
-  assert.equal(room.members.has('s-7'), true);
-
-  // New socket with same nickname reconnects without going through pendingReconnects
-  const result = RoomManager.joinRoom(room.roomId, 's-8', 'Ghost');
+  assert.equal(room.members.has('u-7'), true);
+  
+  // Same user opens a new tab
+  const result = RoomManager.joinRoom(room.roomId, 'u-7', 's-8', 'Ghost');
   assert.ok(!result.error);
-  assert.equal(room.members.has('s-7'), false, 'ghost socket should be ejected');
-  assert.equal(room.members.has('s-8'), true, 'new socket should be in the room');
+  assert.equal(result.wasReconnect, true); // Treated as existing member
+  
+  const member = room.members.get('u-7');
+  assert.ok(member.socketIds.includes('s-7'));
+  assert.ok(member.socketIds.includes('s-8'));
+  assert.equal(member.socketIds.length, 2);
+  assert.equal(room.members.size, 2, 'number of unique members should still be 2');
 });
 
 // ─── Suite 4: leaveRoom (grace-period disconnect) ──────────────────────────
 
-test('leaveRoom — removes member and adds system message', (t) => {
+test('leaveRoom — removes member and adds system message if fully disconnected', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-9', 'Host');
-  RoomManager.joinRoom(room.roomId, 's-10', 'Guest');
+  const room = RoomManager.createRoom('u-9', 's-9', 'Host');
+  RoomManager.joinRoom(room.roomId, 'u-10', 's-10', 'Guest');
 
   const result = RoomManager.leaveRoom('s-10');
   assert.ok(result, 'should return a result');
   assert.equal(result.roomId, room.roomId);
   assert.equal(result.sessionEnded, false, 'room should NOT be disbanded when host is still present');
 
-  // Member removed immediately from room map
-  assert.equal(room.members.has('s-10'), false);
+  // Member removed immediately from room map because they had only 1 socket
+  assert.equal(room.members.has('u-10'), false);
 
   const lastMsg = room.chatHistory.at(-1);
   assert.ok(lastMsg.isSystem);
@@ -127,7 +131,7 @@ test('leaveRoom — removes member and adds system message', (t) => {
 
 test('leaveRoom — does NOT immediately disband room (grace period)', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-11', 'Solo');
+  const room = RoomManager.createRoom('u-11', 's-11', 'Solo');
   const roomId = room.roomId;
 
   RoomManager.leaveRoom('s-11');
@@ -140,7 +144,7 @@ test('leaveRoom — does NOT immediately disband room (grace period)', (t) => {
 
 test('intentionalLeave — last member disbands room immediately', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-12', 'Solo');
+  const room = RoomManager.createRoom('u-12', 's-12', 'Solo');
   const roomId = room.roomId;
 
   const result = RoomManager.intentionalLeave('s-12');
@@ -150,8 +154,8 @@ test('intentionalLeave — last member disbands room immediately', (t) => {
 
 test('intentionalLeave — non-last member adds chat message', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-13', 'Host');
-  RoomManager.joinRoom(room.roomId, 's-14', 'Guest');
+  const room = RoomManager.createRoom('u-13', 's-13', 'Host');
+  RoomManager.joinRoom(room.roomId, 'u-14', 's-14', 'Guest');
 
   const result = RoomManager.intentionalLeave('s-14');
   assert.equal(result.sessionEnded, false);
@@ -166,8 +170,8 @@ test('intentionalLeave — non-last member adds chat message', (t) => {
 
 test('updatePlayback — any member can control playback (egalitarian)', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-15', 'Host');
-  RoomManager.joinRoom(room.roomId, 's-16', 'Guest');
+  const room = RoomManager.createRoom('u-15', 's-15', 'Host');
+  RoomManager.joinRoom(room.roomId, 'u-16', 's-16', 'Guest');
 
   // Guest controls playback — should NOT be blocked
   const result = RoomManager.updatePlayback(room.roomId, 's-16', { isPlaying: true, currentTime: 42 });
@@ -178,7 +182,7 @@ test('updatePlayback — any member can control playback (egalitarian)', (t) => 
 
 test('updatePlayback — loading a new video updates currentVideo', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-17', 'Host');
+  const room = RoomManager.createRoom('u-17', 's-17', 'Host');
 
   const result = RoomManager.updatePlayback(room.roomId, 's-17', {
     youtubeId: 'abc12345678',
@@ -199,7 +203,7 @@ test('updatePlayback — loading a new video updates currentVideo', (t) => {
 
 test('updatePlayback — same youtubeId does NOT add duplicate system message', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-18', 'Host');
+  const room = RoomManager.createRoom('u-18', 's-18', 'Host');
   const initialCount = room.chatHistory.length;
 
   // Seek to a new time on the same video
@@ -223,7 +227,7 @@ test('updatePlayback — returns null for unknown room', (t) => {
 
 test('addChatMessage — adds a message for a valid member', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-20', 'Host');
+  const room = RoomManager.createRoom('u-20', 's-20', 'Host');
   const result = RoomManager.addChatMessage(room.roomId, 's-20', 'Hello!');
 
   assert.ok(result, 'should return a result');
@@ -231,12 +235,11 @@ test('addChatMessage — adds a message for a valid member', (t) => {
   assert.equal(result.message.sender, 'Host');
   assert.equal(result.message.isSystem, false);
   assert.ok(result.message.id.startsWith('msg-'));
-  assert.ok(result.message.color, 'message should carry sender colour');
 });
 
 test('addChatMessage — trims whitespace and respects 100-msg cap', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-21', 'Host');
+  const room = RoomManager.createRoom('u-21', 's-21', 'Host');
 
   for (let i = 0; i < 110; i++) {
     RoomManager.addChatMessage(room.roomId, 's-21', `msg ${i}`);
@@ -247,7 +250,7 @@ test('addChatMessage — trims whitespace and respects 100-msg cap', (t) => {
 
 test('addChatMessage — returns null for unknown user', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-22', 'Host');
+  const room = RoomManager.createRoom('u-22', 's-22', 'Host');
   const result = RoomManager.addChatMessage(room.roomId, 'GHOST', 'hi');
   assert.equal(result, null, 'unknown socket should return null');
 });
@@ -256,7 +259,7 @@ test('addChatMessage — returns null for unknown user', (t) => {
 
 test('getRoomStateDTO — returns serialisable DTO (no Maps)', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-23', 'Host');
+  const room = RoomManager.createRoom('u-23', 's-23', 'Host');
   const dto = RoomManager.getRoomStateDTO(room);
 
   assert.ok(Array.isArray(dto.members), 'members should be an Array in the DTO');
@@ -266,7 +269,7 @@ test('getRoomStateDTO — returns serialisable DTO (no Maps)', (t) => {
 
 test('getRoomStateDTO — live interpolates currentTime while playing', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-24', 'Host');
+  const room = RoomManager.createRoom('u-24', 's-24', 'Host');
 
   // Manually set playback to playing, 50 seconds ago
   room.playback.isPlaying = true;
@@ -279,7 +282,7 @@ test('getRoomStateDTO — live interpolates currentTime while playing', (t) => {
 
 test('getRoomStateDTO — does NOT interpolate when paused', (t) => {
   clearRooms();
-  const room = RoomManager.createRoom('s-25', 'Host');
+  const room = RoomManager.createRoom('u-25', 's-25', 'Host');
 
   room.playback.isPlaying = false;
   room.playback.currentTime = 50;

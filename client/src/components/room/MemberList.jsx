@@ -38,21 +38,25 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
       {/* Member List */}
       <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {members.map((m) => {
-          const isYou = m.socketId === currentSocketId;
+          const isYou = m.socketIds && m.socketIds.includes(currentSocketId);
 
           return (
             <div
-              key={m.socketId}
+              key={m.userId}
               className={`member-row${isYou ? ' you' : ''}`}
             >
               {/* Avatar */}
               <div style={{ flexShrink: 0, marginTop: '2px' }}>
-                <Avatar
-                  size={34}
-                  name={m.nickname}
-                  variant="beam"
-                  colors={['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b']}
-                />
+                {m.avatar ? (
+                  <img src={m.avatar} alt="Avatar" style={{ width: '34px', height: '34px', borderRadius: '50%' }} />
+                ) : (
+                  <Avatar
+                    size={34}
+                    name={m.nickname}
+                    variant="beam"
+                    colors={['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b']}
+                  />
+                )}
               </div>
 
               {/* Info */}

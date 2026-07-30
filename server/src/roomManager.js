@@ -1,7 +1,7 @@
 // In-memory room manager for Together watch party app
 export const rooms = new Map();
 
-// Track disconnected sockets awaiting reconnect: socketId -> { roomId, nickname, isHost, hasControl, color, timer }
+// Track disconnected users awaiting reconnect: userId -> { roomId, timer }
 const pendingReconnects = new Map();
 
 // Helper to generate readable random room ID (e.g. TOG-8492)
@@ -14,25 +14,17 @@ function generateRoomCode() {
   return `TOG-${code}`;
 }
 
-const AVATAR_COLORS = [
-  '#FF5733', '#33FF57', '#3357FF', '#F033FF', '#FF33A1',
-  '#33FFF5', '#FFC733', '#9D33FF', '#00E676', '#FF9100'
-];
-
-function getRandomColor() {
-  return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
-}
-
 // Grace period before a disconnected host/member's room is deleted (30 seconds)
 const RECONNECT_GRACE_MS = 30000;
 
 export const RoomManager = {
-  createRoom(hostSocketId, hostNickname) {
+  createRoom(hostUserId, hostSocketId, hostNickname, hostAvatar) {
     const roomId = generateRoomCode();
     const hostUser = {
-      socketId: hostSocketId,
+      userId: hostUserId || hostSocketId, // Fallback for backwards compatibility if needed
+      socketIds: [hostSocketId],
       nickname: hostNickname || 'Guest',
-      color: getRandomColor(),
+      avatar: hostAvatar || null,
       joinedAt: Date.now()
     };
 
@@ -47,7 +39,7 @@ export const RoomManager = {
         currentTime: 0,
         updatedAt: Date.now()
       },
-      members: new Map([[hostSocketId, hostUser]]),
+      members: new Map([[hostUser.userId, hostUser]]),
       chatHistory: [
         {
           id: 'sys-init',
@@ -80,125 +72,103 @@ export const RoomManager = {
     return rooms.get(normalized) || null;
   },
 
-  /**
-   * joinRoom - supports both fresh joins and seamless reconnects.
-   * If the user was previously in the room (matched by nickname+roomId),
-   * their session is restored rather than creating a duplicate entry.
-   */
-  joinRoom(roomId, socketId, nickname) {
+  getMemberBySocketId(room, socketId) {
+    for (const member of room.members.values()) {
+      if (member.socketIds.includes(socketId)) return member;
+    }
+    return null;
+  },
+
+  joinRoom(roomId, userId, socketId, nickname, avatar) {
     const room = this.getRoom(roomId);
     if (!room) return { error: 'Room not found' };
 
-    // --- Seamless Reconnect: check if this nickname was recently in this room ---
-    let existingMemberData = null;
-    for (const [pendingSocketId, pendingData] of pendingReconnects.entries()) {
-      if (pendingData.roomId === room.roomId && pendingData.nickname === nickname) {
-        existingMemberData = pendingData;
-        // Cancel the pending deletion timer
-        clearTimeout(pendingData.timer);
-        pendingReconnects.delete(pendingSocketId);
-        break;
+    const actualUserId = userId || socketId; // Fallback
+    
+    // Check if user is already in the room (e.g. another tab)
+    if (room.members.has(actualUserId)) {
+      const member = room.members.get(actualUserId);
+      if (!member.socketIds.includes(socketId)) {
+        member.socketIds.push(socketId);
       }
-    }
-
-    // Fallback: If not in pendingReconnects, they might still be a "ghost" in the room 
-    // due to the server not processing their disconnect yet (e.g. rapid page reload).
-    if (!existingMemberData) {
-      for (const [existingSocketId, m] of room.members.entries()) {
-        if (m.nickname === nickname) {
-          existingMemberData = m;
-          // Eject the old ghost socket immediately
-          room.members.delete(existingSocketId);
-          
-          // Remove them from pendingReconnects if they somehow get added later
-          if (pendingReconnects.has(existingSocketId)) {
-            clearTimeout(pendingReconnects.get(existingSocketId).timer);
-            pendingReconnects.delete(existingSocketId);
-          }
-          break;
-        }
+      
+      // Cancel any pending disconnect timer if they had completely disconnected previously
+      if (pendingReconnects.has(actualUserId)) {
+        clearTimeout(pendingReconnects.get(actualUserId).timer);
+        pendingReconnects.delete(actualUserId);
+        
+        room.chatHistory.push({
+          id: `sys-rejoin-${Date.now()}`,
+          sender: 'System',
+          text: `${member.nickname} reconnected.`,
+          isSystem: true,
+          timestamp: Date.now()
+        });
       }
+      return { room, member, wasReconnect: true };
     }
 
-    let member;
-    if (existingMemberData) {
-      member = {
-        socketId, // new socket ID after reconnect
-        nickname: existingMemberData.nickname,
-        color: existingMemberData.color,
-        joinedAt: existingMemberData.joinedAt || Date.now()
-      };
-
-      room.chatHistory.push({
-        id: `sys-rejoin-${Date.now()}`,
-        sender: 'System',
-        text: `${member.nickname} reconnected.`,
-        isSystem: true,
-        timestamp: Date.now()
-      });
-    } else {
-      // Fresh join
-      member = {
-        socketId,
-        nickname: nickname || `Guest_${Math.floor(1000 + Math.random() * 9000)}`,
-        color: getRandomColor(),
-        joinedAt: Date.now()
-      };
-
-      room.chatHistory.push({
-        id: `sys-join-${Date.now()}`,
-        sender: 'System',
-        text: `${member.nickname} joined the room.`,
-        isSystem: true,
-        timestamp: Date.now()
-      });
+    // Check if they are in pendingReconnects but somehow missing from the room (shouldn't happen, but just in case)
+    if (pendingReconnects.has(actualUserId)) {
+      clearTimeout(pendingReconnects.get(actualUserId).timer);
+      pendingReconnects.delete(actualUserId);
     }
+
+    // Fresh join
+    const member = {
+      userId: actualUserId,
+      socketIds: [socketId],
+      nickname: nickname || `Guest_${Math.floor(1000 + Math.random() * 9000)}`,
+      avatar: avatar || null,
+      joinedAt: Date.now()
+    };
+
+    room.chatHistory.push({
+      id: `sys-join-${Date.now()}`,
+      sender: 'System',
+      text: `${member.nickname} joined the room.`,
+      isSystem: true,
+      timestamp: Date.now()
+    });
 
     if (room.chatHistory.length > 100) room.chatHistory.shift();
-    room.members.set(socketId, member);
+    room.members.set(actualUserId, member);
 
-    return { room, member, wasReconnect: !!existingMemberData };
+    return { room, member, wasReconnect: false };
   },
 
-  /**
-   * leaveRoom - called on socket disconnect.
-   * Instead of immediately deleting the room, puts the user in a
-   * "pending reconnect" grace period (30s). If they reconnect within
-   * that window, their session is fully restored.
-   */
   leaveRoom(socketId) {
     for (const [roomId, room] of rooms.entries()) {
-      if (room.members.has(socketId)) {
-        const member = room.members.get(socketId);
-        room.members.delete(socketId);
+      const member = this.getMemberBySocketId(room, socketId);
+      if (member) {
+        // Remove this specific socket
+        member.socketIds = member.socketIds.filter(id => id !== socketId);
+        
+        // If the user still has other sockets open in this room, do not trigger a leave event
+        if (member.socketIds.length > 0) {
+          return { roomId, room, member, sessionEnded: false };
+        }
+
+        // Otherwise, they are fully disconnected from this room
+        room.members.delete(member.userId);
 
         // Schedule grace-period deletion
         const timer = setTimeout(() => {
-          // Grace period expired — this is a real leave, not a reload
-          pendingReconnects.delete(socketId);
-
+          pendingReconnects.delete(member.userId);
           const currentRoom = rooms.get(roomId);
-          if (!currentRoom) return; // Already deleted
-
+          if (!currentRoom) return; 
+          
           if (currentRoom.members.size === 0) {
-            // Room is completely empty — disband the room
             rooms.delete(roomId);
             return { roomId, sessionEnded: true };
           }
-          // Regular member truly left and room not empty — room stays
         }, RECONNECT_GRACE_MS);
 
-        // Store disconnect data for potential reconnect
-        pendingReconnects.set(socketId, {
+        pendingReconnects.set(member.userId, {
           roomId,
-          nickname: member.nickname,
-          color: member.color,
-          joinedAt: member.joinedAt,
-          timer,
-          disconnectedAt: Date.now()
+          timer
         });
 
-        // System message about leaving (will show, but "reconnected" msg will follow if they come back)
         room.chatHistory.push({
           id: `sys-leave-${Date.now()}`,
           sender: 'System',
@@ -213,26 +183,20 @@ export const RoomManager = {
     return null;
   },
 
-  /**
-   * intentionalLeave - called when user explicitly clicks "Leave Room".
-   * This immediately disbands (if host) or removes (if guest) with no grace period.
-   */
   intentionalLeave(socketId) {
-    // Cancel any pending reconnect timer for this socket
-    if (pendingReconnects.has(socketId)) {
-      clearTimeout(pendingReconnects.get(socketId).timer);
-      pendingReconnects.delete(socketId);
-    }
-
     for (const [roomId, room] of rooms.entries()) {
-      if (room.members.has(socketId)) {
-        const member = room.members.get(socketId);
-        room.members.delete(socketId);
+      const member = this.getMemberBySocketId(room, socketId);
+      if (member) {
+        // Fully remove user regardless of how many sockets they have open
+        room.members.delete(member.userId);
+
+        if (pendingReconnects.has(member.userId)) {
+          clearTimeout(pendingReconnects.get(member.userId).timer);
+          pendingReconnects.delete(member.userId);
+        }
 
         let sessionEnded = false;
-
         if (room.members.size === 0) {
-          // Last member intentionally left — disband immediately
           rooms.delete(roomId);
           sessionEnded = true;
         } else {
@@ -255,7 +219,7 @@ export const RoomManager = {
     const room = this.getRoom(roomId);
     if (!room) return null;
 
-    const member = room.members.get(socketId);
+    const member = this.getMemberBySocketId(room, socketId);
     if (!member) {
       return { error: 'User not found in room.' };
     }
@@ -287,13 +251,14 @@ export const RoomManager = {
     const room = this.getRoom(roomId);
     if (!room) return null;
 
-    const member = room.members.get(socketId);
+    const member = this.getMemberBySocketId(room, socketId);
     if (!member) return null;
 
     const msg = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: member.nickname,
-      color: member.color,
+      avatar: member.avatar, // Added avatar
+      color: '#0145F2', // Default color, removed random colors
       text: text.trim(),
       isSystem: false,
       timestamp: Date.now()
@@ -308,7 +273,6 @@ export const RoomManager = {
   getRoomStateDTO(room) {
     if (!room) return null;
 
-    // Calculate accurate live interpolated time
     let liveCurrentTime = room.playback.currentTime;
     if (room.playback.isPlaying) {
       const elapsedSeconds = (Date.now() - room.playback.updatedAt) / 1000;
@@ -328,18 +292,15 @@ export const RoomManager = {
   }
 };
 
-// Global Memory Sweeper (Runs every 10 minutes)
 setInterval(() => {
   const now = Date.now();
   for (const [roomId, room] of rooms.entries()) {
     if (room.members.size === 0) {
-      // Only delete if no pending reconnects are associated with this room
       const hasPendingReconnect = Array.from(pendingReconnects.values()).some(p => p.roomId === roomId);
       if (!hasPendingReconnect) {
         rooms.delete(roomId);
       }
     } else {
-      // Hard expiration: 24 hours
       const isExpired = room.chatHistory[0] && (now - room.chatHistory[0].timestamp > 86400000);
       if (isExpired) rooms.delete(roomId);
     }

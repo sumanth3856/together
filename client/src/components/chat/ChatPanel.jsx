@@ -178,12 +178,16 @@ export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingRea
                 >
                   {/* Avatar */}
                   <div style={{ flexShrink: 0, marginTop: '2px' }}>
-                    <Avatar
-                      size={28}
-                      name={msg.sender}
-                      variant="beam"
-                      colors={['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b']}
-                    />
+                    {msg.avatar ? (
+                      <img src={msg.avatar} alt="Avatar" style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+                    ) : (
+                      <Avatar
+                        size={28}
+                        name={msg.sender}
+                        variant="beam"
+                        colors={['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b']}
+                      />
+                    )}
                   </div>
 
                   {/* Content */}
