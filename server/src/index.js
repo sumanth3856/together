@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -21,8 +22,30 @@ app.use(cors({
 app.use(express.json());
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Together-Server', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  let supabaseStatus = 'skipped';
+  
+  // Ping Supabase to keep it awake on the free tier
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+    try {
+      const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/`, {
+        headers: {
+          'apikey': process.env.SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`
+        }
+      });
+      supabaseStatus = response.ok ? 'awake' : 'error';
+    } catch (err) {
+      supabaseStatus = 'error';
+    }
+  }
+
+  res.json({ 
+    status: 'ok', 
+    service: 'Together-Server', 
+    supabase: supabaseStatus,
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // Serve static frontend build from client/dist if available
