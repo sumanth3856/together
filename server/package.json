@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test test/roomManager.test.js"
+    "test": "node --test test/*.test.js",
+    "coverage": "c8 --check-coverage --lines 100 node --test test/*.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -15,5 +16,8 @@
     "express": "^4.19.2",
     "socket.io": "^4.7.5",
     "yt-search": "^2.13.1"
+  },
+  "devDependencies": {
+    "c8": "^12.0.0"
   }
 }

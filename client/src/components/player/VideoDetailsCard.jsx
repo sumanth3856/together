@@ -1,20 +1,26 @@
 import React, { memo, useState } from 'react';
 import { Film, Copy, Check, Share2, Signal } from 'lucide-react';
+import { useRoomStore } from '../../store/useRoomStore';
 
-export const VideoDetailsCard = memo(function VideoDetailsCard({ currentVideo, roomState, currentSocketId, onLoadVideo }) {
+export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId, onLoadVideo }) {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const isPlaying = roomState?.playback?.isPlaying;
+  const roomId = useRoomStore(state => state.roomState?.roomId);
+  const hostId = useRoomStore(state => state.roomState?.hostId);
+  const currentVideo = useRoomStore(state => state.roomState?.currentVideo);
+  const isPlaying = useRoomStore(state => state.roomState?.playback?.isPlaying);
+  const videoQueueLength = useRoomStore(state => state.roomState?.videoQueue?.length || 0);
+  const memberCount = useRoomStore(state => state.roomState?.members?.length || 0);
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(roomState?.roomId || '');
+    navigator.clipboard.writeText(roomId || '');
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const handleCopyShareLink = () => {
-    const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomState?.roomId}`;
+    const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
     navigator.clipboard.writeText(shareUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -48,9 +54,9 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentVideo, r
             }}>
               {currentVideo?.title || 'No Video Loaded'}
             </h3>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontFamily: 'monospace', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              ID: {currentVideo?.youtubeId || '—'}
-            </span>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Up Next: <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{videoQueueLength} video{videoQueueLength !== 1 ? 's' : ''} in queue</span>
+            </div>
           </div>
         </div>
 
@@ -87,7 +93,7 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentVideo, r
           fontWeight: '600'
         }}>
           <div className="pulse-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--status-success)' }} />
-          <span style={{ fontFamily: "'Inter', sans-serif" }}>{roomState?.members?.length || 1} Members</span>
+          <span style={{ fontFamily: "'Inter', sans-serif" }}>{memberCount || 1} Members</span>
         </div>
       </div>
 

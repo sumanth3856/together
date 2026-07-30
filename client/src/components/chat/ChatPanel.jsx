@@ -3,8 +3,16 @@ import { MessageSquare, Send, Crown, Key, Hash } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import Avatar from 'boring-avatars';
 import { EmojiReactions } from './EmojiReactions';
+import { useRoomStore } from '../../store/useRoomStore';
+import { useUIStore } from '../../store/useUIStore';
+import { useSocket } from '../../hooks/useSocket';
 
-export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendReaction }) {
+const EMPTY_ARRAY = [];
+
+export const ChatPanel = memo(function ChatPanel() {
+  const chatHistory = useRoomStore(state => state.roomState?.chatHistory || EMPTY_ARRAY);
+  const incomingReaction = useUIStore(state => state.incomingReaction);
+  const { sendChatMessage: onSendMessage, sendReaction: onSendReaction } = useSocket();
   const [inputText, setInputText] = useState('');
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const chatContainerRef = useRef(null);

@@ -40,12 +40,17 @@ export default function Page() {
     sendReaction
   }), [createRoom, joinRoom, leaveRoom, syncPlayback, sendChatMessage, sendReaction]);
 
-  const roomState = useRoomStore(state => state.roomState);
+  const EMPTY_ARRAY = useMemo(() => [], []);
+  const roomId = useRoomStore(state => state.roomState?.roomId);
+  const hostId = useRoomStore(state => state.roomState?.hostId);
+  const currentVideo = useRoomStore(state => state.roomState?.currentVideo);
+  const members = useRoomStore(state => state.roomState?.members || EMPTY_ARRAY);
+  const videoQueueLength = useRoomStore(state => state.roomState?.videoQueue?.length || 0);
+  const chatHistoryLength = useRoomStore(state => state.roomState?.chatHistory?.length || 0);
   const isConnected = useRoomStore(state => state.isConnected);
   const isReconnecting = useRoomStore(state => state.isReconnecting);
   const socketId = useRoomStore(state => state.socketId);
   const sessionEnded = useRoomStore(state => state.sessionEnded);
-  const syncedPlaybackEvent = useRoomStore(state => state.syncedPlaybackEvent);
 
   const toasts = useUIStore(state => state.toasts);
   const setToastNotification = useUIStore(state => state.setToastNotification);
@@ -107,13 +112,13 @@ export default function Page() {
     }
   }, [isReconnecting]);
 
-  // Update URL when room state changes (keeps URL in sync)
+  // This effect syncs the URL to include the room ID when joining/creating
   useEffect(() => {
-    if (roomState?.roomId) {
-      const newUrl = `${window.location.pathname}?room=${roomState.roomId}`;
+    if (roomId) {
+      const newUrl = `${window.location.pathname}?room=${roomId}`;
       window.history.replaceState({ path: newUrl }, '', newUrl);
     }
-  }, [roomState?.roomId]);
+  }, [roomId]);
 
   // ---------- Handlers ----------
 
@@ -146,21 +151,21 @@ export default function Page() {
   }, [actions]);
 
   // ---------- Derived State ----------
-  const currentMember = roomState?.members?.find((m) => m.socketIds?.includes(socketId));
-  const isHost = roomState?.hostId === currentMember?.userId;
+  const currentMember = members.find((m) => m.socketIds?.includes(socketId));
+  const isHost = hostId === currentMember?.userId;
 
   const handleVideoEnded = useCallback(() => {
-    if (isHost && roomState?.videoQueue?.length > 0) {
+    if (isHost && videoQueueLength > 0) {
       playNext();
     }
-  }, [isHost, roomState?.videoQueue?.length, playNext]);
+  }, [isHost, videoQueueLength, playNext]);
 
   // ---------- Render ----------
   return (
     <div style={{ minHeight: '100dvh', position: 'relative', background: 'var(--bg-primary)' }}>
 
       {/* ── Reconnecting Banner ── */}
-      {isReconnecting && !roomState && (
+      {isReconnecting && !roomId && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20000,
           background: 'rgba(245,158,11,0.12)', borderBottom: '1px solid rgba(245,158,11,0.25)',
@@ -178,7 +183,7 @@ export default function Page() {
       )}
 
       {/* ── Reconnecting Banner (in-room disconnect) ── */}
-      {isReconnecting && roomState && (
+      {isReconnecting && roomId && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20000,
           background: 'rgba(245,158,11,0.10)', borderBottom: '1px solid rgba(245,158,11,0.2)',
@@ -240,7 +245,7 @@ export default function Page() {
       </div>
 
       {/* ── Reconnecting full-screen overlay (no room, no session ended) ── */}
-      {isReconnecting && !roomState && !sessionEnded && (
+      {isReconnecting && !roomId && !sessionEnded && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
           background: 'var(--bg-primary)',
@@ -265,11 +270,11 @@ export default function Page() {
       )}
 
       {/* ── Main Content ── */}
-      {!hasCheckedSession && !roomState ? (
+      {!hasCheckedSession && !roomId ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
           <div className="pulse-dot" style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-primary)' }} />
         </div>
-      ) : !roomState ? (
+      ) : !roomId ? (
         sessionEnded ? (
           /* Session Ended Screen */
           <div style={{
@@ -315,7 +320,7 @@ export default function Page() {
         >
           <RoomHeader
             onLeaveRoom={handleLeaveRoom}
-            roomId={roomState.roomId}
+            roomId={roomId}
           />
 
           {!isMobileScreen ? (
@@ -323,21 +328,18 @@ export default function Page() {
             <div className="desktop-grid">
               <div>
                 <YouTubePlayer
-                  youtubeId={roomState.currentVideo?.youtubeId}
-                  playback={roomState.playback}
-                  syncedPlaybackEvent={syncedPlaybackEvent}
-                  onPlaybackChange={(pData) => actions.syncPlayback(pData)}
+                  youtubeId={currentVideo?.youtubeId}
                   onVideoEnded={handleVideoEnded}
                 />
                 <VideoDetailsCard
-                  currentVideo={roomState.currentVideo}
-                  roomState={roomState}
+                  currentVideo={currentVideo}
+                  roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
                   currentSocketId={socketId}
                   onLoadVideo={(vData) => actions.syncPlayback(vData)}
                 />
 
                 <MemberList
-                  members={roomState.members}
+                  members={members}
                   currentSocketId={socketId}
                 />
                 
@@ -347,12 +349,7 @@ export default function Page() {
               </div>
 
               <div className="chat-sidebar">
-                <ChatPanel
-                  chatHistory={roomState.chatHistory}
-                  incomingReaction={incomingReaction}
-                  onSendMessage={actions.sendChatMessage}
-                  onSendReaction={actions.sendReaction}
-                />
+                <ChatPanel />
               </div>
             </div>
           ) : (
@@ -360,37 +357,29 @@ export default function Page() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div className="mobile-sticky-player">
                 <YouTubePlayer
-                  youtubeId={roomState.currentVideo?.youtubeId}
-                  playback={roomState.playback}
-                  syncedPlaybackEvent={syncedPlaybackEvent}
-                  onPlaybackChange={(pData) => actions.syncPlayback(pData)}
+                  youtubeId={currentVideo?.youtubeId}
                   onVideoEnded={handleVideoEnded}
                 />
               </div>
 
               {mobileActiveTab === 'video' && (
                 <VideoDetailsCard
-                  currentVideo={roomState.currentVideo}
-                  roomState={roomState}
+                  currentVideo={currentVideo}
+                  roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
                   currentSocketId={socketId}
                   onLoadVideo={(vData) => actions.syncPlayback(vData)}
                 />
               )}
 
               {mobileActiveTab === 'chat' && (
-                <div style={{ height: 'calc(100dvh - 280px)', minHeight: '300px' }}>
-                  <ChatPanel
-                    chatHistory={roomState.chatHistory}
-                    incomingReaction={incomingReaction}
-                    onSendMessage={actions.sendChatMessage}
-                    onSendReaction={actions.sendReaction}
-                  />
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <ChatPanel />
                 </div>
               )}
 
               {mobileActiveTab === 'members' && (
                 <MemberList
-                  members={roomState.members}
+                  members={members}
                   currentSocketId={socketId}
                 />
               )}
@@ -404,8 +393,8 @@ export default function Page() {
               <MobileTabBar
                 activeTab={mobileActiveTab}
                 onSelectTab={setMobileActiveTab}
-                memberCount={roomState.members.length}
-                chatCount={roomState.chatHistory.length}
+                memberCount={members.length}
+                chatCount={chatHistoryLength}
               />
             </div>
           )}

@@ -421,17 +421,25 @@ export const RoomManager = {
     };
   }
 };
-
-setInterval(() => {
+export const cleanupInterval = setInterval(() => {
   const now = Date.now();
+  
+  // O(P) pass to gather rooms with pending reconnects
+  const roomsWithPending = new Set();
+  for (const p of pendingReconnects.values()) {
+    roomsWithPending.add(p.roomId);
+  }
+
+  // O(R) pass to cleanup
   for (const [roomId, room] of rooms.entries()) {
     if (room.members.size === 0) {
-      const hasPendingReconnect = Array.from(pendingReconnects.values()).some(p => p.roomId === roomId);
-      if (!hasPendingReconnect) {
+      if (!roomsWithPending.has(roomId)) {
         rooms.delete(roomId);
       }
     } else {
-      const isExpired = room.chatHistory[0] && (now - room.chatHistory[0].timestamp > 86400000);
+      // Clean up rooms older than 24 hours to prevent memory leaks if they get orphaned
+      // using playback.updatedAt as a proxy for last activity
+      const isExpired = (now - room.playback.updatedAt > 86400000);
       if (isExpired) rooms.delete(roomId);
     }
   }

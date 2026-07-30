@@ -3,9 +3,13 @@
  * Node built-in test runner — no extra deps required.
  * Run with: node --test test/roomManager.test.js
  */
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { RoomManager, rooms } from '../src/roomManager.js';
+import { RoomManager, rooms, cleanupInterval } from '../src/roomManager.js';
+
+after(() => {
+  clearInterval(cleanupInterval);
+});
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

@@ -2,14 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause } from 'lucide-react';
 import throttle from 'lodash/throttle';
 import { PlaybackControls } from './PlaybackControls';
+import { useRoomStore } from '../../store/useRoomStore';
+import { useSocket } from '../../hooks/useSocket';
 
 export const YouTubePlayer = React.memo(function YouTubePlayer({
   youtubeId,
-  playback,
-  syncedPlaybackEvent,
-  onPlaybackChange,
   onVideoEnded
 }) {
+  const playback = useRoomStore(state => state.roomState?.playback);
+  const syncedPlaybackEvent = useRoomStore(state => state.syncedPlaybackEvent);
+  const { syncPlayback: onPlaybackChange } = useSocket();
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
