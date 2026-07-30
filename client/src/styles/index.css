@@ -3,24 +3,24 @@
    ========================================================================== */
 
 :root {
-  /* Core Background Layers (Canvas Cloud) */
-  --bg-primary:     #EDF1F5;
+  /* Core Background Layers */
+  --bg-primary:     #FBF1FF; /* Pale Orchid */
   --bg-surface:     #FFFFFF;
-  --bg-surface-2:   #F8FAFC;
-  --bg-surface-3:   #F1F5F9;
+  --bg-surface-2:   #F3E8F5; /* Lighter Thistle */
+  --bg-surface-3:   #E3D0EA; /* Thistle */
   --bg-input:       #FFFFFF;
-  --bg-hover:       #E2E8F0;
+  --bg-hover:       #E3D0EA;
 
-  /* Border System (Dark Translucency) */
-  --border-subtle:  rgba(0,0,0,0.06);
-  --border-medium:  rgba(0,0,0,0.12);
-  --border-strong:  rgba(0,0,0,0.20);
+  /* Border System */
+  --border-subtle:  rgba(58, 28, 54, 0.08); /* Dark Purple translucent */
+  --border-medium:  rgba(58, 28, 54, 0.15);
+  --border-strong:  rgba(58, 28, 54, 0.25);
 
-  /* Brand Accent — Electric Blue */
-  --accent-primary:        #0145F2;
-  --accent-primary-hover:  #013BCB;
-  --accent-primary-dim:    rgba(1, 69, 242, 0.1);
-  --accent-primary-glow:   rgba(1, 69, 242, 0.25);
+  /* Brand Accent — Amethyst */
+  --accent-primary:        #9B71B2;
+  --accent-primary-hover:  #8A60A1;
+  --accent-primary-dim:    rgba(155, 113, 178, 0.15);
+  --accent-primary-glow:   rgba(155, 113, 178, 0.35);
 
   /* Secondary accents */
   --accent-cyan:    #06b6d4;
@@ -28,11 +28,11 @@
   --accent-amber:   #d97706;
   --accent-emerald: #059669;
 
-  /* Text (Dark for light background) */
-  --text-primary:   #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary:  #64748b;
-  --text-muted:     #cbd5e1;
+  /* Text — Dark Purple */
+  --text-primary:   #3A1C36;
+  --text-secondary: #5A3C56;
+  --text-tertiary:  #7A5C76;
+  --text-muted:     #9A7C96;
 
   /* Status */
   --status-success: #10b981;
