@@ -155,12 +155,78 @@ export function setupSocketHandlers(io) {
 
       const result = RoomManager.addChatMessage(currentRoomId, socket.id, cleanText);
       if (result && result.message) {
-        // chat_received is lightweight — no need to also broadcast full room state
         io.to(currentRoomId).emit('chat_received', result.message);
       }
     });
 
-    // 9. Floating Emoji Reaction Bursts
+    // 6. Queue Controls
+    socket.on('add_to_queue', (video) => {
+      if (!currentRoomId) return;
+      if (!checkRateLimit(socket.id, 'queue', 1000)) return;
+
+      const result = RoomManager.addToQueue(currentRoomId, socket.id, video);
+      if (result && result.room) {
+        broadcastRoomState(currentRoomId);
+      }
+    });
+
+    socket.on('remove_from_queue', ({ queueId }) => {
+      if (!currentRoomId) return;
+      if (!checkRateLimit(socket.id, 'queue', 1000)) return;
+
+      const result = RoomManager.removeFromQueue(currentRoomId, socket.id, queueId);
+      if (result && result.error) {
+        socket.emit('error_message', { message: result.error });
+        return;
+      }
+      if (result && result.room) {
+        broadcastRoomState(currentRoomId);
+      }
+    });
+
+    socket.on('play_next', () => {
+      if (!currentRoomId) return;
+      if (!checkRateLimit(socket.id, 'queue', 1000)) return;
+
+      const result = RoomManager.playNext(currentRoomId, socket.id);
+      if (result && result.room) {
+        broadcastRoomState(currentRoomId);
+      }
+    });
+
+    // 7. Advanced Host Controls
+    socket.on('kick_user', ({ targetUserId }) => {
+      if (!currentRoomId) return;
+
+      const result = RoomManager.kickUser(currentRoomId, socket.id, targetUserId);
+      if (result && result.error) {
+        socket.emit('error_message', { message: result.error });
+        return;
+      }
+      if (result && result.kickedSocketIds) {
+        result.kickedSocketIds.forEach(id => {
+          io.to(id).emit('kicked_from_room');
+          const kickedSocket = io.sockets.sockets.get(id);
+          if (kickedSocket) kickedSocket.leave(currentRoomId);
+        });
+        broadcastRoomState(currentRoomId);
+      }
+    });
+
+    socket.on('transfer_host', ({ newHostId }) => {
+      if (!currentRoomId) return;
+
+      const result = RoomManager.transferHost(currentRoomId, socket.id, newHostId);
+      if (result && result.error) {
+        socket.emit('error_message', { message: result.error });
+        return;
+      }
+      if (result && result.room) {
+        broadcastRoomState(currentRoomId);
+      }
+    });
+
+    // 8. Floating Emoji Reaction Bursts
     socket.on('send_reaction', ({ emoji }) => {
       const cleanEmoji = sanitizeStr(emoji, 10);
       if (!currentRoomId || !cleanEmoji) return;

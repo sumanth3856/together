@@ -6,6 +6,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import ytSearch from 'yt-search';
 import { setupSocketHandlers } from './socketHandlers.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +47,29 @@ app.get('/api/health', async (req, res) => {
     supabase: supabaseStatus,
     timestamp: new Date().toISOString() 
   });
+});
+
+// YouTube Search endpoint
+app.get('/api/youtube/search', async (req, res) => {
+  try {
+    const query = req.query.q;
+    if (!query) {
+      return res.status(400).json({ error: 'Missing query parameter "q"' });
+    }
+    const r = await ytSearch(query);
+    // Return top 15 video results
+    const videos = r.videos.slice(0, 15).map(v => ({
+      youtubeId: v.videoId,
+      title: v.title,
+      thumbnail: v.thumbnail,
+      duration: v.timestamp,
+      author: v.author.name
+    }));
+    res.json({ results: videos });
+  } catch (err) {
+    console.error('YouTube search error:', err);
+    res.status(500).json({ error: 'Failed to search YouTube' });
+  }
 });
 
 // Serve static frontend build from client/dist if available

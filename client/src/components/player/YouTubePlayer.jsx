@@ -7,7 +7,8 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
   youtubeId,
   playback,
   syncedPlaybackEvent,
-  onPlaybackChange
+  onPlaybackChange,
+  onVideoEnded
 }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
@@ -34,6 +35,7 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
 
   // Use refs to avoid stale closures in YouTube iframe event listeners
   const onPlaybackChangeRef = useRef(onPlaybackChange);
+  const onVideoEndedRef = useRef(onVideoEnded);
 
   // Throttled sync specifically for aggressive slider dragging
   const throttledSyncRef = useRef(
@@ -46,7 +48,8 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
 
   useEffect(() => {
     onPlaybackChangeRef.current = onPlaybackChange;
-  }, [onPlaybackChange]);
+    onVideoEndedRef.current = onVideoEnded;
+  }, [onPlaybackChange, onVideoEnded]);
 
   useEffect(() => {
     return () => throttledSyncRef.current.cancel();
@@ -101,6 +104,11 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
               setLocalPlaying(true);
             } else if (state === window.YT.PlayerState.PAUSED) {
               setLocalPlaying(false);
+            } else if (state === window.YT.PlayerState.ENDED) {
+              setLocalPlaying(false);
+              if (onVideoEndedRef.current) {
+                onVideoEndedRef.current();
+              }
             }
 
             // Skip if we triggered this state change ourselves

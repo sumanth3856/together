@@ -15,6 +15,7 @@ import { VideoDetailsCard } from '../components/player/VideoDetailsCard';
 
 import { MemberList } from '../components/room/MemberList';
 import { ChatPanel } from '../components/chat/ChatPanel';
+import { SearchAndQueuePanel } from '../components/player/SearchAndQueuePanel';
 import { MobileTabBar } from '../components/room/MobileTabBar';
 import { LeaveConfirmationModal } from '../components/room/LeaveConfirmationModal';
 import { AlertCircle, CheckCircle2, X, Wifi, WifiOff } from 'lucide-react';
@@ -26,7 +27,8 @@ export default function Page() {
     leaveRoom,
     syncPlayback,
     sendChatMessage,
-    sendReaction
+    sendReaction,
+    playNext
   } = useSocket();
 
   const actions = useMemo(() => ({
@@ -144,7 +146,14 @@ export default function Page() {
   }, [actions]);
 
   // ---------- Derived State ----------
-  const currentMember = roomState?.members?.find((m) => m.socketId === socketId);
+  const currentMember = roomState?.members?.find((m) => m.socketIds?.includes(socketId));
+  const isHost = roomState?.hostId === currentMember?.userId;
+
+  const handleVideoEnded = useCallback(() => {
+    if (isHost && roomState?.videoQueue?.length > 0) {
+      playNext();
+    }
+  }, [isHost, roomState?.videoQueue?.length, playNext]);
 
   // ---------- Render ----------
   return (
@@ -318,6 +327,7 @@ export default function Page() {
                   playback={roomState.playback}
                   syncedPlaybackEvent={syncedPlaybackEvent}
                   onPlaybackChange={(pData) => actions.syncPlayback(pData)}
+                  onVideoEnded={handleVideoEnded}
                 />
                 <VideoDetailsCard
                   currentVideo={roomState.currentVideo}
@@ -330,6 +340,10 @@ export default function Page() {
                   members={roomState.members}
                   currentSocketId={socketId}
                 />
+                
+                <div style={{ height: '400px', marginTop: '14px' }}>
+                  <SearchAndQueuePanel />
+                </div>
               </div>
 
               <div className="chat-sidebar">
@@ -350,6 +364,7 @@ export default function Page() {
                   playback={roomState.playback}
                   syncedPlaybackEvent={syncedPlaybackEvent}
                   onPlaybackChange={(pData) => actions.syncPlayback(pData)}
+                  onVideoEnded={handleVideoEnded}
                 />
               </div>
 
@@ -380,7 +395,11 @@ export default function Page() {
                 />
               )}
 
-
+              {mobileActiveTab === 'search' && (
+                <div style={{ height: 'calc(100dvh - 280px)', minHeight: '300px' }}>
+                  <SearchAndQueuePanel />
+                </div>
+              )}
 
               <MobileTabBar
                 activeTab={mobileActiveTab}

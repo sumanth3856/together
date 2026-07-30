@@ -129,6 +129,15 @@ export function useSocket() {
       useRoomStore.getState().setIsReconnecting(false);
     });
 
+    socket.on('kicked_from_room', () => {
+      clearSession();
+      activeSessionRef.current = null;
+      useRoomStore.getState().setSessionEnded(true);
+      useRoomStore.getState().setRoomState(null);
+      useRoomStore.getState().setIsReconnecting(false);
+      useUIStore.getState().setToastNotification({ type: 'error', message: 'You have been kicked from the room.' });
+    });
+
     socket.on('chat_received', (message) => {
       useRoomStore.getState().updateChatHistory(message);
     });
@@ -248,6 +257,26 @@ export function useSocket() {
     }
   }, []);
 
+  const addToQueue = useCallback((video) => {
+    if (socketRef.current) socketRef.current.emit('add_to_queue', video);
+  }, []);
+
+  const removeFromQueue = useCallback((queueId) => {
+    if (socketRef.current) socketRef.current.emit('remove_from_queue', { queueId });
+  }, []);
+
+  const playNext = useCallback(() => {
+    if (socketRef.current) socketRef.current.emit('play_next');
+  }, []);
+
+  const kickUser = useCallback((targetUserId) => {
+    if (socketRef.current) socketRef.current.emit('kick_user', { targetUserId });
+  }, []);
+
+  const transferHost = useCallback((newHostId) => {
+    if (socketRef.current) socketRef.current.emit('transfer_host', { newHostId });
+  }, []);
+
   return {
     socket: socketRef.current,
     createRoom,
@@ -255,6 +284,11 @@ export function useSocket() {
     leaveRoom,
     syncPlayback,
     sendChatMessage,
-    sendReaction
+    sendReaction,
+    addToQueue,
+    removeFromQueue,
+    playNext,
+    kickUser,
+    transferHost
   };
 }

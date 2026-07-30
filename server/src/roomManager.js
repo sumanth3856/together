@@ -30,16 +30,19 @@ export const RoomManager = {
 
     const room = {
       roomId,
+      hostId: hostUser.userId,
       currentVideo: {
         youtubeId: 'dQw4w9WgXcQ',
         title: 'Rick Astley - Never Gonna Give You Up (Official Music Video)'
       },
+      videoQueue: [],
       playback: {
         isPlaying: false,
         currentTime: 0,
         updatedAt: Date.now()
       },
       members: new Map([[hostUser.userId, hostUser]]),
+      bannedUsers: new Set(),
       chatHistory: [
         {
           id: 'sys-init',
@@ -85,6 +88,10 @@ export const RoomManager = {
 
     const actualUserId = userId || socketId; // Fallback
     
+    if (room.bannedUsers.has(actualUserId)) {
+      return { error: 'You have been kicked from this room.' };
+    }
+
     // Check if user is already in the room (e.g. another tab)
     if (room.members.has(actualUserId)) {
       const member = room.members.get(actualUserId);
@@ -247,6 +254,127 @@ export const RoomManager = {
     return { room };
   },
 
+  addToQueue(roomId, socketId, video) {
+    const room = this.getRoom(roomId);
+    if (!room) return null;
+    const member = this.getMemberBySocketId(room, socketId);
+    if (!member) return null;
+
+    room.videoQueue.push({
+      ...video,
+      id: `queue-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      addedBy: member.nickname
+    });
+
+    room.chatHistory.push({
+      id: `sys-queue-${Date.now()}`,
+      sender: 'System',
+      text: `${member.nickname} added "${video.title}" to the queue.`,
+      isSystem: true,
+      timestamp: Date.now()
+    });
+
+    return { room };
+  },
+
+  removeFromQueue(roomId, socketId, queueId) {
+    const room = this.getRoom(roomId);
+    if (!room) return null;
+    const member = this.getMemberBySocketId(room, socketId);
+    if (!member) return null;
+
+    if (room.hostId !== member.userId) {
+      return { error: 'Only the host can remove items from the queue.' };
+    }
+
+    room.videoQueue = room.videoQueue.filter(v => v.id !== queueId);
+    return { room };
+  },
+
+  playNext(roomId, socketId) {
+    const room = this.getRoom(roomId);
+    if (!room) return null;
+    const member = this.getMemberBySocketId(room, socketId);
+    if (!member) return null;
+
+    if (room.videoQueue.length === 0) return { room }; // Nothing to play
+
+    const nextVideo = room.videoQueue.shift();
+    room.currentVideo = {
+      youtubeId: nextVideo.youtubeId,
+      title: nextVideo.title
+    };
+
+    room.playback = {
+      isPlaying: true,
+      currentTime: 0,
+      updatedAt: Date.now()
+    };
+
+    room.chatHistory.push({
+      id: `sys-next-${Date.now()}`,
+      sender: 'System',
+      text: `Playing next: ${nextVideo.title}`,
+      isSystem: true,
+      timestamp: Date.now()
+    });
+
+    return { room };
+  },
+
+  kickUser(roomId, hostSocketId, targetUserId) {
+    const room = this.getRoom(roomId);
+    if (!room) return null;
+    const host = this.getMemberBySocketId(room, hostSocketId);
+    if (!host || host.userId !== room.hostId) return { error: 'Only the host can kick users.' };
+    if (host.userId === targetUserId) return { error: 'You cannot kick yourself.' };
+
+    const targetMember = room.members.get(targetUserId);
+    if (!targetMember) return { error: 'User not found.' };
+
+    const targetSocketIds = [...targetMember.socketIds];
+
+    room.members.delete(targetUserId);
+    room.bannedUsers.add(targetUserId);
+
+    if (pendingReconnects.has(targetUserId)) {
+      clearTimeout(pendingReconnects.get(targetUserId).timer);
+      pendingReconnects.delete(targetUserId);
+    }
+
+    room.chatHistory.push({
+      id: `sys-kick-${Date.now()}`,
+      sender: 'System',
+      text: `${targetMember.nickname} was kicked from the room.`,
+      isSystem: true,
+      timestamp: Date.now()
+    });
+
+    return { room, kickedSocketIds: targetSocketIds, kickedNickname: targetMember.nickname };
+  },
+
+  transferHost(roomId, hostSocketId, newHostId) {
+    const room = this.getRoom(roomId);
+    if (!room) return null;
+    const host = this.getMemberBySocketId(room, hostSocketId);
+    if (!host || host.userId !== room.hostId) return { error: 'Only the host can transfer ownership.' };
+    
+    const newHost = room.members.get(newHostId);
+    if (!newHost) return { error: 'New host user not found.' };
+
+    room.hostId = newHostId;
+
+    room.chatHistory.push({
+      id: `sys-transfer-${Date.now()}`,
+      sender: 'System',
+      text: `${newHost.nickname} is now the host.`,
+      isSystem: true,
+      timestamp: Date.now()
+    });
+
+    return { room };
+  },
+
   addChatMessage(roomId, socketId, text) {
     const room = this.getRoom(roomId);
     if (!room) return null;
@@ -281,7 +409,9 @@ export const RoomManager = {
 
     return {
       roomId: room.roomId,
+      hostId: room.hostId,
       currentVideo: room.currentVideo,
+      videoQueue: room.videoQueue,
       playback: {
         ...room.playback,
         currentTime: liveCurrentTime
