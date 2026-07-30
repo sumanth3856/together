@@ -54,6 +54,9 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
   };
 
   const handlePlayNow = (video) => {
+    if (video.id && onRemoveVideo) {
+      onRemoveVideo(video.id);
+    }
     if (onPlayVideo) onPlayVideo(video);
   };
 

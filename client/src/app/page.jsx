@@ -166,12 +166,16 @@ export default function Page() {
   const isHost = hostId === currentMember?.userId;
 
   const handleVideoEnded = useCallback(() => {
-    if (isHost && videoQueueLength > 0) {
-      setTimeout(() => {
-        playNext();
-      }, 500);
+    if (isHost) {
+      if (videoQueueLength > 0) {
+        setTimeout(() => {
+          playNext();
+        }, 500);
+      } else {
+        actions.syncPlayback({ isPlaying: false, hasEnded: true });
+      }
     }
-  }, [isHost, videoQueueLength, playNext]);
+  }, [isHost, videoQueueLength, playNext, actions]);
 
   // ---------- Render ----------
   return (

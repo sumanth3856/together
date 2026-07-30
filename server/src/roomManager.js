@@ -31,10 +31,7 @@ export const RoomManager = {
     const room = {
       roomId,
       hostId: hostUser.userId,
-      currentVideo: {
-        youtubeId: 'dQw4w9WgXcQ',
-        title: 'Rick Astley - Never Gonna Give You Up (Official Music Video)'
-      },
+      currentVideo: {},
       videoQueue: [],
       playback: {
         isPlaying: false,
@@ -222,7 +219,7 @@ export const RoomManager = {
     return null;
   },
 
-  updatePlayback(roomId, socketId, { isPlaying, currentTime, youtubeId, title }) {
+  updatePlayback(roomId, socketId, { isPlaying, currentTime, youtubeId, title, hasEnded }) {
     const room = this.getRoom(roomId);
     if (!room) return null;
 
@@ -248,6 +245,7 @@ export const RoomManager = {
     room.playback = {
       isPlaying: typeof isPlaying === 'boolean' ? isPlaying : room.playback.isPlaying,
       currentTime: typeof currentTime === 'number' ? currentTime : room.playback.currentTime,
+      hasEnded: hasEnded === true,
       updatedAt: Date.now()
     };
 
@@ -260,8 +258,8 @@ export const RoomManager = {
     const member = this.getMemberBySocketId(room, socketId);
     if (!member) return null;
 
-    // If player is completely empty, play it immediately instead of queueing
-    if (!room.currentVideo.youtubeId) {
+    // If player is completely empty or the previous video ended, play it immediately instead of queueing
+    if (!room.currentVideo.youtubeId || room.playback.hasEnded) {
       room.currentVideo = {
         youtubeId: video.youtubeId,
         title: video.title || 'YouTube Video'
@@ -269,6 +267,7 @@ export const RoomManager = {
       room.playback = {
         isPlaying: true,
         currentTime: 0,
+        hasEnded: false,
         updatedAt: Date.now()
       };
       
@@ -333,6 +332,7 @@ export const RoomManager = {
     room.playback = {
       isPlaying: true,
       currentTime: 0,
+      hasEnded: false,
       updatedAt: Date.now()
     };
 
