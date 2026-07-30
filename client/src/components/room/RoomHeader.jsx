@@ -1,8 +1,10 @@
-import React from 'react';
-import { Monitor, LogOut, Copy } from 'lucide-react';
+import React, { useState } from 'react';
+import { Monitor, LogOut, Copy, User } from 'lucide-react';
 import { useUIStore } from '../../store/useUIStore';
+import { UserProfileModal } from '../profile/UserProfileModal';
 
-export function RoomHeader({ onLeaveRoom, roomId }) {
+export function RoomHeader({ onLeaveRoom, roomId, user }) {
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const setToastNotification = useUIStore(state => state.setToastNotification);
 
   const handleCopyCode = () => {
@@ -52,8 +54,27 @@ export function RoomHeader({ onLeaveRoom, roomId }) {
         )}
       </div>
 
-      {/* Leave */}
-      <div style={{ justifySelf: 'end' }}>
+      {/* Profile & Leave */}
+      <div style={{ justifySelf: 'end', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {user && (
+          <button
+            onClick={() => setIsProfileModalOpen(true)}
+            style={{
+              width: '32px', height: '32px', borderRadius: '50%',
+              background: 'var(--accent-primary-dim)', border: '1px solid rgba(155, 113, 178, 0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', overflow: 'hidden', padding: 0
+            }}
+            title="Profile"
+          >
+            {user.user_metadata?.avatar_url ? (
+              <img src={user.user_metadata.avatar_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <User size={16} color="var(--accent-primary)" />
+            )}
+          </button>
+        )}
+
         <button
           onClick={onLeaveRoom}
           className="btn btn-danger btn-leave"
@@ -64,6 +85,13 @@ export function RoomHeader({ onLeaveRoom, roomId }) {
           <span className="hide-on-small">Leave</span>
         </button>
       </div>
+
+      {isProfileModalOpen && (
+        <UserProfileModal 
+          user={user} 
+          onClose={() => setIsProfileModalOpen(false)} 
+        />
+      )}
     </header>
   );
 }

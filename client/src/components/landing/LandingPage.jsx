@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Monitor, Zap, ShieldCheck, Smile, ArrowRight, Play, Users } from 'lucide-react';
 import { JoinRoomModal } from '../room/JoinRoomModal';
+import { UserProfileModal } from '../profile/UserProfileModal';
 
 export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   const [isModalOpen, setIsModalOpen] = useState(!!initialRoomId);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   return (
     <div className="landing-bg" style={{ display: 'block', padding: '0' }}>
@@ -27,14 +29,14 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
         
         {user ? (
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsProfileModalOpen(true)}
             className="btn btn-secondary"
-            style={{ borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '8px' }}
+            style={{ borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 16px' }}
           >
-            {user.user_metadata.avatar_url ? (
+            {user.user_metadata?.avatar_url ? (
               <img src={user.user_metadata.avatar_url} alt="avatar" style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
             ) : null}
-            <span>{user.user_metadata.full_name || 'Get Started'}</span>
+            <span style={{ fontWeight: '600' }}>{user.user_metadata?.full_name || user.email?.split('@')[0] || 'My Profile'}</span>
           </button>
         ) : (
           <button 
@@ -96,9 +98,9 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
       {/* ── Features Section ── */}
       <section style={{
         position: 'relative', zIndex: 10,
-        maxWidth: '1200px', margin: '0 auto', padding: '60px 20px 100px',
+        maxWidth: '1200px', margin: '0 auto', padding: '60px 5vw 100px',
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
           
           <div className="feature-card">
             <div style={{
@@ -150,6 +152,13 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
           onJoinRoom={onJoinRoom} 
           onCancel={() => setIsModalOpen(false)}
           user={user}
+        />
+      )}
+
+      {isProfileModalOpen && (
+        <UserProfileModal 
+          user={user} 
+          onClose={() => setIsProfileModalOpen(false)} 
         />
       )}
     </div>

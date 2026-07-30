@@ -81,6 +81,13 @@ export default function Page() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Handle auto-leave on logout
+  useEffect(() => {
+    if (hasCheckedSession && !user && roomId) {
+      actions.leaveRoom();
+    }
+  }, [user, roomId, actions, hasCheckedSession]);
+
   // Responsive listener
   useEffect(() => {
     setIsMobileScreen(window.innerWidth < 768);
@@ -327,6 +334,7 @@ export default function Page() {
           <RoomHeader
             onLeaveRoom={handleLeaveRoom}
             roomId={roomId}
+            user={user}
           />
 
           {!isMobileScreen ? (

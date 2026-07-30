@@ -921,18 +921,23 @@ h1, h2, h3, h4, h5, .font-heading {
    Feature Cards
    ============================================================ */
 .feature-card {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius-xl);
   padding: 32px 24px;
-  transition: all var(--transition-base);
+  transition: all var(--transition-slow);
   position: relative;
   overflow: hidden;
+  box-shadow: 0 8px 32px rgba(58, 28, 54, 0.03);
 }
 
 .feature-card:hover {
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 12px 40px rgba(155, 113, 178, 0.15);
+  transform: translateY(-6px) scale(1.02);
+  border-color: rgba(255, 255, 255, 0.9);
 }
 
 .feature-card::before {
@@ -941,10 +946,10 @@ h1, h2, h3, h4, h5, .font-heading {
   top: 0;
   left: 0;
   right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.2), transparent);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
   opacity: 0;
-  transition: opacity var(--transition-base);
+  transition: opacity var(--transition-slow);
 }
 
 .feature-card:hover::before {
