@@ -6,6 +6,7 @@ import { EmojiReactions } from './EmojiReactions';
 
 export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingReaction, onSendMessage, onSendReaction }) {
   const [inputText, setInputText] = useState('');
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -15,6 +16,38 @@ export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingRea
     estimateSize: () => 65,
     overscan: 10,
   });
+
+  // Track keyboard height via Visual Viewport API so the fixed input
+  // lifts above the software keyboard on mobile browsers.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const TAB_BAR_HEIGHT = 60;
+
+    const onViewportResize = () => {
+      const vv = window.visualViewport;
+      // keyboard offset = how much the viewport has shrunk from the bottom
+      const keyboardHeight = Math.max(
+        0,
+        window.innerHeight - vv.height - vv.offsetTop
+      );
+      setKeyboardOffset(keyboardHeight);
+
+      // When keyboard opens, ensure latest message stays visible
+      if (keyboardHeight > 0 && chatContainerRef.current && chatHistory.length > 0) {
+        setTimeout(() => {
+          rowVirtualizer.scrollToIndex(chatHistory.length - 1, { align: 'end' });
+        }, 100);
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', onViewportResize);
+    window.visualViewport.addEventListener('scroll', onViewportResize);
+    return () => {
+      window.visualViewport.removeEventListener('resize', onViewportResize);
+      window.visualViewport.removeEventListener('scroll', onViewportResize);
+    };
+  }, [chatHistory.length, rowVirtualizer]);
 
   useEffect(() => {
     if (chatContainerRef.current && chatHistory.length > 0) {
@@ -29,6 +62,16 @@ export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingRea
     setInputText('');
   };
 
+  // Height of the docked input bar (approx 62px) + tab bar (60px) + buffer
+  const INPUT_DOCK_HEIGHT = 62;
+  const TAB_BAR_H = 60;
+  // When keyboard is open: input sits just above keyboard; messages need bottom padding for input only
+  // When keyboard is closed: input sits above tab bar
+  const formBottom = keyboardOffset > 0
+    ? keyboardOffset
+    : TAB_BAR_H;
+  const scrollPaddingBottom = INPUT_DOCK_HEIGHT + (keyboardOffset > 0 ? keyboardOffset : TAB_BAR_H) + 8;
+
   return (
     <div
       className="panel"
@@ -40,6 +83,8 @@ export const ChatPanel = memo(function ChatPanel({ chatHistory = [], incomingRea
         position: 'relative',
         overflow: 'hidden',
         background: 'var(--bg-surface)',
+        '--chat-form-bottom': `${formBottom}px`,
+        '--chat-scroll-padding': `${scrollPaddingBottom}px`,
       }}
     >
       {/* Floating Emoji Particles */}

@@ -36,7 +36,7 @@ export const PlaybackControls = memo(function PlaybackControls({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
         
         {/* Left: Sync Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: '600' }}>
             <Signal size={14} color="var(--status-success)" />
             <span className="hide-on-small">Synced</span>
