@@ -24,7 +24,21 @@ export function SearchAndQueuePanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
+      const getApiUrl = () => {
+        if (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL) {
+          return process.env.NEXT_PUBLIC_SOCKET_SERVER_URL;
+        }
+        if (typeof window !== 'undefined') {
+          const { protocol, hostname } = window.location;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return `${protocol}//${hostname}:4000`;
+          }
+        }
+        return ''; // Falls back to relative if not configured
+      };
+
+      const baseUrl = getApiUrl();
+      const res = await fetch(`${baseUrl}/api/youtube/search?q=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
       setResults(data.results || []);
