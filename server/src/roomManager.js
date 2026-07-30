@@ -260,6 +260,28 @@ export const RoomManager = {
     const member = this.getMemberBySocketId(room, socketId);
     if (!member) return null;
 
+    // If player is completely empty, play it immediately instead of queueing
+    if (!room.currentVideo.youtubeId) {
+      room.currentVideo = {
+        youtubeId: video.youtubeId,
+        title: video.title || 'YouTube Video'
+      };
+      room.playback = {
+        isPlaying: true,
+        currentTime: 0,
+        updatedAt: Date.now()
+      };
+      
+      room.chatHistory.push({
+        id: `sys-play-${Date.now()}`,
+        sender: 'System',
+        text: `${member.nickname} started playing "${video.title}".`,
+        isSystem: true,
+        timestamp: Date.now()
+      });
+      return { room };
+    }
+
     room.videoQueue.push({
       ...video,
       id: `queue-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
