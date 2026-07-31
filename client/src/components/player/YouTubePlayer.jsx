@@ -108,7 +108,6 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
             const state = event.data;
             const nowTime = player.getCurrentTime();
 
-            // Always update local playing state for the overlay
             if (state === window.YT.PlayerState.PLAYING) {
               setLocalPlaying(true);
             } else if (state === window.YT.PlayerState.PAUSED) {
@@ -120,10 +119,16 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
               }
             }
 
+            // Extend lock if buffering happens soon after a programmatic seek
+            if (state === window.YT.PlayerState.BUFFERING && (Date.now() - isSelfSyncing.current < 1500)) {
+               isSelfSyncing.current = Date.now();
+               return;
+            }
+
             // Skip if we triggered this state change ourselves
             if (Date.now() - isSelfSyncing.current < 800) return;
 
-            // Removed permission check — everyone can broadcast playback
+            // Broadcast
             if (state === window.YT.PlayerState.PLAYING) {
               onPlaybackChangeRef.current({ isPlaying: true, currentTime: nowTime });
             } else if (state === window.YT.PlayerState.PAUSED) {
@@ -203,12 +208,18 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
 
     isSelfSyncing.current = Date.now();
 
-    if (drift > 0.5) player.seekTo(targetTime, true);
-
     if (serverPlayback.isPlaying) {
       if (player.getPlayerState() !== window.YT.PlayerState.PLAYING) player.playVideo();
+      if (drift > 0.5) player.seekTo(targetTime, true);
     } else {
       if (player.getPlayerState() !== window.YT.PlayerState.PAUSED) player.pauseVideo();
+      if (drift > 0.5) {
+        // If we need to seek while pausing, do it immediately after pausing.
+        player.seekTo(targetTime, true);
+        
+        // Safety lock: ensure any buffering caused by this seek doesn't trigger a broadcast
+        isSelfSyncing.current = Date.now() + 1000;
+      }
     }
   }, [syncedPlaybackEvent, isPlayerReady]);
 
