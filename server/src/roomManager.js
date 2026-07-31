@@ -168,6 +168,19 @@ export const RoomManager = {
           if (currentRoom.members.size === 0) {
             rooms.delete(roomId);
             return { roomId, sessionEnded: true };
+          } else if (currentRoom.hostId === member.userId) {
+            // Auto-promote the oldest surviving member
+            const nextHost = Array.from(currentRoom.members.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
+            if (nextHost) {
+              currentRoom.hostId = nextHost.userId;
+              currentRoom.chatHistory.push({
+                id: `sys-promo-${Date.now()}`,
+                sender: 'System',
+                text: `${nextHost.nickname} is the new host.`,
+                isSystem: true,
+                timestamp: Date.now()
+              });
+            }
           }
         }, RECONNECT_GRACE_MS);
 
@@ -207,6 +220,21 @@ export const RoomManager = {
           rooms.delete(roomId);
           sessionEnded = true;
         } else {
+          // If the host left, automatically promote the oldest member
+          if (room.hostId === member.userId) {
+            const nextHost = Array.from(room.members.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
+            if (nextHost) {
+              room.hostId = nextHost.userId;
+              room.chatHistory.push({
+                id: `sys-promo-${Date.now()}`,
+                sender: 'System',
+                text: `${nextHost.nickname} is the new host.`,
+                isSystem: true,
+                timestamp: Date.now()
+              });
+            }
+          }
+
           room.chatHistory.push({
             id: `sys-leave-${Date.now()}`,
             sender: 'System',
@@ -480,6 +508,7 @@ export const RoomManager = {
       hostId: room.hostId,
       currentVideo: room.currentVideo,
       videoQueue: room.videoQueue,
+      settings: room.settings,
       playback: {
         ...room.playback,
         currentTime: liveCurrentTime

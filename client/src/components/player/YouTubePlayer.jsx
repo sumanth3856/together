@@ -10,8 +10,13 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
   onVideoEnded
 }) {
   const playback = useRoomStore(state => state.roomState?.playback);
-  const roomState = useRoomStore(state => state.roomState);
+  const allowMemberControls = useRoomStore(state => state.roomState?.settings?.allowMemberControls);
+  const hostId = useRoomStore(state => state.roomState?.hostId);
   const currentSocketId = useRoomStore(state => state.socketId);
+  const currentUserId = useRoomStore(state => {
+    const currentMember = state.roomState?.members?.find(m => m.socketIds?.includes(state.socketId));
+    return currentMember?.userId;
+  });
   const syncedPlaybackEvent = useRoomStore(state => state.syncedPlaybackEvent);
   const { syncPlayback: onPlaybackChange } = useSocket();
   const containerRef = useRef(null);
@@ -359,7 +364,7 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
         onSeekChange={handleSeekChange}
         onVolumeChange={handleVolumeChange}
         onMuteToggle={handleMuteToggle}
-        locked={!roomState?.settings?.allowMemberControls && roomState?.hostId !== roomState?.members?.find(m => m.socketIds?.includes(currentSocketId))?.userId}
+        locked={allowMemberControls === false && hostId !== currentUserId}
       />
     </div>
   );

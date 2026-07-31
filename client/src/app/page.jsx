@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useSocket } from '../hooks/useSocket';
 import { useRoomStore } from '../store/useRoomStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '../store/useUIStore';
 import { supabase } from '../lib/supabase';
 
@@ -48,7 +49,7 @@ export default function Page() {
   const roomId = useRoomStore(state => state.roomState?.roomId);
   const hostId = useRoomStore(state => state.roomState?.hostId);
   const currentVideo = useRoomStore(state => state.roomState?.currentVideo);
-  const members = useRoomStore(state => state.roomState?.members || EMPTY_ARRAY);
+  const members = useRoomStore(useShallow(state => state.roomState?.members || EMPTY_ARRAY));
   const videoQueueLength = useRoomStore(state => state.roomState?.videoQueue?.length || 0);
   const chatHistoryLength = useRoomStore(state => state.roomState?.chatHistory?.length || 0);
   const isConnected = useRoomStore(state => state.isConnected);
