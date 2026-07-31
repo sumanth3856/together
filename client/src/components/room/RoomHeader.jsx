@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { Monitor, LogOut, Copy, User } from 'lucide-react';
+import { Monitor, LogOut, Copy, User, Settings } from 'lucide-react';
 import { useUIStore } from '../../store/useUIStore';
+import { useRoomStore } from '../../store/useRoomStore';
+import { useSocket } from '../../hooks/useSocket';
 import { UserProfileModal } from '../profile/UserProfileModal';
 
 export function RoomHeader({ onLeaveRoom, roomId, user }) {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const setToastNotification = useUIStore(state => state.setToastNotification);
+  const roomState = useRoomStore(state => state.roomState);
+  const { updateRoomSettings } = useSocket();
+
+  const isHost = roomState?.hostId === user?.id;
 
   const handleCopyCode = () => {
     if (!roomId) return;
@@ -54,8 +60,25 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
         )}
       </div>
 
-      {/* Profile & Leave */}
+      {/* Profile & Settings & Leave */}
       <div style={{ justifySelf: 'end', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {isHost && (
+          <button
+            onClick={() => updateRoomSettings({ allowMemberControls: !roomState?.settings?.allowMemberControls })}
+            style={{
+              width: '32px', height: '32px', borderRadius: '50%',
+              background: roomState?.settings?.allowMemberControls ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${roomState?.settings?.allowMemberControls ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', padding: 0,
+              color: roomState?.settings?.allowMemberControls ? 'var(--status-success)' : 'var(--status-danger)'
+            }}
+            title={roomState?.settings?.allowMemberControls ? "Member Controls: Enabled (Click to Disable)" : "Member Controls: Disabled (Click to Enable)"}
+          >
+            <Settings size={16} />
+          </button>
+        )}
+
         {user && (
           <button
             onClick={() => setIsProfileModalOpen(true)}

@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Play, Pause, Signal, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Signal, Volume2, VolumeX, Lock } from 'lucide-react';
 
 // Hoisted: module-level helper — not re-created on every render
 const formatTime = (secs) => {
@@ -18,6 +18,7 @@ export const PlaybackControls = memo(function PlaybackControls({
   onSeekChange,
   onVolumeChange,
   onMuteToggle,
+  locked = false
 }) {
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -37,9 +38,9 @@ export const PlaybackControls = memo(function PlaybackControls({
         
         {/* Left: Sync Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: '600' }}>
-            <Signal size={14} color="var(--status-success)" />
-            <span className="hide-on-small">Synced</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: locked ? 'var(--status-warning)' : 'var(--status-success)', fontWeight: '600' }}>
+            {locked ? <Lock size={14} color="var(--status-warning)" /> : <Signal size={14} color="var(--status-success)" />}
+            <span className="hide-on-small">{locked ? 'Host Only' : 'Synced'}</span>
           </div>
         </div>
 
@@ -48,12 +49,14 @@ export const PlaybackControls = memo(function PlaybackControls({
           <button
             className="btn btn-primary"
             onClick={onManualPlayPause}
+            disabled={locked}
             style={{
               width: '44px', height: '44px', borderRadius: '50%',
               padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(1,69,242,0.3)', background: 'var(--accent-primary)'
+              boxShadow: '0 4px 12px rgba(1,69,242,0.3)', background: locked ? 'var(--text-muted)' : 'var(--accent-primary)',
+              opacity: locked ? 0.6 : 1, cursor: locked ? 'not-allowed' : 'pointer'
             }}
-            title={localPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            title={locked ? 'Controls locked by host' : (localPlaying ? 'Pause (Space)' : 'Play (Space)')}
           >
             {localPlaying ? <Pause size={20} color="#fff" /> : <Play size={20} color="#fff" style={{ marginLeft: '2px' }} />}
           </button>
@@ -89,12 +92,22 @@ export const PlaybackControls = memo(function PlaybackControls({
           <div className="timeline-slider-track" />
           <div className="timeline-slider-progress" style={{ width: `${progressPercent}%` }} />
           <input
-            type="range"
-            min={0} max={duration || 100} step={0.5}
-            value={currentTime}
-            onChange={onSeekChange}
-            className="timeline-slider"
-          />
+          type="range"
+          min="0"
+          max={duration || 100}
+          value={currentTime || 0}
+          onChange={onSeekChange}
+          disabled={locked}
+          style={{
+            width: '100%',
+            height: '6px',
+            borderRadius: '4px',
+            WebkitAppearance: 'none',
+            background: `linear-gradient(to right, var(--accent-primary) ${progressPercent}%, var(--bg-surface-3) ${progressPercent}%)`,
+            cursor: locked ? 'not-allowed' : 'pointer',
+            opacity: locked ? 0.7 : 1
+          }}
+        />
         </div>
         <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', minWidth: '40px', textAlign: 'right', fontWeight: '500' }}>
           {formatTime(duration)}

@@ -194,6 +194,19 @@ export function setupSocketHandlers(io) {
       }
     });
 
+    socket.on('update_room_settings', (newSettings) => {
+      if (!currentRoomId) return;
+
+      const result = RoomManager.updateRoomSettings(currentRoomId, socket.id, newSettings);
+      if (result && result.error) {
+        socket.emit('error_message', { message: result.error });
+        return;
+      }
+      if (result && result.room) {
+        broadcastRoomState(currentRoomId);
+      }
+    });
+
     // 7. Advanced Host Controls
     socket.on('kick_user', ({ targetUserId }) => {
       if (!currentRoomId) return;

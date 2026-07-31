@@ -277,6 +277,10 @@ export function useSocket() {
     if (socketRef.current) socketRef.current.emit('transfer_host', { newHostId });
   }, []);
 
+  const updateRoomSettings = useCallback((newSettings) => {
+    if (socketRef.current) socketRef.current.emit('update_room_settings', newSettings);
+  }, []);
+
   return {
     socket: socketRef.current,
     createRoom,
@@ -289,6 +293,7 @@ export function useSocket() {
     removeFromQueue,
     playNext,
     kickUser,
-    transferHost
+    transferHost,
+    updateRoomSettings
   };
 }

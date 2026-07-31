@@ -33,6 +33,9 @@ export const RoomManager = {
       hostId: hostUser.userId,
       currentVideo: {},
       videoQueue: [],
+      settings: {
+        allowMemberControls: true
+      },
       playback: {
         isPlaying: false,
         currentTime: 0,
@@ -228,6 +231,10 @@ export const RoomManager = {
       return { error: 'User not found in room.' };
     }
 
+    if (!room.settings.allowMemberControls && room.hostId !== member.userId) {
+      return { error: 'Only the host can control playback.' };
+    }
+
     if (youtubeId && youtubeId !== room.currentVideo.youtubeId) {
       room.currentVideo = {
         youtubeId,
@@ -256,7 +263,13 @@ export const RoomManager = {
     const room = this.getRoom(roomId);
     if (!room) return null;
     const member = this.getMemberBySocketId(room, socketId);
-    if (!member) return null;
+    if (!member) {
+      return { error: 'User not found in room.' };
+    }
+
+    if (!room.settings.allowMemberControls && room.hostId !== member.userId) {
+      return { error: 'Only the host can modify the queue.' };
+    }
 
     // If player is completely empty or the previous video ended, play it immediately instead of queueing
     if (!room.currentVideo.youtubeId || room.playback.hasEnded) {
@@ -304,8 +317,8 @@ export const RoomManager = {
     const member = this.getMemberBySocketId(room, socketId);
     if (!member) return null;
 
-    if (room.hostId !== member.userId) {
-      return { error: 'Only the host can remove items from the queue.' };
+    if (!room.settings.allowMemberControls && room.hostId !== member.userId) {
+      return { error: 'Only the host can modify the queue.' };
     }
 
     room.videoQueue = room.videoQueue.filter(v => v.id !== queueId);
@@ -318,8 +331,9 @@ export const RoomManager = {
     const member = this.getMemberBySocketId(room, socketId);
     if (!member) return null;
 
-    // Only the host can automatically trigger playNext
-    if (room.hostId !== member.userId) return null;
+    if (!room.settings.allowMemberControls && room.hostId !== member.userId) {
+      return { error: 'Only the host can control playback.' };
+    }
 
     if (room.videoQueue.length === 0) return { room }; // Nothing to play
 
@@ -347,52 +361,81 @@ export const RoomManager = {
     return { room };
   },
 
-  kickUser(roomId, hostSocketId, targetUserId) {
+  updateRoomSettings(roomId, socketId, newSettings) {
     const room = this.getRoom(roomId);
     if (!room) return null;
-    const host = this.getMemberBySocketId(room, hostSocketId);
-    if (!host || host.userId !== room.hostId) return { error: 'Only the host can kick users.' };
-    if (host.userId === targetUserId) return { error: 'You cannot kick yourself.' };
 
-    const targetMember = room.members.get(targetUserId);
-    if (!targetMember) return { error: 'User not found.' };
-
-    const targetSocketIds = [...targetMember.socketIds];
-
-    room.members.delete(targetUserId);
-    room.bannedUsers.add(targetUserId);
-
-    if (pendingReconnects.has(targetUserId)) {
-      clearTimeout(pendingReconnects.get(targetUserId).timer);
-      pendingReconnects.delete(targetUserId);
+    const member = this.getMemberBySocketId(room, socketId);
+    if (!member || room.hostId !== member.userId) {
+      return { error: 'Only the host can change room settings.' };
     }
 
+    room.settings = { ...room.settings, ...newSettings };
+    
     room.chatHistory.push({
-      id: `sys-kick-${Date.now()}`,
+      id: `sys-settings-${Date.now()}`,
       sender: 'System',
-      text: `${targetMember.nickname} was kicked from the room.`,
+      text: `Host updated room settings.`,
       isSystem: true,
       timestamp: Date.now()
     });
 
-    return { room, kickedSocketIds: targetSocketIds, kickedNickname: targetMember.nickname };
+    return { room };
   },
 
-  transferHost(roomId, hostSocketId, newHostId) {
+  kickUser(roomId, socketId, targetUserId) {
     const room = this.getRoom(roomId);
     if (!room) return null;
-    const host = this.getMemberBySocketId(room, hostSocketId);
-    if (!host || host.userId !== room.hostId) return { error: 'Only the host can transfer ownership.' };
-    
-    const newHost = room.members.get(newHostId);
-    if (!newHost) return { error: 'New host user not found.' };
 
-    room.hostId = newHostId;
+    const member = this.getMemberBySocketId(room, socketId);
+    if (!member || room.hostId !== member.userId) {
+      return { error: 'Only the host can kick users.' };
+    }
+
+    if (room.hostId === targetUserId) {
+      return { error: 'Cannot kick the host.' };
+    }
+
+    const targetUser = room.members.get(targetUserId);
+    if (!targetUser) {
+      return { error: 'User not found.' };
+    }
+
+    const kickedSocketIds = [...targetUser.socketIds];
+    room.bannedUsers.add(targetUserId);
+    room.members.delete(targetUserId);
 
     room.chatHistory.push({
-      id: `sys-transfer-${Date.now()}`,
+      id: `sys-kick-${Date.now()}`,
       sender: 'System',
-      text: `${newHost.nickname} is now the host.`,
+      text: `${targetUser.nickname} was kicked by the host.`,
+      isSystem: true,
+      timestamp: Date.now()
+    });
+
+    return { room, kickedSocketIds };
+  },
+
+  transferHost(roomId, socketId, targetUserId) {
+    const room = this.getRoom(roomId);
+    if (!room) return null;
+
+    const member = this.getMemberBySocketId(room, socketId);
+    if (!member || room.hostId !== member.userId) {
+      return { error: 'Only the host can transfer host privileges.' };
+    }
+
+    const targetUser = room.members.get(targetUserId);
+    if (!targetUser) {
+      return { error: 'Target user not found.' };
+    }
+
+    room.hostId = targetUserId;
+
+    room.chatHistory.push({
+      id: `sys-host-${Date.now()}`,
+      sender: 'System',
+      text: `${targetUser.nickname} is the new host.`,
       isSystem: true,
       timestamp: Date.now()
     });
@@ -410,8 +453,8 @@ export const RoomManager = {
     const msg = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: member.nickname,
-      avatar: member.avatar, // Added avatar
-      color: '#0145F2', // Default color, removed random colors
+      avatar: member.avatar,
+      color: '#0145F2',
       text: text.trim(),
       isSystem: false,
       timestamp: Date.now()
