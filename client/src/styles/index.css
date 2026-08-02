@@ -683,9 +683,13 @@ input[type=range]:hover::-webkit-slider-thumb {
     position: sticky;
     top: 76px;
     z-index: 90;
-    background: var(--bg-primary);
-    padding-bottom: 10px;
-    margin-top: -6px; /* tighter spacing to header when docked */
+    background: rgba(13, 7, 20, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding-bottom: 16px;
+    margin-top: -6px;
+    border-bottom: 1px solid var(--border-subtle);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
   }
 }
 
