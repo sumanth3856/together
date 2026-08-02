@@ -33,7 +33,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   }, []);
 
   return (
-    <div className="landing-bg" style={{ display: 'block', padding: '0', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', overflowX: 'hidden' }}>
+    <div className="landing-bg" style={{ display: 'block', padding: '0', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', overflowX: 'clip' }}>
       
       {/* 1. Header */}
       <header className={`glass-pill-nav ${scrolled ? 'scrolled' : ''}`}>
@@ -59,7 +59,19 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
                 <UserAvatar user={user} size={20} />
                 {user.user_metadata?.full_name || 'My Profile'}
               </button>
-            ) : null}
+            ) : (
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                style={{ 
+                  backgroundColor: 'var(--accent-primary)', border: 'none', 
+                  color: '#fff', padding: '8px 24px', borderRadius: '9999px',
+                  fontSize: '14px', fontWeight: '600', cursor: 'pointer',
+                  transition: 'background 0.3s'
+                }}
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </nav>
       </header>
