@@ -127,8 +127,8 @@ export function UserProfileModal({ user, onClose }) {
         <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-subtle)' }}>
           <button 
             onClick={() => setShowLogoutConfirm(true)}
-            className="btn btn-secondary"
-            style={{ width: '100%', minHeight: '48px', borderRadius: '12px', background: 'var(--status-danger)', color: 'white', border: 'none' }}
+            className="btn btn-danger"
+            style={{ width: '100%', minHeight: '48px', borderRadius: 'var(--radius-md)' }}
             disabled={isLoggingOut}
           >
             <LogOut size={18} />
