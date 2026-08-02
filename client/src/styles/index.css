@@ -1167,3 +1167,43 @@ input[type=range]:hover::-webkit-slider-thumb {
   100% { background-position: 0% 50%; }
 }
 
+/* ============================================================
+   Landing Navbar Links
+   ============================================================ */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.nav-item:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-item.active {
+  background: rgba(157, 78, 221, 0.15); /* light purple bg */
+  color: var(--accent-primary);
+}
+
+@media (max-width: 767px) {
+  .nav-links {
+    display: none;
+  }
+}

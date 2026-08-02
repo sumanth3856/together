@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Home, LayoutGrid, Info, Mail } from 'lucide-react';
 import { JoinRoomModal } from '../room/JoinRoomModal';
 import { UserProfileModal } from '../profile/UserProfileModal';
 import { useRoomStore } from '../../store/useRoomStore';
@@ -41,8 +42,28 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           width: '100%'
         }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent-primary)', letterSpacing: '-0.02em', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            Being Us
+          <div style={{ fontSize: '28px', fontWeight: '700', letterSpacing: '-0.02em', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <span style={{ color: 'var(--accent-primary)' }}>Being Us</span>
+            <span style={{ color: 'var(--text-primary)' }}>.</span>
+          </div>
+
+          <div className="nav-links">
+            <button className="nav-item active" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+              <Home size={16} />
+              <span>Home</span>
+            </button>
+            <button className="nav-item" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
+              <LayoutGrid size={16} />
+              <span>Features</span>
+            </button>
+            <button className="nav-item" onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Info size={16} />
+              <span>About</span>
+            </button>
+            <button className="nav-item" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Mail size={16} />
+              <span>Contact</span>
+            </button>
           </div>
 
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -154,7 +175,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
         </section>
 
         {/* 3. Features Section */}
-        <section style={{ padding: '96px 20px', maxWidth: '1200px', margin: '0 auto' }}>
+        <section id="features" style={{ padding: '96px 20px', maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '64px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h2 style={{ fontSize: '40px', fontWeight: '700', color: 'var(--text-primary)' }}>Designed for Digital Intimacy</h2>
             <p style={{ fontSize: '16px', color: 'var(--text-tertiary)', maxWidth: '576px', margin: '0 auto' }}>
@@ -192,8 +213,8 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
           </div>
         </section>
 
-        {/* 4. Quote Section */}
-        <section style={{ position: 'relative', padding: '128px 20px', overflow: 'hidden' }}>
+        {/* 4. Quote Section (About) */}
+        <section id="about" style={{ position: 'relative', padding: '128px 20px', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(142,87,69,0.05)', filter: 'blur(120px)', zIndex: 0 }}></div>
           <div style={{ maxWidth: '896px', margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 10 }}>
             <span className="material-symbols-outlined" style={{ color: 'rgba(142,87,69,0.4)', fontSize: '60px', marginBottom: '32px', userSelect: 'none' }}>format_quote</span>
@@ -258,7 +279,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
       </main>
 
       {/* 7. Footer */}
-      <footer style={{ backgroundColor: 'var(--bg-primary)', borderTop: '1px solid var(--border-subtle)', padding: '48px 20px', position: 'relative' }}>
+      <footer id="contact" style={{ backgroundColor: 'var(--bg-primary)', borderTop: '1px solid var(--border-subtle)', padding: '48px 20px', position: 'relative' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '48px', alignItems: 'start' }}>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
