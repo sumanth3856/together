@@ -717,7 +717,7 @@ input[type=range]:hover::-webkit-slider-thumb {
   transition: width 0.1s linear;
 }
 
-.timeline-slider {
+input[type=range].timeline-slider {
   position: absolute;
   inset: -8px 0;
   width: 100%;
@@ -731,16 +731,16 @@ input[type=range]:hover::-webkit-slider-thumb {
   margin: 0;
 }
 
-.timeline-slider::-webkit-slider-runnable-track {
+input[type=range].timeline-slider::-webkit-slider-runnable-track {
   background: transparent;
   height: 100%;
 }
-.timeline-slider::-moz-range-track {
+input[type=range].timeline-slider::-moz-range-track {
   background: transparent;
   height: 100%;
 }
 
-.timeline-slider::-webkit-slider-thumb {
+input[type=range].timeline-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 14px;
@@ -754,7 +754,7 @@ input[type=range]:hover::-webkit-slider-thumb {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.timeline-slider::-moz-range-thumb {
+input[type=range].timeline-slider::-moz-range-thumb {
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -765,11 +765,11 @@ input[type=range]:hover::-webkit-slider-thumb {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.timeline-slider-container:hover .timeline-slider::-webkit-slider-thumb {
+.timeline-slider-container:hover input[type=range].timeline-slider::-webkit-slider-thumb {
   opacity: 1;
   transform: scale(1.15);
 }
-.timeline-slider-container:hover .timeline-slider::-moz-range-thumb {
+.timeline-slider-container:hover input[type=range].timeline-slider::-moz-range-thumb {
   opacity: 1;
   transform: scale(1.15);
 }
@@ -996,7 +996,7 @@ input[type=range]:hover::-webkit-slider-thumb {
   }
   
   .chat-messages-scroll-area {
-    padding-bottom: var(--chat-scroll-padding, 70px) !important;
+    margin-bottom: var(--chat-scroll-padding, 70px) !important;
   }
 }
 
