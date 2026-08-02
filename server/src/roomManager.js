@@ -105,7 +105,7 @@ export const RoomManager = {
         pendingReconnects.delete(actualUserId);
         
         room.chatHistory.push({
-          id: `sys-rejoin-${Date.now()}`,
+          id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           sender: 'System',
           text: `${member.nickname} reconnected.`,
           isSystem: true,
@@ -131,7 +131,7 @@ export const RoomManager = {
     };
 
     room.chatHistory.push({
-      id: `sys-join-${Date.now()}`,
+      id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `${member.nickname} joined the room.`,
       isSystem: true,
@@ -174,7 +174,7 @@ export const RoomManager = {
             if (nextHost) {
               currentRoom.hostId = nextHost.userId;
               currentRoom.chatHistory.push({
-                id: `sys-promo-${Date.now()}`,
+                id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
                 sender: 'System',
                 text: `${nextHost.nickname} is the new host.`,
                 isSystem: true,
@@ -190,7 +190,7 @@ export const RoomManager = {
         });
 
         room.chatHistory.push({
-          id: `sys-leave-${Date.now()}`,
+          id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           sender: 'System',
           text: `${member.nickname} disconnected.`,
           isSystem: true,
@@ -226,7 +226,7 @@ export const RoomManager = {
             if (nextHost) {
               room.hostId = nextHost.userId;
               room.chatHistory.push({
-                id: `sys-promo-${Date.now()}`,
+                id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
                 sender: 'System',
                 text: `${nextHost.nickname} is the new host.`,
                 isSystem: true,
@@ -236,7 +236,7 @@ export const RoomManager = {
           }
 
           room.chatHistory.push({
-            id: `sys-leave-${Date.now()}`,
+            id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
             sender: 'System',
             text: `${member.nickname} left the room.`,
             isSystem: true,
@@ -269,7 +269,7 @@ export const RoomManager = {
         title: title || 'YouTube Video'
       };
       room.chatHistory.push({
-        id: `sys-vid-${Date.now()}`,
+        id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         sender: 'System',
         text: `${member.nickname} changed the video.`,
         isSystem: true,
@@ -313,7 +313,7 @@ export const RoomManager = {
       };
       
       room.chatHistory.push({
-        id: `sys-play-${Date.now()}`,
+        id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         sender: 'System',
         text: `${member.nickname} started playing "${video.title}".`,
         isSystem: true,
@@ -329,7 +329,7 @@ export const RoomManager = {
     });
 
     room.chatHistory.push({
-      id: `sys-queue-${Date.now()}`,
+      id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `${member.nickname} added "${video.title}" to the queue.`,
       isSystem: true,
@@ -379,7 +379,7 @@ export const RoomManager = {
     };
 
     room.chatHistory.push({
-      id: `sys-next-${Date.now()}`,
+      id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `Playing next: ${nextVideo.title}`,
       isSystem: true,
@@ -401,7 +401,7 @@ export const RoomManager = {
     room.settings = { ...room.settings, ...newSettings };
     
     room.chatHistory.push({
-      id: `sys-settings-${Date.now()}`,
+      id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `Host updated room settings.`,
       isSystem: true,
@@ -434,7 +434,7 @@ export const RoomManager = {
     room.members.delete(targetUserId);
 
     room.chatHistory.push({
-      id: `sys-kick-${Date.now()}`,
+      id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `${targetUser.nickname} was kicked by the host.`,
       isSystem: true,
@@ -461,7 +461,7 @@ export const RoomManager = {
     room.hostId = targetUserId;
 
     room.chatHistory.push({
-      id: `sys-host-${Date.now()}`,
+      id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `${targetUser.nickname} is the new host.`,
       isSystem: true,

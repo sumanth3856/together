@@ -26,6 +26,7 @@ export const ChatPanel = memo(function ChatPanel() {
     getScrollElement: () => chatContainerRef.current,
     estimateSize: () => 65,
     overscan: 10,
+    getItemKey: (index) => chatHistory[index]?.id || index,
   });
 
   // Track keyboard height via Visual Viewport API so the fixed input
