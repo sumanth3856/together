@@ -3,6 +3,7 @@ import { JoinRoomModal } from '../room/JoinRoomModal';
 import { UserProfileModal } from '../profile/UserProfileModal';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
+import { UserAvatar } from '../common/UserAvatar';
 
 export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   const [isModalOpen, setIsModalOpen] = useState(!!initialRoomId);
@@ -32,30 +33,16 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   }, []);
 
   return (
-    <div className="landing-bg font-be-vietnam" style={{ display: 'block', padding: '0', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', overflowX: 'hidden' }}>
+    <div className="landing-bg" style={{ display: 'block', padding: '0', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', overflowX: 'hidden' }}>
       
       {/* 1. Header */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50, width: '100%',
-        backgroundColor: scrolled ? 'rgba(20, 19, 10, 0.95)' : 'rgba(20, 19, 10, 0.8)',
-        backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-        borderBottom: '1px solid var(--border-subtle)',
-        boxShadow: scrolled ? 'var(--shadow-lg)' : 'var(--shadow-sm)',
-        transition: 'all 0.3s ease'
-      }}>
+      <header className={`glass-pill-nav ${scrolled ? 'scrolled' : ''}`}>
         <nav style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          height: '80px', padding: '0 48px', maxWidth: '1200px', margin: '0 auto'
+          width: '100%'
         }}>
-          <div className="font-literata" style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent-primary)', letterSpacing: '-0.02em', cursor: 'pointer' }}>
-            ToGe
-          </div>
-          
-          <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }} className="hide-on-mobile">
-            <a href="#" className="active-nav-border" style={{ fontSize: '14px', fontWeight: '600', color: 'var(--accent-primary)', textDecoration: 'none' }}>Features</a>
-            <a href="#" style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Togetherness</a>
-            <a href="#" style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Community</a>
-            <a href="#" style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Support</a>
+          <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent-primary)', letterSpacing: '-0.02em', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Being Us
           </div>
 
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -69,26 +56,10 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
                   display: 'flex', alignItems: 'center', gap: '8px'
                 }}
               >
-                {user.user_metadata?.avatar_url && (
-                  <img src={user.user_metadata.avatar_url} alt="avatar" style={{ width: '20px', height: '20px', borderRadius: '50%' }} />
-                )}
+                <UserAvatar user={user} size={20} />
                 {user.user_metadata?.full_name || 'My Profile'}
               </button>
             ) : null}
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="soft-glow-primary"
-              style={{ 
-                backgroundColor: 'var(--accent-primary)', color: '#fff', 
-                padding: '10px 24px', borderRadius: '9999px', border: 'none',
-                fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-                transition: 'transform 0.2s ease'
-              }}
-              onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-              onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            >
-              Start Watching
-            </button>
           </div>
         </nav>
       </header>
@@ -110,17 +81,19 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <img 
                 src="https://lh3.googleusercontent.com/aida/AP1WRLt_dupsMi6ScGVyQEnvX2C8yVrlAHuozZ_Y4z3Wzb6VBaY7pxwp9PYJD-uwzJkYQPj8uevcqLsS3G_2gY1WbrOynGe-RWT_Zu_LZHqhH6t95rECGo9lEAKt8o60acf08DPzTDJrym_B5eeYTh9K_ZRzXpovpE_UyTIw8ms-GnF1n9CNiAvzGqJthqV7bOw18ERzHPdRWh8GW7ph-UsnAk8wcbvxxJlMjjGbRD-rOYHogk08z56zmjCk3d4"
-                alt="Hero Visual"
+                alt=""
                 style={{ height: '128px', filter: 'sepia(0.3) drop-shadow(0 0 30px rgba(142,87,69,0.3))' }}
               />
             </div>
             
-            <h1 className="font-literata" style={{ fontSize: 'clamp(40px, 6vw, 64px)', lineHeight: '1.1', fontWeight: '800', color: 'var(--text-primary)', margin: '0 auto', maxWidth: '768px', letterSpacing: '-0.03em' }}>
-              Distance means nothing when you <span style={{ color: 'var(--accent-primary)' }} className="soft-glow-text">watch together.</span>
+            <h1 style={{ fontSize: 'clamp(40px, 6vw, 64px)', lineHeight: '1.1', fontWeight: '800', color: 'var(--text-primary)', margin: '0 auto', maxWidth: '768px', letterSpacing: '-0.03em' }}>
+              Watch Together,
+              <br />
+              <span className="text-gradient-primary">Feel Together</span>
             </h1>
             
             <p style={{ fontSize: '18px', lineHeight: '28px', color: 'var(--text-tertiary)', maxWidth: '672px', margin: '0 auto' }}>
-              Sync high-definition video from YouTube and other platforms instantly. Create your private digital cinema for intimate movie dates, no matter the miles.
+              Distance means nothing when you watch together.
             </p>
             
             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '24px' }}>
@@ -171,7 +144,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
         {/* 3. Features Section */}
         <section style={{ padding: '96px 20px', maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '64px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h2 className="font-literata" style={{ fontSize: '40px', fontWeight: '700', color: 'var(--text-primary)' }}>Designed for Digital Intimacy</h2>
+            <h2 style={{ fontSize: '40px', fontWeight: '700', color: 'var(--text-primary)' }}>Designed for Digital Intimacy</h2>
             <p style={{ fontSize: '16px', color: 'var(--text-tertiary)', maxWidth: '576px', margin: '0 auto' }}>
               Every pixel is tuned to bring you closer, eliminating the tech friction between you and your partner.
             </p>
@@ -183,7 +156,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
               <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: 'var(--accent-primary-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px' }}>
                 <span className="material-symbols-outlined" style={{ color: 'var(--accent-primary)', fontSize: '36px' }}>sync</span>
               </div>
-              <h3 className="font-literata" style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Synced Playback</h3>
+              <h3 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Synced Playback</h3>
               <p style={{ fontSize: '16px', color: 'var(--text-tertiary)' }}>Millisecond-perfect synchronization. When you pause to grab popcorn, they pause too. No more "one, two, three, play!" countdowns.</p>
             </div>
 
@@ -192,7 +165,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
               <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: 'rgba(117,137,86,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px' }}>
                 <span className="material-symbols-outlined" style={{ color: 'var(--accent-cyan)', fontSize: '36px' }}>favorite</span>
               </div>
-              <h3 className="font-literata" style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Private Date Rooms</h3>
+              <h3 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Private Date Rooms</h3>
               <p style={{ fontSize: '16px', color: 'var(--text-tertiary)' }}>Invite-only sanctuaries with custom atmospheric backgrounds. A safe, secure space for just the two of you.</p>
             </div>
 
@@ -201,7 +174,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
               <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: 'var(--accent-primary-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px' }}>
                 <span className="material-symbols-outlined" style={{ color: 'var(--accent-primary)', fontSize: '36px' }}>chat_bubble</span>
               </div>
-              <h3 className="font-literata" style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Real-time Reactions</h3>
+              <h3 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Real-time Reactions</h3>
               <p style={{ fontSize: '16px', color: 'var(--text-tertiary)' }}>Express yourself with glowing glass-style chat bubbles and synchronized emoji reactions that burst with color across the screen.</p>
             </div>
           </div>
@@ -212,8 +185,8 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
           <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(142,87,69,0.05)', filter: 'blur(120px)', zIndex: 0 }}></div>
           <div style={{ maxWidth: '896px', margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 10 }}>
             <span className="material-symbols-outlined" style={{ color: 'rgba(142,87,69,0.4)', fontSize: '60px', marginBottom: '32px', userSelect: 'none' }}>format_quote</span>
-            <blockquote className="font-literata" style={{ fontSize: 'clamp(24px, 4vw, 36px)', fontStyle: 'italic', color: 'rgba(240,242,235,0.9)', lineHeight: '1.6', marginBottom: '32px' }}>
-              "Intimacy isn't about being in the same room; it's about being in the same moment. ToGe turns a lonely YouTube link into a shared memory."
+            <blockquote style={{ fontSize: 'clamp(24px, 4vw, 36px)', fontStyle: 'italic', color: 'rgba(240,242,235,0.9)', lineHeight: '1.6', marginBottom: '32px' }}>
+              "Intimacy isn't about being in the same room; it's about being in the same moment. Being Us turns a lonely YouTube link into a shared memory."
             </blockquote>
             <cite style={{ fontSize: '14px', fontWeight: '600', color: 'var(--accent-primary)', letterSpacing: '0.2em', textTransform: 'uppercase', fontStyle: 'normal' }}>
               — THE ART OF CONNECTING
@@ -234,7 +207,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <span style={{ color: 'var(--accent-cyan)', fontSize: '14px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '2px' }}>Earthy Cinema</span>
-              <h2 className="font-literata" style={{ fontSize: '40px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.2' }}>Cinema-Grade Aesthetics, Living Room Comfort</h2>
+              <h2 style={{ fontSize: '40px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.2' }}>Cinema-Grade Aesthetics, Living Room Comfort</h2>
               <p style={{ fontSize: '18px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
                 We believe the interface should disappear during a movie. Our "Warm Organic" design uses deep earthy tones and soft rust accents to ensure your content is the star, while keeping the UI accessible with a simple glance.
               </p>
@@ -247,7 +220,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
           <div style={{ position: 'absolute', bottom: 0, right: 0, width: '384px', height: '384px', backgroundColor: 'rgba(142,87,69,0.1)', borderRadius: '50%', filter: 'blur(120px)' }}></div>
           
           <div style={{ maxWidth: '896px', margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '40px' }}>
-            <h2 className="font-literata" style={{ fontSize: 'clamp(40px, 5vw, 64px)', fontWeight: '800', color: 'var(--text-primary)' }}>Ready to start your next movie night?</h2>
+            <h2 style={{ fontSize: 'clamp(40px, 5vw, 64px)', fontWeight: '800', color: 'var(--text-primary)' }}>Ready to start your next movie night?</h2>
             <p style={{ fontSize: '18px', color: 'var(--text-tertiary)' }}>Connect in seconds. No accounts required for guests—just send a link and sync your hearts.</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
@@ -277,8 +250,8 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '48px', alignItems: 'start' }}>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="font-literata" style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent-primary)' }}>ToGe</div>
-            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>© 2026 ToGe. Cinema for the soul, together.</p>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent-primary)' }}>Being Us</div>
+            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>© 2026 Being Us. Cinema for the soul, together.</p>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

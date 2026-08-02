@@ -27,20 +27,21 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
   };
 
   return (
-    <div className="panel" style={{ marginTop: '14px', overflow: 'hidden' }}>
+    <div className="panel-glass" style={{ marginTop: '16px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)' }}>
       {/* Video Info Strip */}
       <div style={{
-        padding: '14px 16px',
+        padding: '16px 20px',
         borderBottom: '1px solid var(--border-subtle)',
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px',
-        background: 'var(--bg-surface-2)',
+        background: 'rgba(30, 30, 30, 0.4)',
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
           {/* Icon */}
           <div style={{
-            width: '38px', height: '38px', borderRadius: 'var(--radius-md)',
-            background: 'var(--accent-primary-dim)', border: '1px solid rgba(1,69,242,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            width: '42px', height: '42px', borderRadius: 'var(--radius-lg)',
+            background: 'var(--accent-primary-dim)', border: '1px solid rgba(155, 113, 178, 0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            boxShadow: '0 4px 12px var(--accent-primary-glow)'
           }}>
             <Film size={18} color="var(--accent-primary)" />
           </div>

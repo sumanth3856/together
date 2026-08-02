@@ -10,7 +10,10 @@ import { useSocket } from '../../hooks/useSocket';
 const EMPTY_ARRAY = [];
 
 export const ChatPanel = memo(function ChatPanel() {
-  const chatHistory = useRoomStore(state => state.roomState?.chatHistory || EMPTY_ARRAY);
+  const chatHistory = useRoomStore(state => state.roomState?.chatHistory || []);
+  const socketId = useRoomStore(state => state.socketId);
+  const currentMember = useRoomStore(state => state.roomState?.members?.find(m => m.socketIds?.includes(state.socketId)));
+  const myUserId = currentMember?.userId;
   const incomingReaction = useUIStore(state => state.incomingReaction);
   const { sendChatMessage: onSendMessage, sendReaction: onSendReaction } = useSocket();
   const [inputText, setInputText] = useState('');
@@ -181,7 +184,8 @@ export const ChatPanel = memo(function ChatPanel() {
                     position: 'absolute', top: 0, left: 0, width: '100%',
                     transform: `translateY(${virtualRow.start}px)`,
                     display: 'flex', gap: '10px', alignItems: 'flex-start',
-                    padding: '6px 0'
+                    padding: '6px 0',
+                    flexDirection: msg.senderId === myUserId ? 'row-reverse' : 'row'
                   }}
                 >
                   {/* Avatar */}
@@ -199,21 +203,33 @@ export const ChatPanel = memo(function ChatPanel() {
                   </div>
 
                   {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: msg.senderId === myUserId ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', flexWrap: 'wrap', flexDirection: msg.senderId === myUserId ? 'row-reverse' : 'row' }}>
                       <span style={{
                         fontSize: '0.78rem', fontWeight: '700',
                         color: msg.color || 'var(--text-primary)',
                       }}>
-                        {msg.sender}
+                        {msg.senderId === myUserId ? 'You' : msg.sender}
                       </span>
                       {msg.isHost && <Crown size={11} color="var(--accent-amber)" title="Host" />}
                       {msg.hasControl && !msg.isHost && <Key size={10} color="var(--accent-emerald)" title="Has Control" />}
-                      <span style={{ fontSize: '0.63rem', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>
+                      <span style={{ fontSize: '0.63rem', color: 'var(--text-tertiary)' }}>
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <div className="chat-bubble">{msg.text}</div>
+                    <div 
+                      className="chat-bubble"
+                      style={{
+                        background: msg.senderId === myUserId ? 'var(--accent-primary-dim)' : 'var(--bg-surface-2)',
+                        border: `1px solid ${msg.senderId === myUserId ? 'rgba(155, 113, 178, 0.3)' : 'var(--border-subtle)'}`,
+                        borderRadius: msg.senderId === myUserId 
+                          ? 'var(--radius-md) 2px var(--radius-md) var(--radius-md)' 
+                          : '2px var(--radius-md) var(--radius-md) var(--radius-md)',
+                        color: msg.senderId === myUserId ? 'var(--text-primary)' : 'var(--text-primary)',
+                      }}
+                    >
+                      {msg.text}
+                    </div>
                   </div>
                 </div>
               );

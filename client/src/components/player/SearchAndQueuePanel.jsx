@@ -65,10 +65,10 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
   };
 
   return (
-    <div className="panel" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+    <div className="panel-glass" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)' }}>
       
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-surface-2)' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', background: 'rgba(30, 30, 30, 0.4)' }}>
         <button
           onClick={() => setActiveTab('search')}
           style={{

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tv, Plus, Users, ArrowRight, Zap, ShieldCheck, Smile, Monitor, X } from 'lucide-react';
+import { Tv, Plus, Users, ArrowRight, Zap, ShieldCheck, Smile, Heart, X } from 'lucide-react';
 
 import { supabase } from '../../lib/supabase';
 
@@ -59,7 +59,7 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom, onCance
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(255, 255, 255, 0.85)',
+      background: 'rgba(13, 7, 20, 0.85)',
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '24px 16px',
@@ -91,10 +91,10 @@ export function JoinRoomModal({ initialRoomId, onCreateRoom, onJoinRoom, onCance
             margin: '0 auto 14px',
             boxShadow: '0 4px 20px rgba(99,102,241,0.4), 0 0 0 1px rgba(255,255,255,0.1) inset'
           }}>
-            <Monitor size={30} color="#fff" />
+            <Heart size={30} color="#fff" />
           </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
-            Together
+          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+            Being Us
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
             Watch YouTube in perfect sync with friends

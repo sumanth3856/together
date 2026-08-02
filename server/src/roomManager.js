@@ -481,6 +481,7 @@ export const RoomManager = {
     const msg = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: member.nickname,
+      senderId: member.userId,
       avatar: member.avatar,
       color: '#0145F2',
       text: text.trim(),

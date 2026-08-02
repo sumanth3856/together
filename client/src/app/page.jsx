@@ -18,7 +18,7 @@ import { MemberList } from '../components/room/MemberList';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { SearchAndQueuePanel } from '../components/player/SearchAndQueuePanel';
 import { MobileTabBar } from '../components/room/MobileTabBar';
-import { LeaveConfirmationModal } from '../components/room/LeaveConfirmationModal';
+import { ConfirmationModal } from '../components/common/ConfirmationModal';
 import { AlertCircle, CheckCircle2, X, Wifi, WifiOff } from 'lucide-react';
 
 export default function Page() {
@@ -97,6 +97,20 @@ export default function Page() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Warn on page reload when in a room
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (roomId) {
+        e.preventDefault();
+        e.returnValue = "Reloading this page will result in synchronization issues. Are you sure you want to reload?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [roomId]);
+
   // Pre-fill room ID from URL (for invite links)
   // hasCheckedSession stays false until the socket has had a chance to
   // attempt a rejoin, so we never flash the LandingPage mid-reconnect.
@@ -159,7 +173,7 @@ export default function Page() {
     try {
       await actions.leaveRoom();
     } catch (_) {}
-    window.location.href = window.location.pathname;
+    window.history.replaceState({ path: window.location.pathname }, '', window.location.pathname);
   }, [actions]);
 
   // ---------- Derived State ----------
@@ -289,8 +303,13 @@ export default function Page() {
 
       {/* ── Main Content ── */}
       {!hasCheckedSession && !roomId ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
-          <div className="pulse-dot" style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-primary)' }} />
+        <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', height: '100vh', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          <div className="skeleton" style={{ height: '60px', width: '100%', borderRadius: '12px' }} />
+          <div className="skeleton" style={{ height: '400px', width: '100%', borderRadius: '16px' }} />
+          <div style={{ display: 'flex', gap: '16px' }}>
+             <div className="skeleton" style={{ height: '200px', flex: 1, borderRadius: '12px' }} />
+             <div className="skeleton" style={{ height: '200px', flex: 1, borderRadius: '12px' }} />
+          </div>
         </div>
       ) : !roomId ? (
         sessionEnded ? (
@@ -427,7 +446,10 @@ export default function Page() {
 
           {/* Leave Confirmation Modal */}
           {showLeaveModal && (
-            <LeaveConfirmationModal
+            <ConfirmationModal
+              title="Leave Room?"
+              message="Are you sure you want to leave? Your connection will be lost."
+              confirmText="Leave Surely"
               onConfirm={confirmLeaveRoom}
               onCancel={() => setShowLeaveModal(false)}
             />

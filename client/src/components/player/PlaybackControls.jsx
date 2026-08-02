@@ -92,22 +92,18 @@ export const PlaybackControls = memo(function PlaybackControls({
           <div className="timeline-slider-track" />
           <div className="timeline-slider-progress" style={{ width: `${progressPercent}%` }} />
           <input
-          type="range"
-          min="0"
-          max={duration || 100}
-          value={currentTime || 0}
-          onChange={onSeekChange}
-          disabled={locked}
-          style={{
-            width: '100%',
-            height: '6px',
-            borderRadius: '4px',
-            WebkitAppearance: 'none',
-            background: `linear-gradient(to right, var(--accent-primary) ${progressPercent}%, var(--bg-surface-3) ${progressPercent}%)`,
-            cursor: locked ? 'not-allowed' : 'pointer',
-            opacity: locked ? 0.7 : 1
-          }}
-        />
+            type="range"
+            min="0"
+            max={duration || 100}
+            value={currentTime || 0}
+            onChange={onSeekChange}
+            disabled={locked}
+            className="timeline-slider"
+            style={{
+              cursor: locked ? 'not-allowed' : 'pointer',
+              opacity: locked ? 0.7 : 1
+            }}
+          />
         </div>
         <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', minWidth: '40px', textAlign: 'right', fontWeight: '500' }}>
           {formatTime(duration)}

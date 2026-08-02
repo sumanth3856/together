@@ -1,0 +1,21 @@
+{
+  "name": "Together - Watch Party",
+  "short_name": "Together",
+  "description": "A premium YouTube co-watching experience.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#14130A",
+  "theme_color": "#14130A",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

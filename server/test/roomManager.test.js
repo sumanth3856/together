@@ -38,7 +38,8 @@ test('createRoom — initialises a room correctly', (t) => {
   assert.equal(host.hasControl, undefined, 'hasControl field should NOT exist');
 
   // Default video & playback
-  assert.ok(room.currentVideo.youtubeId, 'default video should be set');
+  assert.ok(room.currentVideo, 'default video object should exist');
+  assert.equal(room.currentVideo.youtubeId, undefined, 'default video should not have youtubeId');
   assert.equal(room.playback.isPlaying, false, 'should start paused');
   assert.equal(room.playback.currentTime, 0, 'should start at time 0');
 

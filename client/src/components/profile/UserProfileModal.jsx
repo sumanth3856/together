@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { X, User, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { UserAvatar } from '../common/UserAvatar';
 import { useUIStore } from '../../store/useUIStore';
+import { ConfirmationModal } from '../common/ConfirmationModal';
 
 export function UserProfileModal({ user, onClose }) {
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
   const setToastNotification = useUIStore(state => state.setToastNotification);
 
@@ -44,23 +47,35 @@ export function UserProfileModal({ user, onClose }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(255, 255, 255, 0.85)',
+      background: 'rgba(13, 7, 20, 0.85)',
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '24px 16px',
       animation: 'fadeIn 0.3s ease'
     }}>
-      <div className="landing-card" style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
+      <div style={{ 
+        position: 'relative', width: '100%', maxWidth: '400px',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-xl)',
+        padding: '32px 24px',
+        boxShadow: 'var(--shadow-lg)',
+        maxHeight: '90vh',
+        overflowY: 'auto'
+      }}>
         
         <button 
           onClick={onClose}
           style={{ 
-            position: 'absolute', top: '16px', right: '16px', 
-            background: 'var(--bg-hover)', border: 'none', color: 'var(--text-secondary)',
-            width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+            position: 'absolute', top: '12px', right: '12px', 
+            background: 'rgba(0,0,0,0.05)', border: 'none', color: 'var(--text-secondary)',
+            width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            transition: 'background 0.2s'
           }}
+          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
+          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
         >
-          <X size={18} />
+          <X size={20} />
         </button>
 
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
@@ -74,11 +89,7 @@ export function UserProfileModal({ user, onClose }) {
             border: '2px solid var(--accent-primary)',
             boxShadow: '0 4px 20px var(--accent-primary-glow)'
           }}>
-            {user?.user_metadata?.avatar_url ? (
-              <img src={user.user_metadata.avatar_url} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <User size={36} color="var(--accent-primary)" />
-            )}
+            <UserAvatar user={user} size={80} />
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>
             Your Profile
@@ -115,7 +126,7 @@ export function UserProfileModal({ user, onClose }) {
 
         <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-subtle)' }}>
           <button 
-            onClick={handleLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             className="btn btn-secondary"
             style={{ width: '100%', minHeight: '48px', borderRadius: '12px', background: 'var(--status-danger)', color: 'white', border: 'none' }}
             disabled={isLoggingOut}
@@ -125,6 +136,16 @@ export function UserProfileModal({ user, onClose }) {
           </button>
         </div>
       </div>
+
+      {showLogoutConfirm && (
+        <ConfirmationModal
+          title="Log Out"
+          message="Are you sure you want to log out of your account?"
+          confirmText="Log Out"
+          onConfirm={handleLogout}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
     </div>
   );
 }

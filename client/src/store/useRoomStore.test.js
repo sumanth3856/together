@@ -21,6 +21,25 @@ describe('useRoomStore', () => {
     expect(state.isConnected).toBe(false);
   });
 
+  it('setters update their respective state fields', () => {
+    const store = useRoomStore.getState();
+    
+    store.setSocketId('socket-123');
+    expect(useRoomStore.getState().socketId).toBe('socket-123');
+
+    store.setIsConnected(true);
+    expect(useRoomStore.getState().isConnected).toBe(true);
+
+    store.setIsReconnecting(true);
+    expect(useRoomStore.getState().isReconnecting).toBe(true);
+
+    store.setSessionEnded(true);
+    expect(useRoomStore.getState().sessionEnded).toBe(true);
+
+    store.setSyncedPlaybackEvent({ type: 'play', time: 10 });
+    expect(useRoomStore.getState().syncedPlaybackEvent).toEqual({ type: 'play', time: 10 });
+  });
+
   it('setRoomState updates roomState', () => {
     const mockRoom = { roomId: 'TOG-1234', currentVideo: { title: 'Vid' } };
     useRoomStore.getState().setRoomState(mockRoom);
