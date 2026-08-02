@@ -159,53 +159,31 @@ export function setupSocketHandlers(io) {
       }
     });
 
+    const handleAction = (actionName, rateLimitMs, managerFunc, extractArgs = (d) => [d]) => {
+      return (data) => {
+        if (!currentRoomId) return;
+        if (actionName && !checkRateLimit(socket.id, actionName, rateLimitMs)) return;
+
+        const args = data !== undefined ? extractArgs(data) : [];
+        const result = managerFunc(currentRoomId, socket.id, ...args);
+        
+        if (result && result.error) {
+          socket.emit('error_message', { message: result.error });
+          return;
+        }
+        if (result && result.room) {
+          broadcastRoomState(currentRoomId);
+        }
+      };
+    };
+
     // 6. Queue Controls
-    socket.on('add_to_queue', (video) => {
-      if (!currentRoomId) return;
-      if (!checkRateLimit(socket.id, 'queue', 1000)) return;
+    socket.on('add_to_queue', handleAction('queue', 1000, RoomManager.addToQueue));
+    socket.on('remove_from_queue', handleAction('queue', 1000, RoomManager.removeFromQueue, d => [d.queueId]));
+    socket.on('play_next', handleAction('queue', 1000, RoomManager.playNext, () => []));
+    socket.on('update_room_settings', handleAction(null, 0, RoomManager.updateRoomSettings));
 
-      const result = RoomManager.addToQueue(currentRoomId, socket.id, video);
-      if (result && result.room) {
-        broadcastRoomState(currentRoomId);
-      }
-    });
 
-    socket.on('remove_from_queue', ({ queueId }) => {
-      if (!currentRoomId) return;
-      if (!checkRateLimit(socket.id, 'queue', 1000)) return;
-
-      const result = RoomManager.removeFromQueue(currentRoomId, socket.id, queueId);
-      if (result && result.error) {
-        socket.emit('error_message', { message: result.error });
-        return;
-      }
-      if (result && result.room) {
-        broadcastRoomState(currentRoomId);
-      }
-    });
-
-    socket.on('play_next', () => {
-      if (!currentRoomId) return;
-      if (!checkRateLimit(socket.id, 'queue', 1000)) return;
-
-      const result = RoomManager.playNext(currentRoomId, socket.id);
-      if (result && result.room) {
-        broadcastRoomState(currentRoomId);
-      }
-    });
-
-    socket.on('update_room_settings', (newSettings) => {
-      if (!currentRoomId) return;
-
-      const result = RoomManager.updateRoomSettings(currentRoomId, socket.id, newSettings);
-      if (result && result.error) {
-        socket.emit('error_message', { message: result.error });
-        return;
-      }
-      if (result && result.room) {
-        broadcastRoomState(currentRoomId);
-      }
-    });
 
     // 7. Advanced Host Controls
     socket.on('kick_user', ({ targetUserId }) => {
@@ -226,18 +204,7 @@ export function setupSocketHandlers(io) {
       }
     });
 
-    socket.on('transfer_host', ({ newHostId }) => {
-      if (!currentRoomId) return;
-
-      const result = RoomManager.transferHost(currentRoomId, socket.id, newHostId);
-      if (result && result.error) {
-        socket.emit('error_message', { message: result.error });
-        return;
-      }
-      if (result && result.room) {
-        broadcastRoomState(currentRoomId);
-      }
-    });
+    socket.on('transfer_host', handleAction(null, 0, RoomManager.transferHost, d => [d.newHostId]));
 
     // 8. Floating Emoji Reaction Bursts
     socket.on('send_reaction', ({ emoji }) => {

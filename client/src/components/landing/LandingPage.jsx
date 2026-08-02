@@ -10,10 +10,25 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   const [isModalOpen, setIsModalOpen] = useState(!!initialRoomId);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState('home');
 
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
+
+      const sections = ['home', 'features', 'about', 'contact'];
+      let current = 'home';
+      
+      for (const section of sections) {
+        const el = document.getElementById(section);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= 250) {
+            current = section;
+          }
+        }
+      }
+      setActiveSection(current);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
@@ -34,7 +49,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   }, []);
 
   return (
-    <div className="landing-bg" style={{ display: 'block', padding: '0', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', overflowX: 'clip' }}>
+    <div className="landing-bg" style={{ display: 'block', padding: '0', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       
       {/* 1. Header */}
       <header className={`glass-pill-nav ${scrolled ? 'scrolled' : ''}`}>
@@ -48,19 +63,19 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
           </div>
 
           <div className="nav-links">
-            <button className="nav-item active" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <button className={`nav-item ${activeSection === 'home' ? 'active' : ''}`} onClick={() => document.getElementById('home')?.scrollIntoView({ behavior: 'smooth' })}>
               <Home size={16} />
               <span>Home</span>
             </button>
-            <button className="nav-item" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
+            <button className={`nav-item ${activeSection === 'features' ? 'active' : ''}`} onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
               <LayoutGrid size={16} />
               <span>Features</span>
             </button>
-            <button className="nav-item" onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>
+            <button className={`nav-item ${activeSection === 'about' ? 'active' : ''}`} onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>
               <Info size={16} />
               <span>About</span>
             </button>
-            <button className="nav-item" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+            <button className={`nav-item ${activeSection === 'contact' ? 'active' : ''}`} onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
               <Mail size={16} />
               <span>Contact</span>
             </button>
@@ -97,7 +112,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
         </nav>
       </header>
 
-      <main>
+      <main id="home">
         {/* 2. Hero Section */}
         <section style={{
           position: 'relative', minHeight: '90vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -119,37 +134,34 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
               />
             </div>
             
-            <h1 style={{ fontSize: 'clamp(40px, 6vw, 64px)', lineHeight: '1.1', fontWeight: '800', color: 'var(--text-primary)', margin: '0 auto', maxWidth: '768px', letterSpacing: '-0.03em' }}>
-              Watch Together,
+            <h1 style={{ fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: '1.15', fontWeight: '800', color: 'var(--text-primary)', margin: '0 auto', maxWidth: '768px', letterSpacing: '-0.03em' }}>
+              Distance means nothing
               <br />
-              <span className="text-gradient-primary">Feel Together</span>
+              <span className="text-gradient-primary">when you watch together.</span>
             </h1>
             
             <p style={{ fontSize: '18px', lineHeight: '28px', color: 'var(--text-tertiary)', maxWidth: '672px', margin: '0 auto' }}>
-              Distance means nothing when you watch together.
+              Connect in seconds. No accounts required for guests—just send a link and sync your hearts.
             </p>
             
             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '24px' }}>
               <button 
                 onClick={() => setIsModalOpen(true)}
-                className="soft-glow-primary"
+                className="btn btn-primary"
                 style={{ 
-                  padding: '16px 40px', backgroundColor: 'var(--accent-primary)', color: '#fff',
-                  borderRadius: '9999px', border: 'none', fontSize: '18px', fontWeight: '600',
-                  cursor: 'pointer', transition: 'all 0.3s ease'
+                  padding: '0 40px', minHeight: '56px', fontSize: '1.05rem', borderRadius: 'var(--radius-md)'
                 }}
               >
                 Create Private Room
               </button>
               <button 
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                className="btn btn-secondary"
                 style={{ 
-                  padding: '16px 40px', backgroundColor: 'rgba(62,78,44,0.2)', color: 'var(--text-primary)',
-                  border: '1px solid var(--border-medium)', borderRadius: '9999px', 
-                  fontSize: '18px', fontWeight: '600', cursor: 'pointer', backdropFilter: 'blur(12px)'
+                  padding: '0 40px', minHeight: '56px', fontSize: '1.05rem', borderRadius: 'var(--radius-md)'
                 }}
               >
-                How it works
+                Explore Features
               </button>
             </div>
 
@@ -184,34 +196,41 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-            {/* Feature 1 */}
-            <div className="glass-card" style={{ padding: '40px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', transition: 'border-color 0.5s' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: 'var(--accent-primary-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px' }}>
-                <span className="material-symbols-outlined" style={{ color: 'var(--accent-primary)', fontSize: '36px' }}>sync</span>
+            {[
+              {
+                icon: 'sync',
+                color: 'var(--accent-primary)',
+                bg: 'var(--accent-primary-dim)',
+                title: 'Synced Playback',
+                desc: 'Millisecond-perfect synchronization. When you pause to grab popcorn, they pause too. No more "one, two, three, play!" countdowns.'
+              },
+              {
+                icon: 'favorite',
+                color: 'var(--accent-cyan)',
+                bg: 'rgba(117,137,86,0.15)',
+                title: 'Private Date Rooms',
+                desc: 'Invite-only sanctuaries with custom atmospheric backgrounds. A safe, secure space for just the two of you.'
+              },
+              {
+                icon: 'chat_bubble',
+                color: 'var(--accent-primary)',
+                bg: 'var(--accent-primary-dim)',
+                title: 'Real-time Reactions',
+                desc: 'Express yourself with glowing glass-style chat bubbles and synchronized emoji reactions that burst with color across the screen.'
+              }
+            ].map((feature, i) => (
+              <div key={i} className="glass-card" style={{ padding: '40px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', transition: 'border-color 0.5s' }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: feature.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px' }}>
+                  <span className="material-symbols-outlined" style={{ color: feature.color, fontSize: '36px' }}>{feature.icon}</span>
+                </div>
+                <h3 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>{feature.title}</h3>
+                <p style={{ fontSize: '16px', color: 'var(--text-tertiary)' }}>{feature.desc}</p>
               </div>
-              <h3 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Synced Playback</h3>
-              <p style={{ fontSize: '16px', color: 'var(--text-tertiary)' }}>Millisecond-perfect synchronization. When you pause to grab popcorn, they pause too. No more "one, two, three, play!" countdowns.</p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="glass-card" style={{ padding: '40px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', transition: 'border-color 0.5s' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: 'rgba(117,137,86,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px' }}>
-                <span className="material-symbols-outlined" style={{ color: 'var(--accent-cyan)', fontSize: '36px' }}>favorite</span>
-              </div>
-              <h3 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Private Date Rooms</h3>
-              <p style={{ fontSize: '16px', color: 'var(--text-tertiary)' }}>Invite-only sanctuaries with custom atmospheric backgrounds. A safe, secure space for just the two of you.</p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="glass-card" style={{ padding: '40px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', transition: 'border-color 0.5s' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: 'var(--accent-primary-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px' }}>
-                <span className="material-symbols-outlined" style={{ color: 'var(--accent-primary)', fontSize: '36px' }}>chat_bubble</span>
-              </div>
-              <h3 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>Real-time Reactions</h3>
-              <p style={{ fontSize: '16px', color: 'var(--text-tertiary)' }}>Express yourself with glowing glass-style chat bubbles and synchronized emoji reactions that burst with color across the screen.</p>
-            </div>
+            ))}
           </div>
         </section>
+
+
 
         {/* 4. Quote Section (About) */}
         <section id="about" style={{ position: 'relative', padding: '128px 20px', overflow: 'hidden' }}>
@@ -259,18 +278,13 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
               <button 
                 onClick={() => setIsModalOpen(true)}
-                className="soft-glow-primary"
+                className="btn btn-primary"
                 style={{ 
-                  padding: '20px 48px', backgroundColor: 'var(--accent-primary)', color: '#fff',
-                  borderRadius: '9999px', border: 'none', fontSize: '20px', fontWeight: '600',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px',
-                  transition: 'transform 0.2s ease'
+                  padding: '0 48px', minHeight: '56px', fontSize: '1.1rem', borderRadius: 'var(--radius-md)'
                 }}
-                onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-                onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
                 Create Your Room
-                <span className="material-symbols-outlined">arrow_forward</span>
+                <span className="material-symbols-outlined" style={{ marginLeft: '8px' }}>arrow_forward</span>
               </button>
               <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: '500' }}>Free for everyone. High fidelity for couples.</p>
             </div>

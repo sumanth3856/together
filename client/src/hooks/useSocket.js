@@ -48,23 +48,36 @@ function clearSession() {
 let globalSocket = null;
 let activeSessionObj = null;
 
-// Attempt rejoin with retry logic
+const executeJoin = (socket, roomId, userId, nickname, avatar, retriesLeft) => {
+  return new Promise((resolve, reject) => {
+    socket.emit('join_room', { roomId, userId, nickname, avatar }, (response) => {
+      if (response.success) {
+        useRoomStore.getState().setRoomState(response.roomState);
+        activeSessionObj = { roomId, userId, nickname, avatar };
+        saveSession(roomId, userId, nickname, avatar);
+        resolve(response.roomState);
+      } else if (response.error === 'Room not found' && retriesLeft > 0) {
+        setTimeout(() => {
+          executeJoin(socket, roomId, userId, nickname, avatar, retriesLeft - 1)
+            .then(resolve)
+            .catch(reject);
+        }, 2000);
+      } else {
+        reject(response.error || 'Failed to join');
+      }
+    });
+  });
+};
+
 const attemptRejoin = (socket, roomId, userId, nickname, avatar, retriesLeft = 4) => {
-  socket.emit('join_room', { roomId, userId, nickname, avatar }, (response) => {
-    if (response.success) {
-      useRoomStore.getState().setRoomState(response.roomState);
-      activeSessionObj = { roomId, userId, nickname, avatar };
-      saveSession(roomId, userId, nickname, avatar);
-      useRoomStore.getState().setIsReconnecting(false);
-    } else if (response.error === 'Room not found' && retriesLeft > 0) {
-      setTimeout(() => attemptRejoin(socket, roomId, userId, nickname, avatar, retriesLeft - 1), 2000);
-    } else {
+  executeJoin(socket, roomId, userId, nickname, avatar, retriesLeft)
+    .then(() => useRoomStore.getState().setIsReconnecting(false))
+    .catch(() => {
       clearSession();
       activeSessionObj = null;
       useRoomStore.getState().setIsReconnecting(false);
       useRoomStore.getState().setRoomState(null);
-    }
-  });
+    });
 };
 
 export function useSocket() {
@@ -170,24 +183,8 @@ export function useSocket() {
   }, []);
 
   const joinRoom = useCallback((roomId, userId, nickname, avatar) => {
-    return new Promise((resolve, reject) => {
-      if (!globalSocket) return reject('Socket not connected');
-      const attempt = (retriesLeft) => {
-        globalSocket.emit('join_room', { roomId, userId, nickname, avatar }, (response) => {
-          if (response.success) {
-            useRoomStore.getState().setRoomState(response.roomState);
-            activeSessionObj = { roomId, userId, nickname, avatar };
-            saveSession(roomId, userId, nickname, avatar);
-            resolve(response.roomState);
-          } else if (response.error === 'Room not found' && retriesLeft > 0) {
-            setTimeout(() => attempt(retriesLeft - 1), 2000);
-          } else {
-            reject(response.error);
-          }
-        });
-      };
-      attempt(3);
-    });
+    if (!globalSocket) return Promise.reject('Socket not connected');
+    return executeJoin(globalSocket, roomId, userId, nickname, avatar, 3);
   }, []);
 
   const leaveRoom = useCallback(() => {
