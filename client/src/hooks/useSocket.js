@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useRoomStore } from '../store/useRoomStore';
 import { useUIStore } from '../store/useUIStore';
+import { supabase } from '../lib/supabase';
 
 const getSocketUrl = () => {
   if (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL) {
@@ -82,15 +83,21 @@ const attemptRejoin = (socket, roomId, userId, nickname, avatar, retriesLeft = 4
 
 export function useSocket() {
   useEffect(() => {
-    if (!globalSocket && typeof window !== 'undefined') {
-      const socket = io(getSocketUrl(), {
-        transports: ['polling', 'websocket'],
-        reconnection: true,
-        reconnectionAttempts: 15,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
-      });
+    const initSocket = async () => {
+      if (!globalSocket && typeof window !== 'undefined') {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        const socket = io(getSocketUrl(), {
+          transports: ['polling', 'websocket'],
+          reconnection: true,
+          reconnectionAttempts: 15,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          timeout: 20000,
+          auth: {
+            token: session?.access_token || null
+          }
+        });
 
       globalSocket = socket;
 
@@ -100,8 +107,7 @@ export function useSocket() {
         useRoomStore.getState().setIsConnected(true);
 
         const session = activeSessionObj || loadSession();
-        const currentRoomState = useRoomStore.getState().roomState;
-        if (session && !currentRoomState) {
+        if (session) {
           console.log('🔄 Auto-rejoining room:', session.roomId);
           useRoomStore.getState().setIsReconnecting(true);
           attemptRejoin(socket, session.roomId, session.userId, session.nickname, session.avatar);
@@ -153,22 +159,27 @@ export function useSocket() {
       socket.on('kicked_from_room', () => {
         clearSession();
         activeSessionObj = null;
-        useRoomStore.getState().setSessionEnded(true);
         useRoomStore.getState().setRoomState(null);
-        useRoomStore.getState().setIsReconnecting(false);
-        useUIStore.getState().setToastNotification({ type: 'error', message: 'You have been kicked from the room.' });
+        useUIStore.getState().setToastNotification({ type: 'error', message: 'You have been removed from the room.' });
+        window.location.href = '/';
       });
 
       socket.on('chat_received', (message) => {
         useRoomStore.getState().updateChatHistory(message);
       });
     }
+  };
+
+  initSocket();
+
+  // Do NOT disconnect on unmount in this architecture, as we want the socket 
+  // to persist across page navigations within the React tree.
   }, []);
 
-  const createRoom = useCallback((userId, nickname, avatar) => {
+  const createRoom = useCallback((userId, nickname, avatar, roomName, mood) => {
     return new Promise((resolve, reject) => {
       if (!globalSocket) return reject('Socket not connected');
-      globalSocket.emit('create_room', { userId, nickname, avatar }, (response) => {
+      globalSocket.emit('create_room', { userId, nickname, avatar, roomName, mood }, (response) => {
         if (response.success) {
           useRoomStore.getState().setRoomState(response.roomState);
           const roomId = response.roomState.roomId;

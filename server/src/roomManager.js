@@ -4,21 +4,21 @@ export const rooms = new Map();
 // Track disconnected users awaiting reconnect: userId -> { roomId, timer }
 const pendingReconnects = new Map();
 
-// Helper to generate readable random room ID (e.g. TOG-8492)
+// Helper to generate a 6-digit room code
 function generateRoomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const chars = '0123456789';
   let code = '';
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return `TOG-${code}`;
+  return code;
 }
 
 // Grace period before a disconnected host/member's room is deleted (30 seconds)
 const RECONNECT_GRACE_MS = 30000;
 
 export const RoomManager = {
-  createRoom(hostUserId, hostSocketId, hostNickname, hostAvatar) {
+  createRoom(hostUserId, hostSocketId, hostNickname, hostAvatar, roomName, mood) {
     const roomId = generateRoomCode();
     const hostUser = {
       userId: hostUserId || hostSocketId, // Fallback for backwards compatibility if needed
@@ -34,7 +34,9 @@ export const RoomManager = {
       currentVideo: {},
       videoQueue: [],
       settings: {
-        allowMemberControls: true
+        allowMemberControls: true,
+        roomName: roomName || `${hostNickname || 'Guest'}'s Watch Party`,
+        mood: mood || 'cosy'
       },
       playback: {
         isPlaying: false,
@@ -60,17 +62,8 @@ export const RoomManager = {
 
   getRoom(roomId) {
     if (!roomId) return null;
-    // Strip everything except letters, numbers, and dashes
-    let normalized = roomId.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
-
-    // Add prefix if they just typed the 4-character code
-    if (normalized.length === 4) {
-      normalized = `TOG-${normalized}`;
-    }
-    // Add dash if they typed TOG1234 instead of TOG-1234
-    else if (normalized.length === 7 && normalized.startsWith('TOG') && !normalized.includes('-')) {
-      normalized = `TOG-${normalized.substring(3)}`;
-    }
+    // Strip everything except letters and numbers
+    const normalized = roomId.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
     return rooms.get(normalized) || null;
   },

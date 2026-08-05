@@ -1,7 +1,6 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { Play, Pause, Signal, Volume2, VolumeX, Lock } from 'lucide-react';
 
-// Hoisted: module-level helper — not re-created on every render
 const formatTime = (secs) => {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
@@ -20,92 +19,96 @@ export const PlaybackControls = memo(function PlaybackControls({
   onMuteToggle,
   locked = false
 }) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragValue, setDragValue] = useState(0);
+
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div style={{
-      marginTop: '16px',
-      padding: '12px 24px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-      background: 'var(--bg-surface)',
-      borderRadius: '30px',
-      boxShadow: 'var(--shadow-md), 0 0 0 1px var(--border-subtle)',
-      width: '100%',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+    <div className="mt-4 p-4 md:px-6 bg-surface-container rounded-3xl border border-outline-variant w-full flex flex-col gap-3 shadow-md ambient-shadow">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         
         {/* Left: Sync Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: locked ? 'var(--status-warning)' : 'var(--status-success)', fontWeight: '600' }}>
-            {locked ? <Lock size={14} color="var(--status-warning)" /> : <Signal size={14} color="var(--status-success)" />}
-            <span className="hide-on-small">{locked ? 'Host Only' : 'Synced'}</span>
+        <div className="flex items-center gap-2 flex-1">
+          <div className={`flex items-center gap-1.5 font-label-sm ${locked ? 'text-on-surface-variant' : 'text-primary'}`}>
+            {locked ? <Lock size={14} /> : <span className="material-symbols-outlined text-[16px] fill-1">bolt</span>}
+            <span className="hidden sm:inline tracking-wide uppercase">{locked ? 'Host Only' : 'Synced'}</span>
           </div>
         </div>
 
         {/* Center: Play/Pause */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="flex items-center justify-center">
           <button
-            className="btn btn-primary"
             onClick={onManualPlayPause}
             disabled={locked}
-            style={{
-              width: '44px', height: '44px', borderRadius: '50%',
-              padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(1,69,242,0.3)', background: locked ? 'var(--text-muted)' : 'var(--accent-primary)',
-              opacity: locked ? 0.6 : 1, cursor: locked ? 'not-allowed' : 'pointer'
-            }}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md ${locked ? 'bg-surface-container-highest text-on-surface-variant cursor-not-allowed opacity-60' : 'bg-primary text-on-primary hover:bg-surface-tint hover:shadow-lg hover:-translate-y-0.5'}`}
             title={locked ? 'Controls locked by host' : (localPlaying ? 'Pause (Space)' : 'Play (Space)')}
           >
-            {localPlaying ? <Pause size={20} color="#fff" /> : <Play size={20} color="#fff" style={{ marginLeft: '2px' }} />}
+            {localPlaying ? <span className="material-symbols-outlined fill-1 text-[24px]">pause</span> : <span className="material-symbols-outlined fill-1 text-[24px]">play_arrow</span>}
           </button>
         </div>
 
         {/* Right: Volume */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flex: 1 }}>
+        <div className="flex items-center justify-end gap-2 flex-1">
           <button
             onClick={onMuteToggle}
-            className="btn btn-ghost"
-            style={{ padding: '6px', borderRadius: '50%' }}
+            className="p-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-background"
             title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
           >
             {isMuted || volume === 0
-              ? <VolumeX size={18} color="var(--status-danger)" />
-              : <Volume2 size={18} color="var(--text-secondary)" />}
+              ? <span className="material-symbols-outlined text-[20px] text-error">volume_off</span>
+              : <span className="material-symbols-outlined text-[20px]">volume_up</span>}
           </button>
           <input
             type="range" min={0} max={100}
             value={isMuted ? 0 : volume}
             onChange={onVolumeChange}
-            style={{ width: '80px', height: '4px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+            className="w-20 h-1.5 bg-outline-variant rounded-full appearance-none outline-none cursor-pointer accent-primary"
           />
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', minWidth: '40px', fontWeight: '500' }}>
-          {formatTime(currentTime)}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-label-sm text-on-surface-variant w-10 text-right tabular-nums">
+          {formatTime(isDragging ? dragValue : currentTime)}
         </span>
-        <div className="timeline-slider-container">
-          <div className="timeline-slider-track" />
-          <div className="timeline-slider-progress" style={{ width: `${progressPercent}%` }} />
+        <div 
+          className="relative flex-1 h-2 bg-outline-variant rounded-full cursor-pointer flex items-center group transition-all"
+        >
+          <div 
+            className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-100 ease-linear pointer-events-none" 
+            style={{ width: `${isDragging ? (dragValue / (duration || 1)) * 100 : progressPercent}%` }} 
+          />
+          {/* Custom Thumb */}
+          <div 
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-primary rounded-full shadow border-2 border-surface-container-lowest opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" 
+            style={{ left: `${isDragging ? (dragValue / (duration || 1)) * 100 : progressPercent}%` }} 
+          />
           <input
             type="range"
             min="0"
             max={duration || 100}
-            value={currentTime || 0}
-            onChange={onSeekChange}
-            disabled={locked}
-            className="timeline-slider"
-            style={{
-              cursor: locked ? 'not-allowed' : 'pointer',
-              opacity: locked ? 0.7 : 1
+            value={isDragging ? dragValue : (currentTime || 0)}
+            onMouseDown={() => setIsDragging(true)}
+            onTouchStart={() => setIsDragging(true)}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              setDragValue(val);
             }}
+            onMouseUp={(e) => {
+              setIsDragging(false);
+              onSeekChange(e);
+            }}
+            onTouchEnd={(e) => {
+              setIsDragging(false);
+              onSeekChange(e);
+            }}
+            disabled={locked}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
           />
         </div>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', minWidth: '40px', textAlign: 'right', fontWeight: '500' }}>
+        <span className="text-xs font-label-sm text-on-surface-variant w-10 tabular-nums">
           {formatTime(duration)}
         </span>
       </div>

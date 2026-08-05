@@ -1,22 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Home, LayoutGrid, Info, Mail } from 'lucide-react';
-import { JoinRoomModal } from '../room/JoinRoomModal';
-import { UserProfileModal } from '../profile/UserProfileModal';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
-import { UserAvatar } from '../common/UserAvatar';
+import { JoinRoomModal } from '../room/JoinRoomModal';
+import { CreateRoomModal } from '../room/CreateRoomModal';
+import { SignInModal } from '../room/SignInModal';
+import { UserProfileModal } from '../profile/UserProfileModal';
 
 export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
-  const [isModalOpen, setIsModalOpen] = useState(!!initialRoomId);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
+  const [activeModal, setActiveModal] = useState(initialRoomId ? 'join' : null);
 
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
 
-      const sections = ['home', 'features', 'about', 'contact'];
+      const sections = ['home', 'features', 'story'];
       let current = 'home';
       
       for (const section of sections) {
@@ -34,321 +33,248 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      const x = (e.clientX / window.innerWidth - 0.5) * 20;
-      const y = (e.clientY / window.innerHeight - 0.5) * 20;
-      const glows = document.querySelectorAll('.parallax-glow');
-      glows.forEach((glow, index) => {
-        const factor = (index + 1) * 0.5;
-        glow.style.transform = `translate(${x * factor}px, ${y * factor}px)`;
-      });
-    };
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
   return (
-    <div className="landing-bg" style={{ display: 'block', padding: '0', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+    <div className="bg-background text-on-background min-h-screen selection:bg-primary-container selection:text-on-primary font-body-md relative overflow-hidden">
       
-      {/* 1. Header */}
-      <header className={`glass-pill-nav ${scrolled ? 'scrolled' : ''}`}>
-        <nav style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          width: '100%'
-        }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', letterSpacing: '-0.02em', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            <span style={{ color: 'var(--accent-primary)' }}>Being Us</span>
-            <span style={{ color: 'var(--text-primary)' }}>.</span>
+      {/* Ambient background effect */}
+      <div className="absolute inset-0 ambient-bg pointer-events-none"></div>
+
+      {/* Top App Bar (Sticky) */}
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'glass-card border-b' : 'bg-transparent'}`}>
+        <div className="w-full px-6 md:px-12 h-20 flex items-center justify-between">
+          
+          <div className="flex items-center gap-2 cursor-pointer">
+            <span className="material-symbols-outlined text-primary text-3xl fill-1">play_circle</span>
+            <span className="font-display-lg text-2xl font-bold tracking-tight text-on-background">Being Us.</span>
           </div>
 
-          <div className="nav-links">
-            <button className={`nav-item ${activeSection === 'home' ? 'active' : ''}`} onClick={() => document.getElementById('home')?.scrollIntoView({ behavior: 'smooth' })}>
-              <Home size={16} />
-              <span>Home</span>
-            </button>
-            <button className={`nav-item ${activeSection === 'features' ? 'active' : ''}`} onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
-              <LayoutGrid size={16} />
-              <span>Features</span>
-            </button>
-            <button className={`nav-item ${activeSection === 'about' ? 'active' : ''}`} onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>
-              <Info size={16} />
-              <span>About</span>
-            </button>
-            <button className={`nav-item ${activeSection === 'contact' ? 'active' : ''}`} onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
-              <Mail size={16} />
-              <span>Contact</span>
-            </button>
-          </div>
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-8 font-label-lg">
+            <button onClick={() => document.getElementById('home')?.scrollIntoView({ behavior: 'smooth' })} className={`hover:text-primary transition-colors ${activeSection === 'home' ? 'text-primary' : 'text-on-surface-variant'}`}>Home</button>
+            <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className={`hover:text-primary transition-colors ${activeSection === 'features' ? 'text-primary' : 'text-on-surface-variant'}`}>Features</button>
+            <button onClick={() => document.getElementById('story')?.scrollIntoView({ behavior: 'smooth' })} className={`hover:text-primary transition-colors ${activeSection === 'story' ? 'text-primary' : 'text-on-surface-variant'}`}>Story</button>
+          </nav>
 
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <div className="flex items-center gap-4">
             {user ? (
               <button 
-                onClick={() => setIsProfileModalOpen(true)}
-                style={{ 
-                  backgroundColor: 'transparent', border: '1px solid var(--border-medium)', 
-                  color: 'var(--text-secondary)', padding: '8px 24px', borderRadius: '9999px',
-                  fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px'
-                }}
+                onClick={() => setActiveModal('profile')}
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-outline hover:bg-surface-container transition-colors"
               >
-                <UserAvatar user={user} size={20} />
-                {user.user_metadata?.full_name || 'My Profile'}
+                <span className="material-symbols-outlined text-primary">person</span>
+                <span className="font-label-sm font-semibold">{user.user_metadata?.full_name || 'My Profile'}</span>
               </button>
             ) : (
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                style={{ 
-                  backgroundColor: 'var(--accent-primary)', border: 'none', 
-                  color: '#fff', padding: '8px 24px', borderRadius: '9999px',
-                  fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-                  transition: 'background 0.3s'
-                }}
-              >
+              <button onClick={() => setActiveModal('signin')} className="hidden md:block font-label-lg text-primary hover:text-on-primary-fixed-variant transition-colors">
                 Sign In
               </button>
             )}
+            <button onClick={() => setActiveModal('create')} className="bg-primary text-on-primary px-6 py-2.5 rounded-full font-label-lg hover:bg-surface-tint transition-all shadow-md hover:shadow-lg flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px]">add</span>
+              Create Room
+            </button>
           </div>
-        </nav>
+        </div>
       </header>
 
-      <main id="home">
-        {/* 2. Hero Section */}
-        <section style={{
-          position: 'relative', minHeight: '90vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden', padding: '0 20px'
-        }}>
-          {/* Atmospheric Shaders */}
-          <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top right, var(--bg-primary), rgba(26,33,19,0.3), rgba(142,87,69,0.05))' }}></div>
-            <div className="parallax-glow" style={{ position: 'absolute', top: '25%', left: '25%', width: '384px', height: '384px', background: 'rgba(142,87,69,0.05)', borderRadius: '50%', filter: 'blur(120px)' }}></div>
-            <div className="parallax-glow" style={{ position: 'absolute', bottom: '25%', right: '25%', width: '384px', height: '384px', background: 'rgba(117,137,86,0.05)', borderRadius: '50%', filter: 'blur(120px)' }}></div>
-          </div>
+      {/* Main Content */}
+      <main>
+        {/* Hero Section */}
+        <section id="home" className="pt-40 pb-20 md:pt-48 md:pb-32 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto relative z-10 flex flex-col items-center text-center">
           
-          <div style={{ position: 'relative', zIndex: 10, maxWidth: '896px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <img 
-                src="https://lh3.googleusercontent.com/aida/AP1WRLt_dupsMi6ScGVyQEnvX2C8yVrlAHuozZ_Y4z3Wzb6VBaY7pxwp9PYJD-uwzJkYQPj8uevcqLsS3G_2gY1WbrOynGe-RWT_Zu_LZHqhH6t95rECGo9lEAKt8o60acf08DPzTDJrym_B5eeYTh9K_ZRzXpovpE_UyTIw8ms-GnF1n9CNiAvzGqJthqV7bOw18ERzHPdRWh8GW7ph-UsnAk8wcbvxxJlMjjGbRD-rOYHogk08z56zmjCk3d4"
-                alt=""
-                style={{ height: '128px', filter: 'sepia(0.3) drop-shadow(0 0 30px rgba(142,87,69,0.3))' }}
-              />
-            </div>
-            
-            <h1 style={{ fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: '1.15', fontWeight: '800', color: 'var(--text-primary)', margin: '0 auto', maxWidth: '768px', letterSpacing: '-0.03em' }}>
-              Distance means nothing
-              <br />
-              <span className="text-gradient-primary">when you watch together.</span>
-            </h1>
-            
-            <p style={{ fontSize: '18px', lineHeight: '28px', color: 'var(--text-tertiary)', maxWidth: '672px', margin: '0 auto' }}>
-              Connect in seconds. No accounts required for guests—just send a link and sync your hearts.
-            </p>
-            
-            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '24px' }}>
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="btn btn-primary"
-                style={{ 
-                  padding: '0 40px', minHeight: '56px', fontSize: '1.05rem', borderRadius: 'var(--radius-md)'
-                }}
-              >
-                Create Private Room
-              </button>
-              <button 
-                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-                className="btn btn-secondary"
-                style={{ 
-                  padding: '0 40px', minHeight: '56px', fontSize: '1.05rem', borderRadius: 'var(--radius-md)'
-                }}
-              >
-                Explore Features
-              </button>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-error-container text-on-error-container font-label-sm mb-8 animate-fade-in-up">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+            Now supporting 4K sync
+          </div>
+
+          <h1 className="font-display-lg text-5xl md:text-7xl lg:text-[80px] leading-[1.1] mb-6 text-on-background animate-fade-in-up delay-100 max-w-4xl">
+            Distance means nothing when you <span className="font-display-accent italic text-primary">watch together.</span>
+          </h1>
+
+          <p className="font-body-lg text-on-surface-variant max-w-2xl mx-auto mb-12 animate-fade-in-up delay-200">
+            A premium, synchronized viewing experience for you and the people who matter most. 
+            No buffering delays, no countdowns. Just perfect harmony.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 animate-fade-in-up delay-300 w-full sm:w-auto">
+            <button onClick={() => setActiveModal('create')} className="bg-primary text-on-primary px-8 py-4 rounded-full font-label-lg hover:bg-surface-tint transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
+              <span className="material-symbols-outlined text-[24px]">add</span>
+              Start Watching Now
+            </button>
+            <button onClick={() => setActiveModal('join')} className="bg-surface text-on-surface px-8 py-4 rounded-full font-label-lg hover:bg-surface-container-high transition-all shadow-md border border-outline-variant flex items-center gap-2 w-full sm:w-auto">
+              <span className="material-symbols-outlined">meeting_room</span>
+              Join a Room
+            </button>
+          </div>
+
+          {/* Abstract Hero Image/Graphic Placeholder */}
+          <div className="mt-20 w-full max-w-5xl aspect-video rounded-3xl overflow-hidden shadow-2xl relative animate-fade-in-up delay-300 border border-outline-variant bg-surface-container-lowest">
+             <div className="absolute inset-0 flex items-center justify-center flex-col gap-4">
+                 <span className="material-symbols-outlined text-[80px] text-primary opacity-20">play_circle</span>
+                 <p className="font-label-sm text-on-surface-variant uppercase tracking-widest opacity-50">Video Player Interface Preview</p>
+             </div>
+             {/* Decorative UI elements for the placeholder */}
+             <div className="absolute bottom-6 left-6 right-6 h-12 glass-card rounded-xl flex items-center px-4 gap-4 opacity-80">
+                 <div className="w-8 h-8 rounded-full bg-primary opacity-20"></div>
+                 <div className="h-2 bg-on-surface opacity-10 rounded-full flex-1"></div>
+             </div>
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <section id="features" className="py-24 bg-surface-container-lowest relative z-10">
+          <div className="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop">
+            <div className="text-center mb-16">
+              <h2 className="font-headline-lg text-4xl md:text-5xl mb-4 text-on-background">Designed for Closeness</h2>
+              <p className="font-body-lg text-on-surface-variant max-w-2xl mx-auto">Every detail crafted to make you feel like you're sitting on the same couch.</p>
             </div>
 
-            {/* Social Proof */}
-            <div style={{ marginTop: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-              <div style={{ display: 'flex', position: 'relative' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid var(--bg-primary)', overflow: 'hidden' }}>
-                  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBA91FyNsAYr7wlSub9Ul1Xcy37P8fKJkxOBdcoKSg0lxhQzegAspUMxx4Nq60DGgJEoVgOVRR9Fnpui32lwqgrtZk2sOcmHlunUOox7lYTK7TmltAeDSmnJVDZsAbgwjlgMH3WBQbUCVwTD9Iuk2Q0ZDt03sulekiETHCSNftl0gn5u6yPZK4zFNJjLbeIFQjxa6-lyRQn4e9wt3GzMRMn1dTcVHuwuYIxsFtol_eiNnwUSFRn66jC" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(0.2)' }}/>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Feature 1 */}
+              <div className="p-8 rounded-3xl bg-surface hover:bg-surface-container transition-colors border border-outline-variant group">
+                <div className="w-14 h-14 rounded-2xl bg-error-container text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <span className="material-symbols-outlined text-[28px]">bolt</span>
                 </div>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid var(--bg-primary)', overflow: 'hidden', marginLeft: '-16px' }}>
-                  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBraHQANKaF3awYofGS60CsoVIOAaYZgmj4J5I-q3vB9wQc31ETUYVzBWc0CWjVfgIgxSHIgHiPVqUE1kBCZfd2JfJw7RvYI7n5FjmNNwiivoXRvpY1SQI5cR-Tq8z0ijs41TvS30IA4wCL0sueX_KEKhlLBLCAskd3THxYmfmz6oToxxWWS6u0z3KXlc_BccfTlgHCf25ITJaLptnMy_rfuwaXsSMLp--e1ZdgsGj_af9s5VRTu37j" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(0.2)' }}/>
-                </div>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid var(--bg-primary)', backgroundColor: 'var(--accent-primary-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)', fontSize: '12px', fontWeight: 'bold', marginLeft: '-16px', backdropFilter: 'blur(4px)' }}>
-                  +
-                </div>
+                <h3 className="font-headline-md text-2xl mb-3">Frame-Perfect Sync</h3>
+                <p className="font-body-md text-on-surface-variant">
+                  Our proprietary sync engine ensures you both laugh at the exact same moment. No more "wait, where are you at?"
+                </p>
               </div>
-              <p style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>
-                <span className="pulse-indicator" style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent-primary)', marginRight: '8px' }}></span>
-                <span style={{ color: 'var(--accent-primary)', fontWeight: 'bold', marginRight: '4px' }}>1,240</span> couples connected right now
-              </p>
-            </div>
-          </div>
-        </section>
 
-        {/* 3. Features Section */}
-        <section id="features" style={{ padding: '96px 20px', maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '64px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h2 style={{ fontSize: '40px', fontWeight: '700', color: 'var(--text-primary)' }}>Designed for Digital Intimacy</h2>
-            <p style={{ fontSize: '16px', color: 'var(--text-tertiary)', maxWidth: '576px', margin: '0 auto' }}>
-              Every pixel is tuned to bring you closer, eliminating the tech friction between you and your partner.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-            {[
-              {
-                icon: 'sync',
-                color: 'var(--accent-primary)',
-                bg: 'var(--accent-primary-dim)',
-                title: 'Synced Playback',
-                desc: 'Millisecond-perfect synchronization. When you pause to grab popcorn, they pause too. No more "one, two, three, play!" countdowns.'
-              },
-              {
-                icon: 'favorite',
-                color: 'var(--accent-cyan)',
-                bg: 'rgba(117,137,86,0.15)',
-                title: 'Private Date Rooms',
-                desc: 'Invite-only sanctuaries with custom atmospheric backgrounds. A safe, secure space for just the two of you.'
-              },
-              {
-                icon: 'chat_bubble',
-                color: 'var(--accent-primary)',
-                bg: 'var(--accent-primary-dim)',
-                title: 'Real-time Reactions',
-                desc: 'Express yourself with glowing glass-style chat bubbles and synchronized emoji reactions that burst with color across the screen.'
-              }
-            ].map((feature, i) => (
-              <div key={i} className="glass-card" style={{ padding: '40px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', transition: 'border-color 0.5s' }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: feature.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px' }}>
-                  <span className="material-symbols-outlined" style={{ color: feature.color, fontSize: '36px' }}>{feature.icon}</span>
+              {/* Feature 2 */}
+              <div className="p-8 rounded-3xl bg-surface hover:bg-surface-container transition-colors border border-outline-variant group">
+                <div className="w-14 h-14 rounded-2xl bg-error-container text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <span className="material-symbols-outlined text-[28px]">chat_bubble</span>
                 </div>
-                <h3 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '16px' }}>{feature.title}</h3>
-                <p style={{ fontSize: '16px', color: 'var(--text-tertiary)' }}>{feature.desc}</p>
+                <h3 className="font-headline-md text-2xl mb-3">Moments in Time</h3>
+                <p className="font-body-md text-on-surface-variant">
+                  Chats are pinned to the video timeline. Relive the exact reactions when you rewatch your favorite scenes.
+                </p>
               </div>
-            ))}
-          </div>
-        </section>
 
-
-
-        {/* 4. Quote Section (About) */}
-        <section id="about" style={{ position: 'relative', padding: '128px 20px', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(142,87,69,0.05)', filter: 'blur(120px)', zIndex: 0 }}></div>
-          <div style={{ maxWidth: '896px', margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 10 }}>
-            <span className="material-symbols-outlined" style={{ color: 'rgba(142,87,69,0.4)', fontSize: '60px', marginBottom: '32px', userSelect: 'none' }}>format_quote</span>
-            <blockquote style={{ fontSize: 'clamp(24px, 4vw, 36px)', fontStyle: 'italic', color: 'rgba(240,242,235,0.9)', lineHeight: '1.6', marginBottom: '32px' }}>
-              "Intimacy isn't about being in the same room; it's about being in the same moment. Being Us turns a lonely YouTube link into a shared memory."
-            </blockquote>
-            <cite style={{ fontSize: '14px', fontWeight: '600', color: 'var(--accent-primary)', letterSpacing: '0.2em', textTransform: 'uppercase', fontStyle: 'normal' }}>
-              — THE ART OF CONNECTING
-            </cite>
-          </div>
-        </section>
-
-        {/* 5. Aesthetic Bento Break */}
-        <section style={{ paddingBottom: '128px', maxWidth: '1200px', margin: '0 auto', padding: '0 20px 128px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '48px', alignItems: 'center' }}>
-            <div className="glass-card" style={{ borderRadius: '12px', overflow: 'hidden', aspectRatio: '16/9', position: 'relative' }}>
-              <img 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3Z605NiKh7Q5UYAnNI_8dTjB14YwsZiyAfftBPRC2B0_b_wqyxpMeHl9uWMk3hQdsL7MyjAd12nFWXRntNnBvx0WlHInapQIxQ3sb6PC4D-uEvTRhYu0hAmca7owjl404wT1rs50IkbpTf3vk0FkUhUAknrGWOBBMQ4r2_ANFjw8B2ON02QorEt77l84TjqZ_ScPfwMfYPjyY7ej5trUbl6l_2pugzEAjFHeq6NXsuy5GQJsCBCEB"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'sepia(0.2)' }}
-              />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, var(--bg-primary), transparent)', opacity: 0.4 }}></div>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <span style={{ color: 'var(--accent-cyan)', fontSize: '14px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '2px' }}>Earthy Cinema</span>
-              <h2 style={{ fontSize: '40px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.2' }}>Cinema-Grade Aesthetics, Living Room Comfort</h2>
-              <p style={{ fontSize: '18px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
-                We believe the interface should disappear during a movie. Our "Warm Organic" design uses deep earthy tones and soft rust accents to ensure your content is the star, while keeping the UI accessible with a simple glance.
-              </p>
+              {/* Feature 3 */}
+              <div className="p-8 rounded-3xl bg-surface hover:bg-surface-container transition-colors border border-outline-variant group">
+                <div className="w-14 h-14 rounded-2xl bg-error-container text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <span className="material-symbols-outlined text-[28px]">chair</span>
+                </div>
+                <h3 className="font-headline-md text-2xl mb-3">Theater Moods</h3>
+                <p className="font-body-md text-on-surface-variant">
+                  Set the perfect vibe. From a cozy starlit cabin to a classic cinema, change the room's atmosphere instantly.
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* 6. CTA Section */}
-        <section style={{ padding: '96px 20px', backgroundColor: 'rgba(30,30,20,0.5)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', bottom: 0, right: 0, width: '384px', height: '384px', backgroundColor: 'rgba(142,87,69,0.1)', borderRadius: '50%', filter: 'blur(120px)' }}></div>
-          
-          <div style={{ maxWidth: '896px', margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '40px' }}>
-            <h2 style={{ fontSize: 'clamp(40px, 5vw, 64px)', fontWeight: '800', color: 'var(--text-primary)' }}>Ready to start your next movie night?</h2>
-            <p style={{ fontSize: '18px', color: 'var(--text-tertiary)' }}>Connect in seconds. No accounts required for guests—just send a link and sync your hearts.</p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="btn btn-primary"
-                style={{ 
-                  padding: '0 48px', minHeight: '56px', fontSize: '1.1rem', borderRadius: 'var(--radius-md)'
-                }}
-              >
-                Create Your Room
-                <span className="material-symbols-outlined" style={{ marginLeft: '8px' }}>arrow_forward</span>
-              </button>
-              <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: '500' }}>Free for everyone. High fidelity for couples.</p>
+        {/* Visual Storytelling Section */}
+        <section id="story" className="py-24 relative z-10 overflow-hidden">
+            <div className="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex flex-col md:flex-row items-center gap-16">
+                <div className="flex-1 space-y-6">
+                    <h2 className="font-headline-lg text-4xl md:text-5xl leading-tight text-on-background">
+                        Because shared experiences <br/><span className="font-display-accent italic text-primary">are better experiences.</span>
+                    </h2>
+                    <p className="font-body-lg text-on-surface-variant">
+                        We built Being Us not just to watch videos, but to connect. Whether it's the season finale, a nostalgia trip, or learning something new together — do it in a space designed for you.
+                    </p>
+                    <ul className="space-y-4 pt-4">
+                        <li className="flex items-center gap-3 font-body-md text-on-background">
+                            <span className="material-symbols-outlined text-primary fill-1">check_circle</span>
+                            Host controls who pauses and plays
+                        </li>
+                        <li className="flex items-center gap-3 font-body-md text-on-background">
+                            <span className="material-symbols-outlined text-primary fill-1">check_circle</span>
+                            Shared queue system for continuous watching
+                        </li>
+                        <li className="flex items-center gap-3 font-body-md text-on-background">
+                            <span className="material-symbols-outlined text-primary fill-1">check_circle</span>
+                            Crystal clear audio and video quality
+                        </li>
+                    </ul>
+                </div>
+                <div className="flex-1 relative">
+                    {/* Abstract compositional layout */}
+                    <div className="w-full aspect-square rounded-full bg-error-container absolute -top-10 -right-10 opacity-50 blur-3xl"></div>
+                    <div className="relative z-10 glass-card p-6 rounded-3xl shadow-xl flex flex-col gap-4 transform rotate-2 hover:rotate-0 transition-transform duration-500">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary font-label-lg">J</div>
+                            <div className="flex-1 bg-surface-container h-12 rounded-2xl flex items-center px-4 relative overflow-hidden">
+                                <span className="text-sm">Wait, did you see that?! 😂</span>
+                                <div className="absolute right-4 text-xs text-on-surface-variant">1:24:05</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4 flex-row-reverse">
+                            <div className="w-12 h-12 rounded-full border border-outline flex items-center justify-center text-primary font-label-lg">M</div>
+                            <div className="flex-1 bg-primary text-on-primary h-12 rounded-2xl flex items-center px-4 relative">
+                                <span className="text-sm">OMG yes! Rewinding 10s...</span>
+                                <div className="absolute right-4 text-xs opacity-70">1:24:12</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="py-24 bg-primary text-on-primary relative z-10">
+            <div className="max-w-4xl mx-auto px-margin-mobile text-center">
+                <h2 className="font-display-lg text-4xl md:text-6xl mb-6">Ready to hit play?</h2>
+                <p className="font-body-lg opacity-90 mb-10 max-w-xl mx-auto">Create your first room in seconds. No installation required. Invite friends with a simple 6-digit code.</p>
+                <button onClick={() => setActiveModal('create')} className="bg-on-primary text-primary px-10 py-5 rounded-full font-label-lg hover:bg-surface-bright transition-all shadow-xl hover:-translate-y-1 inline-flex items-center gap-3">
+                    <span className="material-symbols-outlined text-[24px]">movie</span>
+                    Create Your Room
+                </button>
+            </div>
         </section>
       </main>
 
-      {/* 7. Footer */}
-      <footer id="contact" style={{ backgroundColor: 'var(--bg-primary)', borderTop: '1px solid var(--border-subtle)', padding: '48px 20px', position: 'relative' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '48px', alignItems: 'start' }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent-primary)' }}>Being Us</div>
-            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>© 2026 Being Us. Cinema for the soul, together.</p>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Product</h4>
-            <a href="#" style={{ fontSize: '16px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Privacy Policy</a>
-            <a href="#" style={{ fontSize: '16px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Terms of Service</a>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resources</h4>
-            <a href="#" style={{ fontSize: '16px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Help Center</a>
-            <a href="#" style={{ fontSize: '16px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Community Blog</a>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Social</h4>
-            <div style={{ display: 'flex', gap: '24px' }}>
-              <a href="#" style={{ fontSize: '16px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Instagram</a>
-              <a href="#" style={{ fontSize: '16px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Twitter</a>
-            </div>
-            
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ backgroundColor: 'var(--bg-surface)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic', margin: '0 0 4px 0' }}>Status</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent-cyan)' }}></span>
-                  <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>All systems syncing</span>
-                </div>
+      {/* Footer */}
+      <footer className="bg-surface-container-lowest py-12 border-t border-outline-variant relative z-10">
+          <div className="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex flex-col md:flex-row justify-between items-center gap-6">
+              <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-2xl fill-1">play_circle</span>
+                  <span className="font-display-lg text-xl font-bold tracking-tight text-on-background">Being Us.</span>
               </div>
-            </div>
+              <p className="font-body-sm text-on-surface-variant">© 2026 Being Us. All rights reserved.</p>
+              <div className="flex gap-4">
+                  <a href="#" className="text-on-surface-variant hover:text-primary transition-colors font-label-sm">Privacy</a>
+                  <a href="#" className="text-on-surface-variant hover:text-primary transition-colors font-label-sm">Terms</a>
+                  <a href="#" className="text-on-surface-variant hover:text-primary transition-colors font-label-sm">Help</a>
+              </div>
           </div>
-
-        </div>
       </footer>
 
       {/* Modals */}
-      {isModalOpen && (
+      {activeModal === 'join' && (
         <JoinRoomModal 
-          initialRoomId={initialRoomId} 
-          onCreateRoom={onCreateRoom}
+          isOpen={true} 
+          onClose={() => setActiveModal(null)} 
           onJoinRoom={onJoinRoom}
-          onCancel={() => setIsModalOpen(false)}
+          initialRoomId={initialRoomId}
           user={user}
         />
       )}
 
-      {isProfileModalOpen && (
+      {activeModal === 'create' && (
+        <CreateRoomModal 
+          isOpen={true} 
+          onClose={() => setActiveModal(null)} 
+          onCreateRoom={onCreateRoom}
+          user={user}
+        />
+      )}
+
+      {activeModal === 'profile' && (
         <UserProfileModal 
+          isOpen={true} 
+          onClose={() => setActiveModal(null)} 
           user={user} 
-          onClose={() => setIsProfileModalOpen(false)} 
+        />
+      )}
+
+      {activeModal === 'signin' && (
+        <SignInModal 
+          isOpen={true} 
+          onClose={() => setActiveModal(null)} 
         />
       )}
     </div>

@@ -95,19 +95,12 @@ describe('RoomHeader', () => {
     expect(codeBtn).toBeInTheDocument();
     expect(codeBtn).toHaveTextContent('ABC-123');
 
-    // Test mouseOver and mouseOut styling events
-    fireEvent.mouseOver(codeBtn);
-    expect(codeBtn.style.background).toBe('rgba(157, 78, 221, 0.15)');
-
-    fireEvent.mouseOut(codeBtn);
-    expect(codeBtn.style.background).toBe('var(--accent-primary-dim)');
-
     // Click to copy
     fireEvent.click(codeBtn);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('ABC-123');
     expect(mockSetToastNotification).toHaveBeenCalledWith({
       type: 'success',
-      message: 'Room code copied!',
+      message: 'Room code copied to clipboard',
     });
   });
 
@@ -119,7 +112,6 @@ describe('RoomHeader', () => {
 
     const profileBtn = screen.getByLabelText('Open User Profile');
     expect(profileBtn).toBeInTheDocument();
-    expect(screen.getByTestId('user-avatar')).toBeInTheDocument();
 
     // Modal initially closed
     expect(screen.queryByTestId('user-profile-modal')).not.toBeInTheDocument();

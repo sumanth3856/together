@@ -1,6 +1,4 @@
 import React, { memo, useState } from 'react';
-import { UserCheck, Crown, MoreVertical } from 'lucide-react';
-import Avatar from 'boring-avatars';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useSocket } from '../../hooks/useSocket';
 
@@ -17,79 +15,56 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
   };
 
   return (
-    <div className="panel" style={{ marginTop: '14px', overflow: 'hidden' }}>
+    <div className="bg-surface-container rounded-3xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
       {/* Header */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: '1px solid var(--border-subtle)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'var(--bg-surface-2)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
-            background: 'var(--accent-primary-dim)', border: '1px solid rgba(1,69,242,0.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <UserCheck size={14} color="var(--accent-primary)" />
+      <div className="p-4 md:p-6 border-b border-outline-variant/50 flex items-center justify-between bg-surface-container-lowest">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-tertiary-container text-on-tertiary-container flex items-center justify-center shrink-0">
+             <span className="material-symbols-outlined text-[20px]">groups</span>
           </div>
-          <span style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--text-primary)' }}>Watching Together</span>
+          <span className="font-headline-md text-lg text-on-background">Watching Together</span>
         </div>
-        <span style={{
-          fontSize: '0.68rem', fontWeight: '600',
-          padding: '2px 8px',
-          borderRadius: 'var(--radius-full)',
-          background: 'rgba(16,185,129,0.1)',
-          border: '1px solid rgba(16,185,129,0.18)',
-          color: 'var(--status-success)'
-        }}>
+        <span className="bg-success/10 border border-success/20 text-success px-3 py-1 rounded-full font-label-sm text-[11px] uppercase tracking-wider">
           {members.length} online
         </span>
       </div>
 
       {/* Member List */}
-      <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div className="p-4 flex flex-col gap-2 overflow-y-auto custom-scrollbar max-h-[300px]">
         {members.map((m) => {
           const isYou = m.socketIds && m.socketIds.includes(currentSocketId);
           const isHost = m.userId === hostId;
           const iAmHost = members.find(mem => mem.socketIds?.includes(currentSocketId))?.userId === hostId;
+          const initial = m.nickname ? m.nickname.charAt(0).toUpperCase() : '?';
 
           return (
             <div
               key={m.userId}
-              className={`member-row${isYou ? ' you' : ''}`}
-              style={{ position: 'relative' }}
+              className={`flex items-center gap-4 p-3 rounded-2xl relative ${isYou ? 'bg-primary-container/20 border border-primary-container/50' : 'hover:bg-surface-container-high border border-transparent'} transition-colors`}
             >
               {/* Avatar */}
-              <div style={{ flexShrink: 0, marginTop: '2px' }}>
+              <div className="shrink-0">
                 {m.avatar ? (
-                  <img src={m.avatar} alt="Avatar" style={{ width: '34px', height: '34px', borderRadius: '50%' }} />
+                  <img src={m.avatar} alt="Avatar" className="w-10 h-10 rounded-full border border-outline-variant" />
                 ) : (
-                  <Avatar
-                    size={34}
-                    name={m.nickname}
-                    variant="beam"
-                    colors={['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b']}
-                  />
+                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-on-primary font-display-md shadow-sm">
+                    {initial}
+                  </div>
                 )}
               </div>
 
               {/* Info */}
-              <div style={{ flex: 1, minWidth: 0, paddingLeft: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                  {isHost && <Crown size={14} color="#f59e0b" />}
-                  <span style={{
-                    fontSize: '0.84rem', fontWeight: '700',
-                    color: 'var(--text-primary)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                  }}>
+              <div className="flex-1 min-w-0 flex flex-col">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {isHost && <span className="material-symbols-outlined text-[16px] text-primary" title="Host">star</span>}
+                  <span className="font-label-lg text-on-background truncate">
                     {m.nickname}
                   </span>
                   {isYou && (
-                    <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: '700' }}>(You)</span>
+                    <span className="text-[10px] text-primary font-label-sm tracking-widest uppercase bg-primary/10 px-2 py-0.5 rounded-sm">(You)</span>
                   )}
                 </div>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: '500' }}>
+                <span className="text-xs font-body-md text-on-surface-variant">
                   {isHost ? 'Host' : 'Viewer'}
                 </span>
               </div>
@@ -97,29 +72,22 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
               {/* Host Controls */}
               {iAmHost && !isYou && (
                 <div>
-                  <button onClick={() => toggleMenu(m.userId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)' }}>
-                    <MoreVertical size={16} />
+                  <button onClick={() => toggleMenu(m.userId)} className="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest hover:text-on-background transition-colors">
+                    <span className="material-symbols-outlined text-[20px]">more_vert</span>
                   </button>
-                  
                   {openMenuId === m.userId && (
-                    <div style={{
-                      position: 'absolute', right: '10px', top: '40px', background: 'var(--bg-surface-3)',
-                      border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', padding: '4px',
-                      zIndex: 10, display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }}>
+                    <div className="absolute right-4 top-12 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-10 w-48 py-2 animate-fade-in-up">
                       <button 
                         onClick={() => { transferHost(m.userId); setOpenMenuId(null); }}
-                        style={{ padding: '6px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', textAlign: 'left', borderRadius: '4px' }}
-                        className="btn-hover"
+                        className="w-full text-left px-4 py-2 font-label-md text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2"
                       >
-                        Make Host
+                         <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span> Make Host
                       </button>
                       <button 
                         onClick={() => { kickUser(m.userId); setOpenMenuId(null); }}
-                        style={{ padding: '6px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: '#ef4444', textAlign: 'left', borderRadius: '4px' }}
-                        className="btn-hover"
+                        className="w-full text-left px-4 py-2 font-label-md text-error hover:bg-error/10 transition-colors flex items-center gap-2 mt-1"
                       >
-                        Kick User
+                         <span className="material-symbols-outlined text-[18px]">person_remove</span> Kick from Room
                       </button>
                     </div>
                   )}

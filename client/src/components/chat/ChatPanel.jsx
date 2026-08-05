@@ -1,13 +1,9 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { MessageSquare, Send, Crown, Key, Hash } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import Avatar from 'boring-avatars';
 import { EmojiReactions } from './EmojiReactions';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useSocket } from '../../hooks/useSocket';
-
-const EMPTY_ARRAY = [];
 
 export const ChatPanel = memo(function ChatPanel() {
   const chatHistory = useRoomStore(state => state.roomState?.chatHistory || []);
@@ -29,23 +25,17 @@ export const ChatPanel = memo(function ChatPanel() {
     getItemKey: (index) => chatHistory[index]?.id || index,
   });
 
-  // Track keyboard height via Visual Viewport API so the fixed input
-  // lifts above the software keyboard on mobile browsers.
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
 
-    const TAB_BAR_HEIGHT = 60;
-
     const onViewportResize = () => {
       const vv = window.visualViewport;
-      // keyboard offset = how much the viewport has shrunk from the bottom
       const keyboardHeight = Math.max(
         0,
         window.innerHeight - vv.height - vv.offsetTop
       );
       setKeyboardOffset(keyboardHeight);
 
-      // When keyboard opens, ensure latest message stays visible
       if (keyboardHeight > 0 && chatContainerRef.current && chatHistory.length > 0) {
         setTimeout(() => {
           rowVirtualizer.scrollToIndex(chatHistory.length - 1, { align: 'end' });
@@ -74,78 +64,37 @@ export const ChatPanel = memo(function ChatPanel() {
     setInputText('');
   };
 
-  // Height of the docked input bar (approx 62px) + tab bar (60px) + buffer
   const INPUT_DOCK_HEIGHT = 62;
-  const TAB_BAR_H = 60;
-  // When keyboard is open: input sits just above keyboard; messages need bottom padding for input only
-  // When keyboard is closed: input sits above tab bar
-  const formBottom = keyboardOffset > 0
-    ? keyboardOffset
-    : TAB_BAR_H;
-  const scrollPaddingBottom = INPUT_DOCK_HEIGHT + (keyboardOffset > 0 ? keyboardOffset : TAB_BAR_H) + 8;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const formBottom = keyboardOffset > 0 ? keyboardOffset : (isMobile ? 70 : 0);
+  const scrollPaddingBottom = INPUT_DOCK_HEIGHT + formBottom + 8;
 
   return (
     <div
-      className="panel"
+      className="flex flex-col h-full md:max-h-full relative overflow-hidden bg-surface-container rounded-3xl border border-outline-variant shadow-md"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        maxHeight: 'calc(100vh - 116px)',
-        position: 'relative',
-        overflow: 'hidden',
-        background: 'var(--bg-surface)',
         '--chat-form-bottom': `${formBottom}px`,
         '--chat-scroll-padding': `${scrollPaddingBottom}px`,
       }}
     >
-      {/* Floating Emoji Particles */}
-      <EmojiReactions incomingReaction={incomingReaction} onSendReaction={onSendReaction} />
-
       {/* Header */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: '1px solid var(--border-subtle)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexShrink: 0,
-        background: 'var(--bg-surface-2)',
-        borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
-            background: 'var(--accent-primary-dim)',
-            border: '1px solid rgba(99,102,241,0.22)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <Hash size={14} color="var(--accent-primary)" />
-          </div>
-          <span style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--text-primary)' }}>Live Chat</span>
-        </div>
-        <span style={{
-          fontSize: '0.68rem', fontWeight: '600',
-          color: 'var(--text-tertiary)',
-          background: 'var(--bg-input)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-full)',
-          padding: '2px 8px'
-        }}>
-          {chatHistory.length} msgs
-        </span>
+      <div className="flex items-center gap-2 p-4 border-b border-outline-variant/50 bg-surface-container-lowest shrink-0">
+          <span className="material-symbols-outlined text-primary text-[20px] fill-1">chat_bubble</span>
+          <h2 className="font-headline-md text-lg text-on-background">Moments</h2>
       </div>
 
+      <EmojiReactions incomingReaction={incomingReaction} onSendReaction={onSendReaction} />
+
       {/* Messages */}
-      <div
+      <div 
         ref={chatContainerRef}
-        className="scroll-area chat-messages-scroll-area"
-        style={{ flex: 1, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}
+        className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 pt-4 relative"
+        style={{ paddingBottom: 'var(--chat-scroll-padding)' }}
       >
         {chatHistory.length === 0 ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px 12px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '10px', opacity: 0.6 }}>💬</div>
-            <p style={{ fontSize: '0.82rem', lineHeight: 1.5 }}>No messages yet.<br />Be the first to say hi!</p>
+          <div className="flex flex-col items-center justify-center h-full text-on-surface-variant opacity-70">
+            <span className="material-symbols-outlined text-4xl mb-2">forum</span>
+            <span className="font-label-sm">No moments yet.</span>
           </div>
         ) : (
           <div
@@ -164,70 +113,48 @@ export const ChatPanel = memo(function ChatPanel() {
                     key={virtualRow.key}
                     data-index={virtualRow.index}
                     ref={rowVirtualizer.measureElement}
-                    style={{
-                      position: 'absolute', top: 0, left: 0, width: '100%',
-                      transform: `translateY(${virtualRow.start}px)`,
-                      display: 'flex', justifyContent: 'center',
-                      padding: '4px 0'
-                    }}
+                    className="absolute top-0 left-0 w-full flex justify-center py-2"
+                    style={{ transform: `translateY(${virtualRow.start}px)` }}
                   >
-                    <span className="chat-system-pill">{msg.text}</span>
+                    <span className="bg-surface-container-highest text-on-surface-variant px-3 py-1 rounded-full font-label-sm text-[11px] uppercase tracking-wider">{msg.text}</span>
                   </div>
                 );
               }
+
+              const isMe = msg.senderId === myUserId;
 
               return (
                 <div
                   key={virtualRow.key}
                   data-index={virtualRow.index}
                   ref={rowVirtualizer.measureElement}
-                  style={{
-                    position: 'absolute', top: 0, left: 0, width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                    display: 'flex', gap: '10px', alignItems: 'flex-start',
-                    padding: '6px 0',
-                    flexDirection: msg.senderId === myUserId ? 'row-reverse' : 'row'
-                  }}
+                  className={`absolute top-0 left-0 w-full flex gap-3 py-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+                  style={{ transform: `translateY(${virtualRow.start}px)` }}
                 >
                   {/* Avatar */}
-                  <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                  <div className="shrink-0 pt-1">
                     {msg.avatar ? (
-                      <img src={msg.avatar} alt="Avatar" style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+                      <img src={msg.avatar} alt="Avatar" className="w-8 h-8 rounded-full border border-outline-variant" />
                     ) : (
-                      <Avatar
-                        size={28}
-                        name={msg.sender}
-                        variant="beam"
-                        colors={['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f59e0b']}
-                      />
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-label-sm border border-outline-variant">
+                         {msg.sender?.charAt(0).toUpperCase() || '?'}
+                      </div>
                     )}
                   </div>
 
                   {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: msg.senderId === myUserId ? 'flex-end' : 'flex-start' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', flexWrap: 'wrap', flexDirection: msg.senderId === myUserId ? 'row-reverse' : 'row' }}>
-                      <span style={{
-                        fontSize: '0.78rem', fontWeight: '700',
-                        color: msg.color || 'var(--text-primary)',
-                      }}>
-                        {msg.senderId === myUserId ? 'You' : msg.sender}
+                  <div className={`flex flex-col min-w-0 flex-1 ${isMe ? 'items-end' : 'items-start'}`}>
+                    <div className={`flex items-center gap-2 mb-1 flex-wrap ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <span className="font-label-sm text-on-background">
+                        {isMe ? 'You' : msg.sender}
                       </span>
-                      {msg.isHost && <Crown size={11} color="var(--accent-amber)" title="Host" />}
-                      {msg.hasControl && !msg.isHost && <Key size={10} color="var(--accent-emerald)" title="Has Control" />}
-                      <span style={{ fontSize: '0.63rem', color: 'var(--text-tertiary)' }}>
+                      {msg.isHost && <span className="material-symbols-outlined text-[14px] text-primary" title="Host">star</span>}
+                      <span className="text-[10px] text-on-surface-variant font-label-sm">
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                     <div 
-                      className="chat-bubble"
-                      style={{
-                        background: msg.senderId === myUserId ? 'var(--accent-primary-dim)' : 'var(--bg-surface-2)',
-                        border: `1px solid ${msg.senderId === myUserId ? 'rgba(155, 113, 178, 0.3)' : 'var(--border-subtle)'}`,
-                        borderRadius: msg.senderId === myUserId 
-                          ? 'var(--radius-md) 2px var(--radius-md) var(--radius-md)' 
-                          : '2px var(--radius-md) var(--radius-md) var(--radius-md)',
-                        color: msg.senderId === myUserId ? 'var(--text-primary)' : 'var(--text-primary)',
-                      }}
+                      className={`px-4 py-2 text-sm font-body-md shadow-sm break-words ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-sm' : 'bg-surface-container-lowest text-on-background rounded-2xl rounded-tl-sm border border-outline-variant'}`}
                     >
                       {msg.text}
                     </div>
@@ -242,35 +169,27 @@ export const ChatPanel = memo(function ChatPanel() {
       {/* Input */}
       <form
         onSubmit={handleSend}
-        className="chat-input-form"
+        className="fixed md:absolute left-0 right-0 p-4 bg-surface-container-lowest border-t border-outline-variant flex gap-2 shrink-0 z-50 md:z-20"
         style={{
-          padding: '10px 12px',
-          borderTop: '1px solid var(--border-subtle)',
-          display: 'flex',
-          gap: '8px',
-          flexShrink: 0,
-          background: 'var(--bg-surface-2)',
-          borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
+           bottom: `calc(${formBottom}px + env(safe-area-inset-bottom))`
         }}
       >
         <input
           ref={inputRef}
           type="text"
-          className="input-field"
-          placeholder="Type a message…"
+          className="flex-1 bg-surface-container border border-outline-variant rounded-full px-4 py-2.5 font-body-md text-on-background focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-shadow min-w-0"
+          placeholder="Share a moment…"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           aria-label="Chat message input"
-          style={{ minHeight: '38px', fontSize: '0.875rem', flex: 1, background: 'var(--bg-input)' }}
         />
         <button
           type="submit"
-          className="btn btn-primary"
           disabled={!inputText.trim()}
+          className="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-surface-tint transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           aria-label="Send message"
-          style={{ minHeight: '38px', width: '38px', padding: 0, borderRadius: 'var(--radius-md)', flexShrink: 0 }}
         >
-          <Send size={15} aria-hidden="true" />
+          <span className="material-symbols-outlined text-[20px]">send</span>
         </button>
       </form>
     </div>

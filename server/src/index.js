@@ -7,6 +7,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import ytSearch from 'yt-search';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { setupSocketHandlers } from './socketHandlers.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,12 +17,36 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
+// A05: Security Misconfiguration - Set secure HTTP headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled for simple static serving to avoid blocking assets, usually configured per app
+  crossOriginEmbedderPolicy: false,
+}));
+
+// A05: Security Misconfiguration - Restrict CORS
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://10.234.101.105:3000'];
+
 app.use(cors({
-  origin: '*',
+  origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
   methods: ['GET', 'POST']
 }));
 
-app.use(express.json());
+// A04: Insecure Design - Limit JSON body size to prevent payload exhaustion
+app.use(express.json({ limit: '10kb' }));
+
+// A04: Insecure Design - Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to all /api/ routes
+app.use('/api/', apiLimiter);
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -92,7 +118,7 @@ if (fs.existsSync(clientDistPath)) {
 // Configure Socket.io for Vercel Serverless
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
+    origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
     methods: ['GET', 'POST']
   },
   transports: ['polling', 'websocket'],

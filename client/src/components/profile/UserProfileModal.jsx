@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { X, User, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { UserAvatar } from '../common/UserAvatar';
 import { useUIStore } from '../../store/useUIStore';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 
-export function UserProfileModal({ user, onClose }) {
+export function UserProfileModal({ isOpen, onClose, user }) {
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
   const setToastNotification = useUIStore(state => state.setToastNotification);
+
+  React.useEffect(() => {
+    setDisplayName(user?.user_metadata?.full_name || '');
+  }, [user]);
+
+  if (!isOpen) return null;
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -33,6 +36,8 @@ export function UserProfileModal({ user, onClose }) {
     }
   };
 
+  const [showSignoutConfirm, setShowSignoutConfirm] = useState(false);
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -44,108 +49,106 @@ export function UserProfileModal({ user, onClose }) {
     }
   };
 
+  // Mock initial for avatar if not using boring-avatars right now
+  const initial = displayName ? displayName.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || 'U');
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(13, 7, 20, 0.85)',
-      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '24px 16px',
-      animation: 'fadeIn 0.3s ease'
-    }}>
-      <div style={{ 
-        position: 'relative', width: '100%', maxWidth: '400px',
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-xl)',
-        padding: '32px 24px',
-        boxShadow: 'var(--shadow-lg)',
-        maxHeight: '90vh',
-        overflowY: 'auto'
-      }}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center font-body-md p-4">
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-surface/90 backdrop-blur-md" onClick={onClose}></div>
         
-        <button 
-          onClick={onClose}
-          style={{ 
-            position: 'absolute', top: '12px', right: '12px', 
-            background: 'rgba(0,0,0,0.05)', border: 'none', color: 'var(--text-secondary)',
-            width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            transition: 'background 0.2s'
-          }}
-          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
-          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
-        >
-          <X size={20} />
-        </button>
+        {/* Modal Container */}
+        <div className="relative z-10 w-full max-w-[800px] bg-surface-container-lowest rounded-3xl shadow-2xl overflow-hidden border border-outline-variant animate-fade-in-up flex flex-col md:flex-row">
+            
+            {/* Left Sidebar: Profile Summary */}
+            <div className="w-full md:w-1/3 bg-surface-container p-8 flex flex-col items-center text-center border-r border-outline-variant/50">
+                <div className="w-32 h-32 rounded-full bg-error-container text-primary flex items-center justify-center text-5xl font-display-lg mb-6 border-4 border-surface-container-lowest shadow-lg ambient-shadow">
+                    {initial}
+                </div>
+                <h2 className="font-headline-md text-2xl mb-1 text-on-background">{displayName || 'User'}</h2>
+                <p className="font-label-sm text-on-surface-variant break-all">{user?.email}</p>
+                <div className="mt-auto pt-8 w-full">
+                    <button 
+                        onClick={() => setShowSignoutConfirm(true)}
+                        disabled={isLoggingOut}
+                        className="w-full py-3 rounded-xl font-label-lg text-error hover:bg-error/10 transition-colors flex items-center justify-center gap-2 border border-transparent hover:border-error/20"
+                    >
+                        {isLoggingOut ? (
+                            <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined">logout</span>
+                                Sign Out
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{
-            width: '80px', height: '80px',
-            borderRadius: '50%',
-            background: 'var(--accent-primary-dim)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px',
-            overflow: 'hidden',
-            border: '2px solid var(--accent-primary)',
-            boxShadow: '0 4px 20px var(--accent-primary-glow)'
-          }}>
-            <UserAvatar user={user} size={80} />
-          </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Your Profile
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            {user?.email}
-          </p>
+            {/* Right Content: Settings Form */}
+            <div className="w-full md:w-2/3 p-8">
+                <div className="flex justify-between items-center mb-8">
+                    <h3 className="font-headline-lg text-3xl text-on-background">Account Settings</h3>
+                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors">
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+
+                <form onSubmit={handleSave} className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="block font-label-lg text-on-surface">Display Name</label>
+                        <input 
+                            type="text" 
+                            className="w-full bg-surface-container border border-outline-variant rounded-xl px-4 py-3 font-body-md text-on-background focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-shadow"
+                            value={displayName}
+                            onChange={(e) => setDisplayName(e.target.value)}
+                            disabled={isSaving}
+                        />
+                        <p className="font-label-sm text-on-surface-variant opacity-70">This is how you will appear to others in the room.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="block font-label-lg text-on-surface">Email Address</label>
+                        <input 
+                            type="email" 
+                            className="w-full bg-surface-container/50 border border-outline-variant/50 rounded-xl px-4 py-3 font-body-md text-on-surface-variant cursor-not-allowed"
+                            value={user?.email || ''}
+                            disabled
+                        />
+                    </div>
+
+                    <div className="pt-6 border-t border-outline-variant/50 flex justify-between items-center">
+                        <button type="button" className="text-error font-label-sm hover:underline">
+                            Deactivate Account
+                        </button>
+                        <button 
+                            type="submit" 
+                            disabled={isSaving || !displayName.trim()}
+                            className="bg-primary text-on-primary px-8 py-3 rounded-full font-label-lg hover:bg-surface-tint transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {isSaving ? (
+                                <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                            ) : 'Save Changes'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px', marginLeft: '4px' }}>
-              Display Name
-            </label>
-            <input 
-              type="text" 
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. CinemaFan"
-              className="room-input"
-              required
+        {showSignoutConfirm && (
+            <ConfirmationModal
+                title="Sign Out"
+                message="Are you sure you want to sign out? You will be disconnected from any active rooms."
+                confirmText="Sign Out"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={() => {
+                    setShowSignoutConfirm(false);
+                    handleLogout();
+                }}
+                onCancel={() => setShowSignoutConfirm(false)}
             />
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary"
-            style={{ width: '100%', minHeight: '48px', borderRadius: '12px' }}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </form>
-
-        <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-subtle)' }}>
-          <button 
-            onClick={() => setShowLogoutConfirm(true)}
-            className="btn btn-danger"
-            style={{ width: '100%', minHeight: '48px', borderRadius: 'var(--radius-md)' }}
-            disabled={isLoggingOut}
-          >
-            <LogOut size={18} />
-            <span>{isLoggingOut ? 'Logging out...' : 'Log Out'}</span>
-          </button>
-        </div>
-      </div>
-
-      {showLogoutConfirm && (
-        <ConfirmationModal
-          title="Log Out"
-          message="Are you sure you want to log out of your account?"
-          confirmText="Log Out"
-          onConfirm={handleLogout}
-          onCancel={() => setShowLogoutConfirm(false)}
-        />
-      )}
+        )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for components/common/UserAvatar.jsx</title>
+    <title>Code coverage report for components/room/SignInModal.jsx</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../prettify.css" />
     <link rel="stylesheet" href="../../base.css" />
@@ -19,20 +19,20 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">components/common</a> UserAvatar.jsx</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">components/room</a> SignInModal.jsx</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>0/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>0/2</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>0/6</span>
             </div>
         
             
@@ -102,7 +102,26 @@
 <a name='L37'></a><a href='#L37'>37</a>
 <a name='L38'></a><a href='#L38'>38</a>
 <a name='L39'></a><a href='#L39'>39</a>
-<a name='L40'></a><a href='#L40'>40</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -110,10 +129,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -121,12 +136,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -141,42 +151,89 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React, { useState } from 'react';
-import Avatar from 'boring-avatars';
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React from 'react';
+import { supabase } from '../../lib/supabase';
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >UserAvatar({</span> user, size = <span class="branch-0 cbranch-no" title="branch not covered" >32, s</span>tyle = <span class="branch-0 cbranch-no" title="branch not covered" >{} }) {</span>
-  const [imgFailed, setImgFailed] = <span class="cstat-no" title="statement not covered" >useState(false);</span>
+export function <span class="fstat-no" title="function not covered" >SignInModal({</span> isOpen, onClose }) {
+<span class="cstat-no" title="statement not covered" >  if (!isOpen) <span class="cstat-no" title="statement not covered" >return null;</span></span>
 &nbsp;
-  const avatarUrl = <span class="cstat-no" title="statement not covered" >user?.user_metadata?.avatar_url || user?.user_metadata?.picture;</span>
-  const name = <span class="cstat-no" title="statement not covered" >user?.email || user?.id || 'Together User';</span>
-&nbsp;
-  const avatarColors = <span class="cstat-no" title="statement not covered" >['#8E5745', '#758956', '#2F3D20', '#1A2113', '#C4CBAF'];</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >  if (avatarUrl &amp;&amp; !imgFailed) {</span>
-<span class="cstat-no" title="statement not covered" >    return (</span>
-      &lt;img
-        src={avatarUrl}
-        alt="User Avatar"
-        style={{
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          objectFit: 'cover',
-          ...style
-        }}
-<span class="fstat-no" title="function not covered" >        onError={() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etImgFailed(true)}</span>
-      /&gt;
-    );
-  }
+  const handleGoogleSignIn = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >async () =&gt; {</span></span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+<span class="cstat-no" title="statement not covered" >      await supabase.auth.signInWithOAuth({</span>
+        provider: 'google',
+        options: {
+          redirectTo: window.location.href,
+        },
+      });
+    } catch (error) {
+<span class="cstat-no" title="statement not covered" >      console.error('Error signing in:', error);</span>
+    }
+  };
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
-    &lt;div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, ...style }}&gt;
-      &lt;Avatar
-        size={size}
-        name={name}
-        variant="beam"
-        colors={avatarColors}
-      /&gt;
+    &lt;div className="fixed inset-0 z-[100] flex items-center justify-center font-body-md"&gt;
+        {/* Backdrop */}
+        &lt;div className="absolute inset-0 bg-surface/90 backdrop-blur-md" onClick={onClose}&gt;&lt;/div&gt;
+        
+        {/* Modal Container */}
+        &lt;div className="relative z-10 w-full max-w-[480px] bg-surface-container-lowest rounded-3xl shadow-2xl overflow-hidden border border-outline-variant animate-fade-in-up"&gt;
+            
+            {/* Header */}
+            &lt;div className="p-6 pb-0 flex justify-between items-start"&gt;
+                &lt;div&gt;
+                    &lt;h2 className="font-headline-lg text-3xl mb-1 text-on-background"&gt;Sign In&lt;/h2&gt;
+                    &lt;p className="font-body-md text-on-surface-variant"&gt;Welcome back to Being Us.&lt;/p&gt;
+                &lt;/div&gt;
+                &lt;button onClick={onClose} className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors"&gt;
+                    &lt;span className="material-symbols-outlined"&gt;close&lt;/span&gt;
+                &lt;/button&gt;
+            &lt;/div&gt;
+&nbsp;
+            {/* Content */}
+            &lt;div className="p-6 text-center py-8"&gt;
+                &lt;div className="w-16 h-16 rounded-full bg-error-container text-primary flex items-center justify-center mx-auto mb-6 shadow-sm"&gt;
+                    &lt;span className="material-symbols-outlined text-[32px]"&gt;login&lt;/span&gt;
+                &lt;/div&gt;
+                &lt;button onClick={handleGoogleSignIn} className="w-full py-4 rounded-xl font-label-lg border border-outline hover:bg-surface-container transition-colors flex items-center justify-center gap-3"&gt;
+                    &lt;img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" className="w-5 h-5"/&gt;
+                    Continue with Google
+                &lt;/button&gt;
+            &lt;/div&gt;
+&nbsp;
+            {/* Footer */}
+            &lt;div className="p-6 pt-4 bg-surface-container flex items-center justify-center gap-2 text-on-surface-variant font-label-sm"&gt;
+                &lt;span className="material-symbols-outlined text-[18px]"&gt;lock&lt;/span&gt;
+                Secure authentication
+            &lt;/div&gt;
+        &lt;/div&gt;
     &lt;/div&gt;
   );
 }

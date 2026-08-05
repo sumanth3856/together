@@ -24,8 +24,8 @@ test('createRoom — initialises a room correctly', (t) => {
   clearRooms();
   const room = RoomManager.createRoom('u-1', 's-1', 'Alice', 'avatar.jpg');
 
-  assert.ok(room.roomId.startsWith('TOG-'), 'roomId must be prefixed TOG-');
-  assert.equal(room.roomId.length, 8, 'roomId must be 8 chars (TOG-XXXX)');
+  assert.equal(room.roomId.length, 6, 'roomId must be 6 chars');
+  assert.ok(/^\d{6}$/.test(room.roomId), 'roomId must be a 6-digit number');
   assert.equal(room.members.size, 1, 'should have exactly 1 member after creation');
 
   const host = room.members.get('u-1');
@@ -53,21 +53,17 @@ test('createRoom — initialises a room correctly', (t) => {
 test('getRoom — resolves normalised room codes', (t) => {
   clearRooms();
   const room = RoomManager.createRoom('u-2', 's-2', 'Bob');
-  const code = room.roomId; // e.g. TOG-AB12
+  const code = room.roomId; // e.g. 123456
 
   // Exact match
   assert.equal(RoomManager.getRoom(code)?.roomId, code);
 
-  // Just the 4-char suffix
-  const shortCode = code.replace('TOG-', '');
-  assert.equal(RoomManager.getRoom(shortCode)?.roomId, code, '4-char code should resolve');
-
-  // Without dash: TOG + XXXX
-  const noDash = `TOG${shortCode}`;
-  assert.equal(RoomManager.getRoom(noDash)?.roomId, code, 'TOG+4 without dash should resolve');
+  // Normalisation strips spaces and special chars
+  const dirtyCode = `${code.substring(0, 3)}- ${code.substring(3)}`;
+  assert.equal(RoomManager.getRoom(dirtyCode)?.roomId, code, 'should strip special chars');
 
   // Non-existent room
-  assert.equal(RoomManager.getRoom('TOG-9999'), null, 'missing room should return null');
+  assert.equal(RoomManager.getRoom('999999'), null, 'missing room should return null');
   assert.equal(RoomManager.getRoom(null), null, 'null input should return null');
 });
 
@@ -91,7 +87,7 @@ test('joinRoom — fresh join adds member', (t) => {
 
 test('joinRoom — returns error for non-existent room', (t) => {
   clearRooms();
-  const result = RoomManager.joinRoom('TOG-ZZZZ', 'u-5', 's-5', 'Dan');
+  const result = RoomManager.joinRoom('999999', 'u-5', 's-5', 'Dan');
   assert.equal(result.error, 'Room not found');
 });
 
@@ -224,7 +220,7 @@ test('updatePlayback — same youtubeId does NOT add duplicate system message', 
 
 test('updatePlayback — returns null for unknown room', (t) => {
   clearRooms();
-  const result = RoomManager.updatePlayback('TOG-ZZZZ', 's-19', { isPlaying: true });
+  const result = RoomManager.updatePlayback('999999', 's-19', { isPlaying: true });
   assert.equal(result, null);
 });
 

@@ -315,49 +315,29 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="relative w-full flex flex-col">
       {/* 16:9 Cinema Frame */}
       <div
         ref={containerRef}
-        style={{
-          position: 'relative',
-          width: '100%',
-          paddingTop: '56.25%',
-          background: '#000',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden',
-          border: '1px solid var(--border-subtle)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-        }}
+        className="relative w-full pt-[56.25%] bg-black rounded-2xl overflow-hidden border border-outline shadow-xl"
       >
         <div
           id="yt-player-element"
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+          className="absolute top-0 left-0 w-full h-full"
         />
 
         {/* Autoplay Blocked Overlay */}
         {isPlayerReady && playback?.isPlaying && !localPlaying && (
-          <div style={{
-            position: 'absolute', top: '16px', left: '50%', transform: 'translateX(-50%)',
-            zIndex: 20, animation: 'fadeIn 0.3s ease',
-          }}>
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 animate-fade-in-up">
             <button
               onClick={() => {
                 if (playerRef.current) {
                   playerRef.current.playVideo();
                 }
               }}
-              className="btn btn-primary"
-              style={{
-                padding: '8px 18px', fontSize: '0.85rem',
-                borderRadius: 'var(--radius-full)',
-                boxShadow: '0 4px 16px rgba(1,69,242,0.4)',
-                background: 'rgba(1, 69, 242, 0.95)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-              }}
+              className="bg-primary/90 backdrop-blur-md text-on-primary px-6 py-2.5 rounded-full font-label-lg shadow-[0_4px_20px_rgba(205,0,0,0.4)] flex items-center gap-2 hover:bg-primary transition-colors"
             >
-              <Play size={16} />
+              <span className="material-symbols-outlined fill-1">play_arrow</span>
               <span>Click to Sync</span>
             </button>
           </div>

@@ -41,13 +41,13 @@ describe('useRoomStore', () => {
   });
 
   it('setRoomState updates roomState', () => {
-    const mockRoom = { roomId: 'TOG-1234', currentVideo: { title: 'Vid' } };
+    const mockRoom = { roomId: '123456', currentVideo: { title: 'Vid' } };
     useRoomStore.getState().setRoomState(mockRoom);
     expect(useRoomStore.getState().roomState).toEqual(mockRoom);
   });
 
   it('updateChatHistory adds unique messages only', () => {
-    const mockRoom = { roomId: 'TOG-1234', chatHistory: [{ id: 'msg-1', text: 'hello' }] };
+    const mockRoom = { roomId: '123456', chatHistory: [{ id: 'msg-1', text: 'hello' }] };
     useRoomStore.getState().setRoomState(mockRoom);
 
     // Add unique message

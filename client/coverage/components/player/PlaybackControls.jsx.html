@@ -32,7 +32,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/39</span>
+                <span class='fraction'>0/31</span>
             </div>
         
             
@@ -155,30 +155,7 @@
 <a name='L90'></a><a href='#L90'>90</a>
 <a name='L91'></a><a href='#L91'>91</a>
 <a name='L92'></a><a href='#L92'>92</a>
-<a name='L93'></a><a href='#L93'>93</a>
-<a name='L94'></a><a href='#L94'>94</a>
-<a name='L95'></a><a href='#L95'>95</a>
-<a name='L96'></a><a href='#L96'>96</a>
-<a name='L97'></a><a href='#L97'>97</a>
-<a name='L98'></a><a href='#L98'>98</a>
-<a name='L99'></a><a href='#L99'>99</a>
-<a name='L100'></a><a href='#L100'>100</a>
-<a name='L101'></a><a href='#L101'>101</a>
-<a name='L102'></a><a href='#L102'>102</a>
-<a name='L103'></a><a href='#L103'>103</a>
-<a name='L104'></a><a href='#L104'>104</a>
-<a name='L105'></a><a href='#L105'>105</a>
-<a name='L106'></a><a href='#L106'>106</a>
-<a name='L107'></a><a href='#L107'>107</a>
-<a name='L108'></a><a href='#L108'>108</a>
-<a name='L109'></a><a href='#L109'>109</a>
-<a name='L110'></a><a href='#L110'>110</a>
-<a name='L111'></a><a href='#L111'>111</a>
-<a name='L112'></a><a href='#L112'>112</a>
-<a name='L113'></a><a href='#L113'>113</a>
-<a name='L114'></a><a href='#L114'>114</a>
-<a name='L115'></a><a href='#L115'>115</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L93'></a><a href='#L93'>93</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -202,27 +179,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -294,7 +250,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React, { memo } from 'react';
 import { Play, Pause, Signal, Volume2, VolumeX, Lock } from 'lucide-react';
 &nbsp;
-// Hoisted: module-level helper — not re-created on every render
 const <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >formatTime = (s</span>ecs) =&gt; {</span>
   const m = <span class="cstat-no" title="statement not covered" >Math.floor(secs / 60);</span>
   const s = <span class="cstat-no" title="statement not covered" >Math.floor(secs % 60);</span>
@@ -316,74 +271,56 @@ export const PlaybackControls = <span class="cstat-no" title="statement not cove
   const progressPercent = <span class="cstat-no" title="statement not covered" >duration &gt; 0 ? (currentTime / duration) * 100 : 0;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
-    &lt;div style={{
-      marginTop: '16px',
-      padding: '12px 24px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-      background: 'var(--bg-surface)',
-      borderRadius: '30px',
-      boxShadow: 'var(--shadow-md), 0 0 0 1px var(--border-subtle)',
-      width: '100%',
-    }}&gt;
-      &lt;div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}&gt;
+    &lt;div className="mt-4 p-4 md:px-6 bg-surface-container rounded-3xl border border-outline-variant w-full flex flex-col gap-3 shadow-md ambient-shadow"&gt;
+      &lt;div className="flex items-center justify-between gap-4 flex-wrap"&gt;
         
         {/* Left: Sync Status */}
-        &lt;div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}&gt;
-          &lt;div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: locked ? 'var(--status-warning)' : 'var(--status-success)', fontWeight: '600' }}&gt;
-            {locked ? &lt;Lock size={14} color="var(--status-warning)" /&gt; : &lt;Signal size={14} color="var(--status-success)" /&gt;}
-            &lt;span className="hide-on-small"&gt;{locked ? 'Host Only' : 'Synced'}&lt;/span&gt;
+        &lt;div className="flex items-center gap-2 flex-1"&gt;
+          &lt;div className={`flex items-center gap-1.5 font-label-sm ${locked ? 'text-on-surface-variant' : 'text-primary'}`}&gt;
+            {locked ? &lt;Lock size={14} /&gt; : &lt;span className="material-symbols-outlined text-[16px] fill-1"&gt;bolt&lt;/span&gt;}
+            &lt;span className="hidden sm:inline tracking-wide uppercase"&gt;{locked ? 'Host Only' : 'Synced'}&lt;/span&gt;
           &lt;/div&gt;
         &lt;/div&gt;
 &nbsp;
         {/* Center: Play/Pause */}
-        &lt;div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}&gt;
+        &lt;div className="flex items-center justify-center"&gt;
           &lt;button
-            className="btn btn-primary"
             onClick={onManualPlayPause}
             disabled={locked}
-            style={{
-              width: '44px', height: '44px', borderRadius: '50%',
-              padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(1,69,242,0.3)', background: locked ? 'var(--text-muted)' : 'var(--accent-primary)',
-              opacity: locked ? 0.6 : 1, cursor: locked ? 'not-allowed' : 'pointer'
-            }}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md ${locked ? 'bg-surface-container-highest text-on-surface-variant cursor-not-allowed opacity-60' : 'bg-primary text-on-primary hover:bg-surface-tint hover:shadow-lg hover:-translate-y-0.5'}`}
             title={locked ? 'Controls locked by host' : (localPlaying ? 'Pause (Space)' : 'Play (Space)')}
           &gt;
-            {localPlaying ? &lt;Pause size={20} color="#fff" /&gt; : &lt;Play size={20} color="#fff" style={{ marginLeft: '2px' }} /&gt;}
+            {localPlaying ? &lt;span className="material-symbols-outlined fill-1 text-[24px]"&gt;pause&lt;/span&gt; : &lt;span className="material-symbols-outlined fill-1 text-[24px]"&gt;play_arrow&lt;/span&gt;}
           &lt;/button&gt;
         &lt;/div&gt;
 &nbsp;
         {/* Right: Volume */}
-        &lt;div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flex: 1 }}&gt;
+        &lt;div className="flex items-center justify-end gap-2 flex-1"&gt;
           &lt;button
             onClick={onMuteToggle}
-            className="btn btn-ghost"
-            style={{ padding: '6px', borderRadius: '50%' }}
+            className="p-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-background"
             title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
           &gt;
             {isMuted || volume === 0
-              ? &lt;VolumeX size={18} color="var(--status-danger)" /&gt;
-              : &lt;Volume2 size={18} color="var(--text-secondary)" /&gt;}
+              ? &lt;span className="material-symbols-outlined text-[20px] text-error"&gt;volume_off&lt;/span&gt;
+              : &lt;span className="material-symbols-outlined text-[20px]"&gt;volume_up&lt;/span&gt;}
           &lt;/button&gt;
           &lt;input
             type="range" min={0} max={100}
             value={isMuted ? 0 : volume}
             onChange={onVolumeChange}
-            style={{ width: '80px', height: '4px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+            className="w-20 h-1.5 bg-outline-variant rounded-full appearance-none outline-none cursor-pointer accent-primary"
           /&gt;
         &lt;/div&gt;
       &lt;/div&gt;
 &nbsp;
       {/* Progress Bar */}
-      &lt;div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}&gt;
-        &lt;span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', minWidth: '40px', fontWeight: '500' }}&gt;
+      &lt;div className="flex items-center gap-3"&gt;
+        &lt;span className="text-xs font-label-sm text-on-surface-variant w-10 text-right tabular-nums"&gt;
           {formatTime(currentTime)}
         &lt;/span&gt;
-        &lt;div className="timeline-slider-container"&gt;
-          &lt;div className="timeline-slider-track" /&gt;
-          &lt;div className="timeline-slider-progress" style={{ width: `${progressPercent}%` }} /&gt;
+        &lt;div className="relative flex-1 h-1.5 bg-outline-variant rounded-full cursor-pointer flex items-center group"&gt;
+          &lt;div className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-100 ease-linear pointer-events-none" style={{ width: `${progressPercent}%` }} /&gt;
           &lt;input
             type="range"
             min="0"
@@ -391,14 +328,11 @@ export const PlaybackControls = <span class="cstat-no" title="statement not cove
             value={currentTime || 0}
             onChange={onSeekChange}
             disabled={locked}
-            className="timeline-slider"
-            style={{
-              cursor: locked ? 'not-allowed' : 'pointer',
-              opacity: locked ? 0.7 : 1
-            }}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
           /&gt;
+          {/* Thumb circle (shows on hover of the container, styled mostly by tailwind group-hover if we wanted, but standard range works) */}
         &lt;/div&gt;
-        &lt;span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', minWidth: '40px', textAlign: 'right', fontWeight: '500' }}&gt;
+        &lt;span className="text-xs font-label-sm text-on-surface-variant w-10 tabular-nums"&gt;
           {formatTime(duration)}
         &lt;/span&gt;
       &lt;/div&gt;
@@ -412,7 +346,7 @@ export const PlaybackControls = <span class="cstat-no" title="statement not cove
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-02T14:54:41.778Z
+                at 2026-08-05T17:02:23.506Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

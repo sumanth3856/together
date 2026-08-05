@@ -1,5 +1,4 @@
-import React from 'react';
-import { AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
 
 export function ConfirmationModal({ 
   title, 
@@ -10,29 +9,39 @@ export function ConfirmationModal({
   onCancel, 
   variant = 'danger' 
 }) {
-  
+  const modalRef = useRef(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onCancel]);
+
   const getVariantStyles = () => {
     switch (variant) {
       case 'danger':
         return {
-          icon: <AlertTriangle size={28} color="var(--status-danger)" />,
-          iconBg: 'rgba(239, 68, 68, 0.1)',
-          iconBorder: 'rgba(239, 68, 68, 0.2)',
-          buttonClass: 'btn-danger'
+          icon: 'warning',
+          iconBg: 'bg-error-container',
+          iconColor: 'text-error',
+          buttonClass: 'bg-error hover:bg-error/90 text-on-error',
         };
       case 'success':
         return {
-          icon: <CheckCircle2 size={28} color="var(--status-success)" />,
-          iconBg: 'rgba(16, 185, 129, 0.1)',
-          iconBorder: 'rgba(16, 185, 129, 0.2)',
-          buttonClass: 'btn-primary'
+          icon: 'check_circle',
+          iconBg: 'bg-primary-container',
+          iconColor: 'text-primary',
+          buttonClass: 'bg-primary hover:bg-surface-tint text-on-primary',
         };
       default:
         return {
-          icon: <Info size={28} color="var(--accent-primary)" />,
-          iconBg: 'var(--accent-primary-dim)',
-          iconBorder: 'rgba(1, 69, 242, 0.2)',
-          buttonClass: 'btn-primary'
+          icon: 'info',
+          iconBg: 'bg-surface-container-highest',
+          iconColor: 'text-primary',
+          buttonClass: 'bg-primary hover:bg-surface-tint text-on-primary',
         };
     }
   };
@@ -40,54 +49,42 @@ export function ConfirmationModal({
   const styles = getVariantStyles();
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 10000,
-      background: 'rgba(13, 7, 20, 0.85)',
-      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '24px 16px',
-      animation: 'fadeIn 0.2s ease'
-    }}>
-      <div style={{
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-xl)',
-        padding: '32px 24px',
-        width: '100%', maxWidth: '400px',
-        boxShadow: 'var(--shadow-lg)',
-        animation: 'fadeInUp 0.3s ease both',
-        textAlign: 'center'
-      }}>
-        <div style={{
-          width: '56px', height: '56px', borderRadius: '50%',
-          background: styles.iconBg,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 20px',
-          border: `1px solid ${styles.iconBorder}`
-        }}>
-          {styles.icon}
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-background/80 backdrop-blur-md animate-fade-in"
+        onClick={onCancel}
+      ></div>
+
+      {/* Modal Content */}
+      <div 
+        ref={modalRef}
+        className="relative w-full max-w-md glass-card rounded-3xl p-8 shadow-2xl border border-outline-variant animate-fade-in-up text-center"
+      >
+        <div className={`w-16 h-16 rounded-full ${styles.iconBg} flex items-center justify-center mx-auto mb-6 border border-outline-variant/50 shadow-sm`}>
+          <span className={`material-symbols-outlined text-[32px] ${styles.iconColor}`}>
+            {styles.icon}
+          </span>
         </div>
         
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '12px' }}>
+        <h2 className="font-display-lg text-2xl md:text-3xl font-bold text-on-background mb-4">
           {title}
         </h2>
         
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '28px' }}>
+        <p className="font-body-lg text-on-surface-variant mb-8 leading-relaxed">
           {message}
         </p>
 
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={onCancel}
-            className="btn btn-secondary"
-            style={{ flex: 1, minWidth: '120px', minHeight: '48px', fontSize: '0.95rem', borderRadius: 'var(--radius-md)' }}
+            className="flex-1 px-6 py-3.5 rounded-full font-label-lg bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`btn ${styles.buttonClass}`}
-            style={{ flex: 1, minWidth: '120px', minHeight: '48px', fontSize: '0.95rem', borderRadius: 'var(--radius-md)' }}
+            className={`flex-1 px-6 py-3.5 rounded-full font-label-lg transition-all shadow-md hover:shadow-lg ${styles.buttonClass}`}
           >
             {confirmText}
           </button>

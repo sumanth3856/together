@@ -1,4 +1,6 @@
 import { RoomManager } from './roomManager.js';
+import xss from 'xss';
+import jwt from 'jsonwebtoken';
 
 const rateLimits = new Map();
 
@@ -13,10 +15,33 @@ const checkRateLimit = (socketId, action, limitMs) => {
 
 const sanitizeStr = (str, maxLen = 50) => {
   if (typeof str !== 'string') return '';
-  return str.trim().substring(0, maxLen);
+  return xss(str.trim().substring(0, maxLen));
 };
 
 export function setupSocketHandlers(io) {
+  // A07: Authentication - Verify Supabase JWT token before allowing connection
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      // Allow guest connections, but flag them as unauthenticated if we want strict mode.
+      // For this app, we allow guests to join, but they can't spoof a real user's ID.
+      socket.user = null;
+      return next();
+    }
+
+    try {
+      // Supabase JWTs are signed with the JWT Secret
+      if (process.env.SUPABASE_JWT_SECRET) {
+        const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+        socket.user = decoded; // Contains sub (userId), email, etc.
+      }
+      return next();
+    } catch (err) {
+      console.warn('Socket authentication failed:', err.message);
+      return next(new Error('Authentication error'));
+    }
+  });
+
   io.on('connection', (socket) => {
     let currentRoomId = null;
 
@@ -29,7 +54,7 @@ export function setupSocketHandlers(io) {
     };
 
     // 1. Create Room
-    socket.on('create_room', ({ userId, nickname, avatar }, callback) => {
+    socket.on('create_room', ({ userId, nickname, avatar, roomName, mood }, callback) => {
       const cleanName = sanitizeStr(nickname, 20);
       if (!cleanName) {
         if (typeof callback === 'function') callback({ success: false, error: 'Nickname is required.' });
@@ -41,7 +66,10 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      const room = RoomManager.createRoom(userId, socket.id, cleanName, avatar);
+      // If a real user token is present, strictly enforce that they use their real userId
+      const finalUserId = socket.user?.sub ? socket.user.sub : userId;
+
+      const room = RoomManager.createRoom(finalUserId, socket.id, cleanName, avatar, roomName, mood);
       currentRoomId = room.roomId;
       socket.join(room.roomId);
 
@@ -67,7 +95,10 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      const result = RoomManager.joinRoom(cleanRoomId, userId, socket.id, cleanName, avatar);
+      // If authenticated, enforce real userId
+      const finalUserId = socket.user?.sub ? socket.user.sub : userId;
+
+      const result = RoomManager.joinRoom(cleanRoomId, finalUserId, socket.id, cleanName, avatar);
 
       if (result.error) {
         if (typeof callback === 'function') callback({ success: false, error: result.error });
@@ -178,10 +209,10 @@ export function setupSocketHandlers(io) {
     };
 
     // 6. Queue Controls
-    socket.on('add_to_queue', handleAction('queue', 1000, RoomManager.addToQueue));
-    socket.on('remove_from_queue', handleAction('queue', 1000, RoomManager.removeFromQueue, d => [d.queueId]));
-    socket.on('play_next', handleAction('queue', 1000, RoomManager.playNext, () => []));
-    socket.on('update_room_settings', handleAction(null, 0, RoomManager.updateRoomSettings));
+    socket.on('add_to_queue', handleAction('queue', 1000, RoomManager.addToQueue.bind(RoomManager)));
+    socket.on('remove_from_queue', handleAction('queue', 1000, RoomManager.removeFromQueue.bind(RoomManager), d => [d.queueId]));
+    socket.on('play_next', handleAction('queue', 1000, RoomManager.playNext.bind(RoomManager), () => []));
+    socket.on('update_room_settings', handleAction(null, 0, RoomManager.updateRoomSettings.bind(RoomManager)));
 
 
 

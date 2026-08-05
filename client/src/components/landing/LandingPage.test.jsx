@@ -11,14 +11,33 @@ vi.mock('../room/JoinRoomModal', () => ({
       <button data-testid="modal-cancel-btn" onClick={onCancel}>
         Cancel
       </button>
-      <button data-testid="modal-create-btn" onClick={() => onCreateRoom && onCreateRoom()}>
-        Create Room
-      </button>
       <button data-testid="modal-join-btn" onClick={() => onJoinRoom && onJoinRoom('test-room')}>
         Join Room
       </button>
     </div>
   ),
+}));
+
+vi.mock('../room/CreateRoomModal', () => ({
+  CreateRoomModal: ({ onCreateRoom, onClose }) => (
+    <div data-testid="create-room-modal">
+      <button data-testid="modal-create-btn" onClick={() => onCreateRoom && onCreateRoom()}>
+        Create Room
+      </button>
+      <button data-testid="modal-cancel-btn" onClick={onClose}>
+        Cancel
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+    },
+  },
 }));
 
 vi.mock('../profile/UserProfileModal', () => ({
@@ -55,15 +74,15 @@ describe('LandingPage', () => {
   it('renders landing page main content and default layout', () => {
     render(<LandingPage {...defaultProps} />);
 
-    expect(screen.getAllByText('Being Us')[0]).toBeInTheDocument();
-    expect(screen.getByText('Watch Together,')).toBeInTheDocument();
-    expect(screen.getByText('Feel Together')).toBeInTheDocument();
-    expect(screen.getByText('Designed for Digital Intimacy')).toBeInTheDocument();
-    expect(screen.getByText('Synced Playback')).toBeInTheDocument();
-    expect(screen.getByText('Private Date Rooms')).toBeInTheDocument();
-    expect(screen.getByText('Real-time Reactions')).toBeInTheDocument();
-    expect(screen.getByText('Ready to start your next movie night?')).toBeInTheDocument();
-    expect(screen.getByText('© 2026 Being Us. Cinema for the soul, together.')).toBeInTheDocument();
+    expect(screen.getAllByText('Being Us.')[0]).toBeInTheDocument();
+    expect(screen.getByText('Distance means nothing when you')).toBeInTheDocument();
+    expect(screen.getByText('watch together.')).toBeInTheDocument();
+    expect(screen.getByText('Designed for Closeness')).toBeInTheDocument();
+    expect(screen.getByText('Frame-Perfect Sync')).toBeInTheDocument();
+    expect(screen.getByText('Moments in Time')).toBeInTheDocument();
+    expect(screen.getByText('Theater Moods')).toBeInTheDocument();
+    expect(screen.getByText('Ready to hit play?')).toBeInTheDocument();
+    expect(screen.getByText('© 2026 Being Us. All rights reserved.')).toBeInTheDocument();
 
     // Modals should not be open by default
     expect(screen.queryByTestId('join-room-modal')).not.toBeInTheDocument();
@@ -78,37 +97,31 @@ describe('LandingPage', () => {
   });
 
 
-  it('opens JoinRoomModal via Create Private Room button in hero section', () => {
+  it('opens CreateRoomModal via Start Watching Now button in hero section', () => {
     render(<LandingPage {...defaultProps} />);
 
-    const createPrivateRoomBtn = screen.getByRole('button', { name: /Create Private Room/i });
+    const createPrivateRoomBtn = screen.getByRole('button', { name: /Start Watching Now/i });
     fireEvent.click(createPrivateRoomBtn);
 
+    expect(screen.getByTestId('create-room-modal')).toBeInTheDocument();
+  });
+
+  it('opens JoinRoomModal via Join a Room button in hero section', () => {
+    render(<LandingPage {...defaultProps} />);
+
+    const joinRoomBtn = screen.getByRole('button', { name: /Join a Room/i });
+    fireEvent.click(joinRoomBtn);
+
     expect(screen.getByTestId('join-room-modal')).toBeInTheDocument();
   });
 
-  it('opens JoinRoomModal via How it works button in hero section', () => {
+  it('opens CreateRoomModal and handles mouse events via Create Your Room button in CTA section', () => {
     render(<LandingPage {...defaultProps} />);
 
-    const howItWorksBtn = screen.getByRole('button', { name: /How it works/i });
-    fireEvent.click(howItWorksBtn);
-
-    expect(screen.getByTestId('join-room-modal')).toBeInTheDocument();
-  });
-
-  it('opens JoinRoomModal and handles mouse events via Create Your Room button in CTA section', () => {
-    render(<LandingPage {...defaultProps} />);
-
-    const createYourRoomBtn = screen.getByRole('button', { name: /Create Your Room/i });
-
-    fireEvent.mouseDown(createYourRoomBtn);
-    expect(createYourRoomBtn.style.transform).toBe('scale(0.95)');
-
-    fireEvent.mouseUp(createYourRoomBtn);
-    expect(createYourRoomBtn.style.transform).toBe('scale(1)');
+    const createYourRoomBtn = screen.getAllByRole('button', { name: /Create Your Room/i })[0];
 
     fireEvent.click(createYourRoomBtn);
-    expect(screen.getByTestId('join-room-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('create-room-modal')).toBeInTheDocument();
   });
 
   it('renders user profile button with full_name when user is provided', () => {
@@ -151,40 +164,26 @@ describe('LandingPage', () => {
     const { container } = render(<LandingPage {...defaultProps} />);
 
     const header = container.querySelector('header');
-    expect(header).not.toHaveClass('scrolled');
+    expect(header).not.toHaveClass('glass-card');
 
     // Trigger scroll > 20
     window.scrollY = 50;
     fireEvent.scroll(window);
-    expect(header).toHaveClass('scrolled');
+    expect(header).toHaveClass('glass-card');
 
     // Trigger scroll <= 20
     window.scrollY = 10;
     fireEvent.scroll(window);
-    expect(header).not.toHaveClass('scrolled');
+    expect(header).not.toHaveClass('glass-card');
   });
 
-  it('handles document mousemove event to update parallax-glow elements', () => {
-    render(<LandingPage {...defaultProps} />);
-
-    const glowElements = document.querySelectorAll('.parallax-glow');
-    expect(glowElements.length).toBeGreaterThan(0);
-
-    fireEvent.mouseMove(document, { clientX: 100, clientY: 200 });
-
-    // Verify glow element style transform was calculated
-    expect(glowElements[0].style.transform).toContain('translate');
-  });
-
-  it('cleans up scroll and mousemove event listeners on unmount', () => {
+  it('cleans up scroll event listener on unmount', () => {
     const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-    const docRemoveEventListenerSpy = vi.spyOn(document, 'removeEventListener');
 
     const { unmount } = render(<LandingPage {...defaultProps} />);
 
     unmount();
 
     expect(removeEventListenerSpy).toHaveBeenCalledWith('scroll', expect.any(Function));
-    expect(docRemoveEventListenerSpy).toHaveBeenCalledWith('mousemove', expect.any(Function));
   });
 });

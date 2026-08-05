@@ -351,10 +351,7 @@ export default function Page() {
         ) : null
       ) : (
         /* ── Main Co-Watching Room View ── */
-        <div
-          className="room-container"
-          style={{ maxWidth: '1380px', margin: '0 auto', padding: isMobileScreen ? '10px' : '14px 20px', minHeight: '100dvh' }}
-        >
+        <div className="min-h-screen bg-background pt-20 pb-6 px-4 md:px-8 max-w-[1600px] mx-auto">
           <RoomHeader
             onLeaveRoom={handleLeaveRoom}
             roomId={roomId}
@@ -363,40 +360,47 @@ export default function Page() {
 
           {!isMobileScreen ? (
             /* ── Desktop / Tablet Grid ── */
-            <div className="desktop-grid">
-              <div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-104px)]">
+              {/* Left Column: Video & Queue */}
+              <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
                 <YouTubePlayer
                   youtubeId={currentVideo?.youtubeId}
                   onVideoEnded={handleVideoEnded}
                 />
-                <VideoDetailsCard
-                  currentVideo={currentVideo}
-                  roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
-                  currentSocketId={socketId}
-                  onLoadVideo={(vData) => actions.syncPlayback(vData)}
-                />
-
-                <MemberList
-                  members={members}
-                  currentSocketId={socketId}
-                />
                 
-                <div style={{ height: '400px', marginTop: '14px' }}>
-                  <SearchAndQueuePanel
-                    onAddVideo={(video) => actions.addToQueue(video)}
-                    onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
-                    onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
-                  />
+                {/* Meta details & queue could go here side-by-side or stacked */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div className="flex flex-col gap-6">
+                        <VideoDetailsCard
+                          currentVideo={currentVideo}
+                          roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
+                          currentSocketId={socketId}
+                          onLoadVideo={(vData) => actions.syncPlayback(vData)}
+                        />
+                        <MemberList
+                          members={members}
+                          currentSocketId={socketId}
+                        />
+                    </div>
+                    
+                    <div className="h-[400px] xl:h-auto">
+                        <SearchAndQueuePanel
+                          onAddVideo={(video) => actions.addToQueue(video)}
+                          onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
+                          onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
+                        />
+                    </div>
                 </div>
               </div>
 
-              <div className="chat-sidebar">
+              {/* Right Column: Moments Chat */}
+              <div className="lg:col-span-4 xl:col-span-3 h-full">
                 <ChatPanel />
               </div>
             </div>
           ) : (
             /* ── Mobile View ── */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '70px' }}>
               <div className="mobile-sticky-player">
                 <YouTubePlayer
                   youtubeId={currentVideo?.youtubeId}

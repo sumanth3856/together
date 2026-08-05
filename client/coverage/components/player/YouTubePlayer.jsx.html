@@ -425,27 +425,7 @@
 <a name='L360'></a><a href='#L360'>360</a>
 <a name='L361'></a><a href='#L361'>361</a>
 <a name='L362'></a><a href='#L362'>362</a>
-<a name='L363'></a><a href='#L363'>363</a>
-<a name='L364'></a><a href='#L364'>364</a>
-<a name='L365'></a><a href='#L365'>365</a>
-<a name='L366'></a><a href='#L366'>366</a>
-<a name='L367'></a><a href='#L367'>367</a>
-<a name='L368'></a><a href='#L368'>368</a>
-<a name='L369'></a><a href='#L369'>369</a>
-<a name='L370'></a><a href='#L370'>370</a>
-<a name='L371'></a><a href='#L371'>371</a>
-<a name='L372'></a><a href='#L372'>372</a>
-<a name='L373'></a><a href='#L373'>373</a>
-<a name='L374'></a><a href='#L374'>374</a>
-<a name='L375'></a><a href='#L375'>375</a>
-<a name='L376'></a><a href='#L376'>376</a>
-<a name='L377'></a><a href='#L377'>377</a>
-<a name='L378'></a><a href='#L378'>378</a>
-<a name='L379'></a><a href='#L379'>379</a>
-<a name='L380'></a><a href='#L380'>380</a>
-<a name='L381'></a><a href='#L381'>381</a>
-<a name='L382'></a><a href='#L382'>382</a>
-<a name='L383'></a><a href='#L383'>383</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L363'></a><a href='#L363'>363</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -778,28 +758,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1144,49 +1104,29 @@ export const YouTubePlayer = <span class="cstat-no" title="statement not covered
   const progressPercent = <span class="cstat-no" title="statement not covered" >duration &gt; 0 ? (currentTime / duration) * 100 : 0;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
-    &lt;div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column' }}&gt;
+    &lt;div className="relative w-full flex flex-col"&gt;
       {/* 16:9 Cinema Frame */}
       &lt;div
         ref={containerRef}
-        style={{
-          position: 'relative',
-          width: '100%',
-          paddingTop: '56.25%',
-          background: '#000',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden',
-          border: '1px solid var(--border-subtle)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-        }}
+        className="relative w-full pt-[56.25%] bg-black rounded-2xl overflow-hidden border border-outline shadow-xl"
       &gt;
         &lt;div
           id="yt-player-element"
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+          className="absolute top-0 left-0 w-full h-full"
         /&gt;
 &nbsp;
         {/* Autoplay Blocked Overlay */}
         {isPlayerReady &amp;&amp; playback?.isPlaying &amp;&amp; !localPlaying &amp;&amp; (
-          &lt;div style={{
-            position: 'absolute', top: '16px', left: '50%', transform: 'translateX(-50%)',
-            zIndex: 20, animation: 'fadeIn 0.3s ease',
-          }}&gt;
+          &lt;div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 animate-fade-in-up"&gt;
             &lt;button
 <span class="fstat-no" title="function not covered" >              onClick={() =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >                if (playerRef.current) {</span>
 <span class="cstat-no" title="statement not covered" >                  playerRef.current.playVideo();</span>
                 }
               }}
-              className="btn btn-primary"
-              style={{
-                padding: '8px 18px', fontSize: '0.85rem',
-                borderRadius: 'var(--radius-full)',
-                boxShadow: '0 4px 16px rgba(1,69,242,0.4)',
-                background: 'rgba(1, 69, 242, 0.95)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-              }}
+              className="bg-primary/90 backdrop-blur-md text-on-primary px-6 py-2.5 rounded-full font-label-lg shadow-[0_4px_20px_rgba(205,0,0,0.4)] flex items-center gap-2 hover:bg-primary transition-colors"
             &gt;
-              &lt;Play size={16} /&gt;
+              &lt;span className="material-symbols-outlined fill-1"&gt;play_arrow&lt;/span&gt;
               &lt;span&gt;Click to Sync&lt;/span&gt;
             &lt;/button&gt;
           &lt;/div&gt;
@@ -1216,7 +1156,7 @@ export const YouTubePlayer = <span class="cstat-no" title="statement not covered
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-02T14:54:41.778Z
+                at 2026-08-05T17:02:23.506Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

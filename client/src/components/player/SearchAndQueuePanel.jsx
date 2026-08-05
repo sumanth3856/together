@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Search, ListVideo, Plus, Play, Trash2, Loader, Youtube } from 'lucide-react';
+import React, { useState } from 'react';
 import { useRoomStore } from '../../store/useRoomStore';
+
 export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) {
-  const [activeTab, setActiveTab] = useState('search'); // 'search' or 'queue'
+  const [activeTab, setActiveTab] = useState('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
             return `${protocol}//${hostname}:4000`;
           }
         }
-        return ''; // Falls back to relative if not configured
+        return '';
       };
 
       const baseUrl = getApiUrl();
@@ -49,7 +49,6 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
 
   const handleAddToQueue = (video) => {
     if (onAddVideo) onAddVideo(video);
-    // Switch to queue tab to show it was added
     setActiveTab('queue');
   };
 
@@ -65,74 +64,106 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
   };
 
   return (
-    <div className="panel-glass" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)' }}>
-      
+    <div className="bg-surface-container rounded-3xl border border-outline-variant shadow-sm overflow-hidden flex flex-col h-full max-h-full">
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', background: 'rgba(30, 30, 30, 0.4)' }}>
+      <div className="flex border-b border-outline-variant/50 bg-surface-container-lowest shrink-0">
         <button
           onClick={() => setActiveTab('search')}
-          style={{
-            flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '600',
-            color: activeTab === 'search' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-            borderBottom: activeTab === 'search' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-          }}
+          className={`flex-1 py-4 flex items-center justify-center gap-2 font-label-lg transition-colors border-b-2 ${activeTab === 'search' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-background'}`}
         >
-          <Search size={16} /> Search
+          <span className="material-symbols-outlined text-[18px]">search</span>
+          Search
         </button>
         <button
           onClick={() => setActiveTab('queue')}
-          style={{
-            flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '600',
-            color: activeTab === 'queue' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-            borderBottom: activeTab === 'queue' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-          }}
+          className={`flex-1 py-4 flex items-center justify-center gap-2 font-label-lg transition-colors border-b-2 ${activeTab === 'queue' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-background'}`}
         >
-          <ListVideo size={16} /> Queue ({queue.length})
+          <span className="material-symbols-outlined text-[18px]">queue_music</span>
+          Queue ({queue.length})
         </button>
       </div>
 
       {/* Content Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 bg-surface-container">
         
         {/* Search Tab */}
         {activeTab === 'search' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <form onSubmit={handleSearch} style={{ display: 'flex', gap: '8px' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <Search size={14} color="var(--text-tertiary)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+          <div className="flex flex-col gap-4 h-full">
+            <form onSubmit={handleSearch} className="flex gap-2 shrink-0">
+              <div className="relative flex-1">
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
                 <input
                   type="text"
                   placeholder="Search YouTube..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="input-field"
-                  style={{ paddingLeft: '32px', fontSize: '0.85rem', background: 'var(--bg-input)' }}
+                  className="w-full pl-11 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-on-background focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-shadow"
                 />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={loading} style={{ padding: '0 12px' }}>
-                {loading ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : 'Go'}
+              <button 
+                type="submit" 
+                disabled={loading} 
+                className="bg-primary text-on-primary px-5 rounded-xl font-label-lg hover:bg-surface-tint transition-all disabled:opacity-50 flex items-center justify-center min-w-[64px]"
+              >
+                {loading ? <span className="material-symbols-outlined animate-spin">progress_activity</span> : 'Go'}
               </button>
             </form>
 
-            {error && <div style={{ color: 'var(--status-error)', fontSize: '0.8rem', textAlign: 'center' }}>{error}</div>}
+            {error && <div className="text-error font-label-sm text-center bg-error-container/50 p-2 rounded-lg">{error}</div>}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="flex flex-col gap-3 overflow-y-auto">
+              {results.length === 0 && !loading && !error && (
+                 <div className="flex flex-col items-center justify-center h-40 text-on-surface-variant opacity-70">
+                    <span className="material-symbols-outlined text-4xl mb-2">youtube_activity</span>
+                    <span className="font-label-sm">Search for videos to watch</span>
+                 </div>
+              )}
+              {loading && (
+                <div className="flex flex-col gap-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant animate-pulse">
+                      <div className="w-[100px] h-[56px] shrink-0 rounded-lg bg-surface-container-high"></div>
+                      <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+                        <div className="h-4 bg-surface-container-high rounded-full w-3/4"></div>
+                        <div className="h-3 bg-surface-container-high rounded-full w-1/2"></div>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0 justify-center pr-1">
+                        <div className="w-7 h-7 rounded-lg bg-surface-container-high"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {results.map((v) => (
-                <div key={v.youtubeId} style={{ display: 'flex', gap: '10px', background: 'var(--bg-surface-2)', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                  <img src={v.thumbnail} alt={v.title} style={{ width: '100px', height: '56px', objectFit: 'cover', borderRadius: '4px' }} />
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.title}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>{v.author} • {v.duration}</div>
+                <div key={v.youtubeId} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant hover:border-primary-container transition-colors group">
+                  <div className="w-[100px] h-[56px] shrink-0 rounded-lg overflow-hidden relative">
+                     <img 
+                        src={v.thumbnail} 
+                        alt={v.title} 
+                        className="w-full h-full object-cover bg-surface-container" 
+                        onError={(e) => {
+                          if (e.target.src !== `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`) {
+                            e.target.src = `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`;
+                          }
+                        }}
+                     />
+                     <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] px-1 rounded font-label-sm">
+                         {v.duration}
+                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
-                    <button type="button" onClick={() => handleAddToQueue(v)} style={{ background: 'var(--bg-surface-3)', border: 'none', borderRadius: '4px', padding: '6px', cursor: 'pointer', color: 'var(--accent-primary)' }} title="Add to Queue">
-                      <Plus size={14} />
+                  <div className="flex-1 min-w-0 flex flex-col justify-center">
+                    <div className="font-label-md text-on-background truncate group-hover:text-primary transition-colors">{v.title}</div>
+                    <div className="font-label-sm text-xs text-on-surface-variant truncate mt-0.5">{v.author}</div>
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0 justify-center pr-1">
+                    <button type="button" onClick={() => handleAddToQueue(v)} className="w-7 h-7 rounded-lg bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary flex items-center justify-center transition-colors" title="Add to Queue">
+                       <span className="material-symbols-outlined text-[16px]">add</span>
                     </button>
-                    <button type="button" onClick={() => handlePlayNow(v)} style={{ background: 'var(--accent-primary)', border: 'none', borderRadius: '4px', padding: '6px', cursor: 'pointer', color: '#fff' }} title="Play Now">
-                      <Play size={14} />
-                    </button>
+                    {isHost && (
+                      <button type="button" onClick={() => handlePlayNow(v)} className="w-7 h-7 rounded-lg bg-primary text-on-primary hover:bg-surface-tint flex items-center justify-center transition-colors" title="Play Now">
+                        <span className="material-symbols-outlined text-[16px] fill-1">play_arrow</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -142,28 +173,45 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
 
         {/* Queue Tab */}
         {activeTab === 'queue' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="flex flex-col gap-3 h-full overflow-y-auto">
             {queue.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-tertiary)' }}>
-                <ListVideo size={32} style={{ opacity: 0.5, marginBottom: '10px' }} />
-                <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>Queue is empty</div>
-                <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>Search for videos to add them here.</div>
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-on-surface-variant opacity-70">
+                <span className="material-symbols-outlined text-4xl mb-2">queue_music</span>
+                <span className="font-label-sm">Queue is empty</span>
+                <span className="text-[11px] mt-1">Search for videos to add them here.</span>
               </div>
             ) : (
               queue.map((v, index) => (
-                <div key={v.id} style={{ display: 'flex', gap: '10px', background: 'var(--bg-surface-2)', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: '-6px', left: '-6px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div key={v.id} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant relative hover:border-primary-container transition-colors group">
+                  <div className="absolute -top-2 -left-2 bg-primary text-on-primary text-[10px] font-label-lg w-5 h-5 rounded-full flex items-center justify-center shadow-md">
                     {index + 1}
                   </div>
-                  <img src={v.thumbnail} alt={v.title} style={{ width: '100px', height: '56px', objectFit: 'cover', borderRadius: '4px' }} />
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.title}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>Added by {v.addedBy}</div>
+                  <div className="w-[100px] h-[56px] shrink-0 rounded-lg overflow-hidden ml-2">
+                     <img 
+                        src={v.thumbnail} 
+                        alt={v.title} 
+                        className="w-full h-full object-cover bg-surface-container"
+                        onError={(e) => {
+                          if (e.target.src !== `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`) {
+                            e.target.src = `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`;
+                          }
+                        }}
+                     />
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-center">
+                    <div className="font-label-md text-on-background truncate group-hover:text-primary transition-colors">{v.title}</div>
+                    <div className="font-label-sm text-[10px] text-on-surface-variant truncate mt-0.5 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">person</span>
+                        {v.addedBy}
+                    </div>
                   </div>
                   {isHost && (
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <button type="button" onClick={() => handleRemoveFromQueue(v.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', borderRadius: '4px', padding: '8px', cursor: 'pointer', color: '#ef4444' }} title="Remove">
-                        <Trash2 size={16} />
+                    <div className="flex flex-col gap-1 shrink-0 justify-center pr-1">
+                      <button type="button" onClick={() => handlePlayNow(v)} className="w-7 h-7 rounded-lg bg-primary text-on-primary hover:bg-surface-tint flex items-center justify-center transition-colors" title="Play Now">
+                        <span className="material-symbols-outlined text-[16px] fill-1">play_arrow</span>
+                      </button>
+                      <button type="button" onClick={() => handleRemoveFromQueue(v.id)} className="w-7 h-7 rounded-lg bg-error/10 text-error hover:bg-error hover:text-on-error flex items-center justify-center transition-colors" title="Remove">
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
                       </button>
                     </div>
                   )}
