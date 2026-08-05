@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 
 export function ConfirmationModal({ 
   title, 
@@ -10,6 +11,8 @@ export function ConfirmationModal({
   variant = 'danger' 
 }) {
   const modalRef = useRef(null);
+
+  useLockBodyScroll(true);
 
   // Close on Escape key
   useEffect(() => {

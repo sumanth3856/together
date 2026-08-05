@@ -13,6 +13,14 @@ vi.mock('socket.io-client', () => ({
   }))
 }));
 
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    },
+  },
+}));
+
 describe('useSocket', () => {
   beforeEach(() => {
     mockEmit.mockClear();
@@ -20,9 +28,12 @@ describe('useSocket', () => {
     localStorage.clear();
   });
 
-  it('connects to socket and returns functions', () => {
+  it('connects to socket and returns functions', async () => {
     const { result } = renderHook(() => useSocket());
-    
+
+    // Flush the async initSocket (supabase.getSession -> io)
+    await act(async () => {});
+
     expect(typeof result.current.createRoom).toBe('function');
     expect(typeof result.current.joinRoom).toBe('function');
     expect(typeof result.current.leaveRoom).toBe('function');
@@ -34,14 +45,16 @@ describe('useSocket', () => {
     expect(mockEmit).toHaveBeenCalledWith('send_chat', { text: 'hello' });
   });
 
-  it('addToQueue emits correct event', () => {
+  it('addToQueue emits correct event', async () => {
     const { result } = renderHook(() => useSocket());
+    await act(async () => {});
     act(() => result.current.addToQueue({ videoId: '123' }));
     expect(mockEmit).toHaveBeenCalledWith('add_to_queue', { videoId: '123' });
   });
 
-  it('syncPlayback emits correct event', () => {
+  it('syncPlayback emits correct event', async () => {
     const { result } = renderHook(() => useSocket());
+    await act(async () => {});
     act(() => result.current.syncPlayback({ currentTime: 10 }));
     expect(mockEmit).toHaveBeenCalledWith('sync_playback', { currentTime: 10 });
   });

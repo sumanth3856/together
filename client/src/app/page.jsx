@@ -9,17 +9,15 @@ import { useUIStore } from '../store/useUIStore';
 import { supabase } from '../lib/supabase';
 
 const LandingPage = dynamic(() => import('../components/landing/LandingPage').then((mod) => mod.LandingPage), { ssr: false });
-
-import { RoomHeader } from '../components/room/RoomHeader';
-import { YouTubePlayer } from '../components/player/YouTubePlayer';
-import { VideoDetailsCard } from '../components/player/VideoDetailsCard';
-
-import { MemberList } from '../components/room/MemberList';
-import { ChatPanel } from '../components/chat/ChatPanel';
-import { SearchAndQueuePanel } from '../components/player/SearchAndQueuePanel';
-import { MobileTabBar } from '../components/room/MobileTabBar';
-import { ConfirmationModal } from '../components/common/ConfirmationModal';
-import { AlertCircle, CheckCircle2, X, Wifi, WifiOff } from 'lucide-react';
+const RoomHeader = dynamic(() => import('../components/room/RoomHeader').then((mod) => mod.RoomHeader), { ssr: false });
+const YouTubePlayer = dynamic(() => import('../components/player/YouTubePlayer').then((mod) => mod.YouTubePlayer), { ssr: false });
+const VideoDetailsCard = dynamic(() => import('../components/player/VideoDetailsCard').then((mod) => mod.VideoDetailsCard), { ssr: false });
+const MemberList = dynamic(() => import('../components/room/MemberList').then((mod) => mod.MemberList), { ssr: false });
+const ChatPanel = dynamic(() => import('../components/chat/ChatPanel').then((mod) => mod.ChatPanel), { ssr: false });
+const SearchAndQueuePanel = dynamic(() => import('../components/player/SearchAndQueuePanel').then((mod) => mod.SearchAndQueuePanel), { ssr: false });
+const MobileTabBar = dynamic(() => import('../components/room/MobileTabBar').then((mod) => mod.MobileTabBar), { ssr: false });
+const ToastStack = dynamic(() => import('../components/common/ToastStack').then((mod) => mod.ToastStack), { ssr: false });
+import { AlertCircle, Wifi, WifiOff } from 'lucide-react';
 
 export default function Page() {
   const {
@@ -57,15 +55,12 @@ export default function Page() {
   const socketId = useRoomStore(state => state.socketId);
   const sessionEnded = useRoomStore(state => state.sessionEnded);
 
-  const toasts = useUIStore(state => state.toasts);
   const setToastNotification = useUIStore(state => state.setToastNotification);
-  const removeToast = useUIStore(state => state.removeToast);
   const incomingReaction = useUIStore(state => state.incomingReaction);
 
   const [initialRoomId, setInitialRoomId] = useState('');
   const [mobileActiveTab, setMobileActiveTab] = useState('video');
   const [isMobileScreen, setIsMobileScreen] = useState(false);
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
   const [user, setUser] = useState(null);
 
@@ -164,12 +159,7 @@ export default function Page() {
     }
   }, [actions, setToastNotification]);
 
-  const handleLeaveRoom = useCallback(() => {
-    setShowLeaveModal(true);
-  }, []);
-
-  const confirmLeaveRoom = useCallback(async () => {
-    setShowLeaveModal(false);
+  const handleLeaveRoom = useCallback(async () => {
     try {
       await actions.leaveRoom();
     } catch (_) {}
@@ -194,7 +184,7 @@ export default function Page() {
 
   // ---------- Render ----------
   return (
-    <div style={{ minHeight: '100dvh', position: 'relative', background: 'var(--bg-primary)' }}>
+    <div style={{ minHeight: '100dvh', position: 'relative', background: '#efede6' }}>
 
       {/* ── Reconnecting Banner ── */}
       {isReconnecting && !roomId && (
@@ -230,57 +220,13 @@ export default function Page() {
       )}
 
       {/* ── Toast Notifications Stack ── */}
-      <div style={{
-        position: 'fixed',
-        top: isReconnecting ? '48px' : '16px',
-        right: '16px',
-        left: isMobileScreen ? '16px' : 'auto',
-        zIndex: 10000,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        pointerEvents: 'none',
-      }}>
-        {toasts.map((toast) => (
-          <div key={toast.id} style={{
-            pointerEvents: 'auto',
-            maxWidth: '380px',
-            animation: 'slideInRight 0.25s ease',
-            display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '12px 14px',
-            background: 'var(--bg-surface-2)',
-            border: `1px solid ${toast.type === 'error' ? 'rgba(244,63,94,0.35)' : 'rgba(99,102,241,0.35)'}`,
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-lg)',
-          }}>
-            <div style={{
-              width: '30px', height: '30px', borderRadius: 'var(--radius-md)', flexShrink: 0,
-              background: toast.type === 'error' ? 'rgba(244,63,94,0.12)' : 'var(--accent-primary-dim)',
-              border: `1px solid ${toast.type === 'error' ? 'rgba(244,63,94,0.22)' : 'rgba(99,102,241,0.22)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {toast.type === 'error'
-                ? <AlertCircle size={15} color="var(--status-danger)" />
-                : <CheckCircle2 size={15} color="var(--accent-primary)" />}
-            </div>
-            <span style={{ fontSize: '0.84rem', color: 'var(--text-primary)', flex: 1, lineHeight: 1.4 }}>
-              {toast.message}
-            </span>
-            <button
-              onClick={() => removeToast(toast.id)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '4px', borderRadius: 'var(--radius-sm)', display: 'flex', flexShrink: 0 }}
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
+      <ToastStack top={isReconnecting ? '48px' : '16px'} />
 
       {/* ── Reconnecting full-screen overlay (no room, no session ended) ── */}
       {isReconnecting && !roomId && !sessionEnded && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'var(--bg-primary)',
+          background: '#efede6',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px',
           animation: 'fadeIn 0.3s ease',
         }}>
@@ -289,13 +235,13 @@ export default function Page() {
             background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#cd0000" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
               <path d="M21 12a9 9 0 1 1-6.219-8.56" />
             </svg>
           </div>
           <div style={{ textAlign: 'center' }}>
             <h2 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '6px' }}>Rejoining your room…</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Restoring your session, please wait.</p>
+            <p style={{ color: '#5e3f3a', fontSize: '0.875rem' }}>Restoring your session, please wait.</p>
           </div>
           <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`}</style>
         </div>
@@ -324,18 +270,18 @@ export default function Page() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: '20px', boxShadow: '0 0 40px rgba(244,63,94,0.12)',
             }}>
-              <AlertCircle size={36} color="var(--status-danger)" />
+              <AlertCircle size={36} color="#ba1a1a" />
             </div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', fontFamily: "var(--font-outfit), sans-serif" }}>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', fontFamily: "var(--font-oswald), sans-serif" }}>
               Session Ended
             </h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', maxWidth: '300px', lineHeight: 1.6, fontSize: '0.9rem' }}>
+            <p style={{ color: '#5e3f3a', marginBottom: '28px', maxWidth: '300px', lineHeight: 1.6, fontSize: '0.9rem' }}>
               The host left the room and ended the session. Thanks for watching together!
             </p>
             <button
-              className="btn btn-primary"
+              className="bg-primary text-on-primary hover:bg-surface-tint transition-colors shadow-md"
               onClick={() => window.location.href = '/'}
-              style={{ padding: '12px 32px', borderRadius: 'var(--radius-full)', fontSize: '0.95rem' }}
+              style={{ padding: '12px 32px', borderRadius: '9999px', fontSize: '0.95rem' }}
             >
               Return Home
             </button>
@@ -446,17 +392,6 @@ export default function Page() {
                 chatCount={chatHistoryLength}
               />
             </div>
-          )}
-
-          {/* Leave Confirmation Modal */}
-          {showLeaveModal && (
-            <ConfirmationModal
-              title="Leave Room?"
-              message="Are you sure you want to leave? Your connection will be lost."
-              confirmText="Leave Surely"
-              onConfirm={confirmLeaveRoom}
-              onCancel={() => setShowLeaveModal(false)}
-            />
           )}
         </div>
       )}

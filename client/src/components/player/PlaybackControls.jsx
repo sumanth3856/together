@@ -82,7 +82,7 @@ export const PlaybackControls = memo(function PlaybackControls({
           />
           {/* Custom Thumb */}
           <div 
-            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-primary rounded-full shadow border-2 border-surface-container-lowest opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" 
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 md:w-4 md:h-4 bg-primary rounded-full shadow border-2 border-surface-container-lowest opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity pointer-events-none" 
             style={{ left: `${isDragging ? (dragValue / (duration || 1)) * 100 : progressPercent}%` }} 
           />
           <input

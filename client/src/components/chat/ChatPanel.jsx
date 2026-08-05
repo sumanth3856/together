@@ -134,7 +134,7 @@ export const ChatPanel = memo(function ChatPanel() {
                   {/* Avatar */}
                   <div className="shrink-0 pt-1">
                     {msg.avatar ? (
-                      <img src={msg.avatar} alt="Avatar" className="w-8 h-8 rounded-full border border-outline-variant" />
+                      <img src={msg.avatar} alt="Avatar" loading="lazy" className="w-8 h-8 rounded-full border border-outline-variant" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-label-sm border border-outline-variant">
                          {msg.sender?.charAt(0).toUpperCase() || '?'}

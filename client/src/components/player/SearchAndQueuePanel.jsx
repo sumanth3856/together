@@ -140,6 +140,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                      <img 
                         src={v.thumbnail} 
                         alt={v.title} 
+                        loading="lazy"
                         className="w-full h-full object-cover bg-surface-container" 
                         onError={(e) => {
                           if (e.target.src !== `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`) {
@@ -190,6 +191,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                      <img 
                         src={v.thumbnail} 
                         alt={v.title} 
+                        loading="lazy"
                         className="w-full h-full object-cover bg-surface-container"
                         onError={(e) => {
                           if (e.target.src !== `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`) {

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
-import { JoinRoomModal } from '../room/JoinRoomModal';
-import { CreateRoomModal } from '../room/CreateRoomModal';
-import { SignInModal } from '../room/SignInModal';
-import { UserProfileModal } from '../profile/UserProfileModal';
+
+const JoinRoomModal = dynamic(() => import('../room/JoinRoomModal').then((mod) => mod.JoinRoomModal), { ssr: false });
+const CreateRoomModal = dynamic(() => import('../room/CreateRoomModal').then((mod) => mod.CreateRoomModal), { ssr: false });
+const SignInModal = dynamic(() => import('../room/SignInModal').then((mod) => mod.SignInModal), { ssr: false });
+const UserProfileModal = dynamic(() => import('../profile/UserProfileModal').then((mod) => mod.UserProfileModal), { ssr: false });
 
 export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   const [scrolled, setScrolled] = useState(false);
@@ -95,14 +97,110 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
               Join a Room
             </button>
           </div>
-          <div className="mt-12 sm:mt-20 w-full max-w-5xl aspect-video rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl relative animate-fade-in-up delay-300 border border-outline-variant bg-surface-container-lowest">
-            <div className="absolute inset-0 flex items-center justify-center flex-col gap-4">
-              <span className="material-symbols-outlined text-[60px] sm:text-[80px] text-primary opacity-20">play_circle</span>
-              <p className="font-label-sm text-on-surface-variant uppercase tracking-widest opacity-50 text-[10px] sm:text-xs px-4 text-center">Video Player Interface Preview</p>
+          {/* Product Preview */}
+          <div className="mt-12 sm:mt-20 w-full max-w-5xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl relative animate-fade-in-up delay-300 border border-outline-variant bg-surface-container-lowest">
+            {/* Room bar */}
+            <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 bg-surface-container border-b border-outline-variant">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-error animate-pulse shrink-0"></span>
+                <span className="font-label-sm text-on-surface-variant tracking-widest text-[10px] sm:text-xs">LIVE · ROOM 482913</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-1.5">
+                  {['J','M','A'].map((l, i) => (
+                    <span key={i} className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[9px] sm:text-[10px] flex items-center justify-center font-label-sm border border-surface ${i === 0 ? 'bg-primary text-on-primary' : i === 1 ? 'bg-surface-container-high text-on-surface' : 'bg-error-container text-on-error-container'}`}>{l}</span>
+                  ))}
+                </div>
+                <span className="font-label-sm text-on-surface-variant text-[10px] sm:text-xs">3 watching</span>
+              </div>
             </div>
-            <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6 h-10 sm:h-12 glass-card rounded-xl flex items-center px-4 gap-3 opacity-80">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary opacity-20 shrink-0"></div>
-              <div className="h-2 bg-on-surface opacity-10 rounded-full flex-1"></div>
+
+            <div className="flex flex-col md:flex-row">
+              {/* Video player */}
+              <div className="relative flex-1 bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-950 aspect-video md:aspect-auto md:min-h-[320px]">
+                <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
+                <div className="absolute bottom-0 right-10 w-52 h-52 rounded-full bg-primary/20 blur-3xl pointer-events-none"></div>
+
+                {/* Sync badge */}
+                <div className="absolute top-3 sm:top-4 left-3 sm:left-4 flex items-center gap-2 glass-card rounded-full px-3 sm:px-4 py-1 sm:py-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0"></span>
+                  <span className="font-label-sm text-on-surface text-[9px] sm:text-[11px] tracking-wider">SYNCED · 1:24:05</span>
+                </div>
+
+                {/* 4K badge */}
+                <div className="absolute top-3 sm:top-4 right-3 sm:right-4 glass-card rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
+                  <span className="font-label-sm text-on-surface text-[9px] sm:text-[11px] tracking-widest">4K</span>
+                </div>
+
+                {/* Center play */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 sm:gap-4">
+                  <div className="preview-play-btn w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-2xl shadow-primary/40 cursor-default">
+                    <span className="material-symbols-outlined text-[28px] sm:text-[32px] ml-0.5">play_arrow</span>
+                  </div>
+                  <p className="font-label-sm text-white/70 tracking-widest text-[9px] sm:text-[11px] uppercase">Everyone watches in perfect sync</p>
+                </div>
+
+                {/* Controls */}
+                <div className="absolute bottom-3 sm:bottom-5 left-3 sm:left-5 right-3 sm:right-5 glass-card rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+                    <span className="text-[9px] sm:text-[10px] text-on-surface-variant font-label-sm tabular-nums">1:24:05</span>
+                    <div className="relative h-1 flex-1 rounded-full bg-on-surface/15 overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 w-3/5 rounded-full bg-primary"></div>
+                      <div className="preview-shimmer absolute inset-y-0 w-1/3 rounded-full bg-white/40"></div>
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] text-on-surface-variant font-label-sm tabular-nums">1:58:33</span>
+                  </div>
+                  <div className="flex items-center gap-2 sm:gap-3 text-on-surface">
+                    <span className="material-symbols-outlined text-[14px] sm:text-[16px] cursor-default">skip_previous</span>
+                    <span className="material-symbols-outlined text-[18px] sm:text-[20px] text-primary cursor-default">pause_circle</span>
+                    <span className="material-symbols-outlined text-[14px] sm:text-[16px] cursor-default">skip_next</span>
+                    <span className="material-symbols-outlined text-[14px] sm:text-[16px] cursor-default">volume_up</span>
+                    <span className="flex-1"></span>
+                    <span className="material-symbols-outlined text-[14px] sm:text-[16px] cursor-default">picture_in_picture_alt</span>
+                    <span className="material-symbols-outlined text-[14px] sm:text-[16px] cursor-default">fullscreen</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live chat sidebar */}
+              <div className="hidden md:flex w-64 lg:w-72 flex-col bg-surface border-l border-outline-variant">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
+                  <span className="font-label-sm text-on-surface tracking-wide text-xs">Live Chat</span>
+                  <span className="flex items-center gap-1 font-label-sm text-on-surface-variant text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>3 online
+                  </span>
+                </div>
+                <div className="flex-1 flex flex-col gap-3 p-3 sm:p-4">
+                  <div className="flex items-start gap-2">
+                    <span className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-[11px] shrink-0">J</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="bg-surface-container rounded-xl rounded-tl-sm px-2.5 py-2 text-[11px] leading-4 text-on-surface">Wait, did you see that?!</div>
+                      <span className="text-[9px] text-on-surface-variant ml-1">pinned to 1:24:05</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 flex-row-reverse">
+                    <span className="w-7 h-7 rounded-full bg-error-container text-on-error-container flex items-center justify-center font-label-sm text-[11px] shrink-0">M</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="bg-primary text-on-primary rounded-xl rounded-tr-sm px-2.5 py-2 text-[11px] leading-4">OMG yes! Rewinding 10s...</div>
+                      <span className="text-[9px] text-on-surface-variant mr-1 block text-right">1:24:12</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="w-7 h-7 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center font-label-sm text-[11px] shrink-0">A</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="bg-surface-container rounded-xl rounded-tl-sm px-2.5 py-2 text-[11px] leading-4">adding this to the queue next</div>
+                      <span className="text-[9px] text-on-surface-variant ml-1">1:26:40</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 border-t border-outline-variant">
+                  <div className="flex items-center gap-2 bg-surface-container rounded-full px-3 py-2">
+                    <span className="material-symbols-outlined text-[14px] text-on-surface-variant">emoji_emotions</span>
+                    <span className="flex-1 text-[11px] text-on-surface-variant opacity-60">Send a message...</span>
+                    <span className="material-symbols-outlined text-[14px] text-primary">send</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

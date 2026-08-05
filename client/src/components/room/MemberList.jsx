@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useSocket } from '../../hooks/useSocket';
 
@@ -8,11 +8,27 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
   const hostId = roomState?.hostId;
   
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [menuAnchor, setMenuAnchor] = useState(null);
 
-  const toggleMenu = (userId) => {
-    if (openMenuId === userId) setOpenMenuId(null);
-    else setOpenMenuId(userId);
+  const toggleMenu = (userId, e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuAnchor({
+      top: rect.bottom + 4,
+      right: Math.max(8, window.innerWidth - rect.right),
+    });
+    setOpenMenuId((prev) => (prev === userId ? null : userId));
   };
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const close = () => setOpenMenuId(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [openMenuId]);
 
   return (
     <div className="bg-surface-container rounded-3xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
@@ -45,7 +61,7 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
               {/* Avatar */}
               <div className="shrink-0">
                 {m.avatar ? (
-                  <img src={m.avatar} alt="Avatar" className="w-10 h-10 rounded-full border border-outline-variant" />
+                  <img src={m.avatar} alt="Avatar" loading="lazy" className="w-10 h-10 rounded-full border border-outline-variant" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-on-primary font-display-md shadow-sm">
                     {initial}
@@ -72,11 +88,12 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
               {/* Host Controls */}
               {iAmHost && !isYou && (
                 <div>
-                  <button onClick={() => toggleMenu(m.userId)} className="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest hover:text-on-background transition-colors">
+                  <button onClick={(e) => toggleMenu(m.userId, e)} className="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest hover:text-on-background transition-colors">
                     <span className="material-symbols-outlined text-[20px]">more_vert</span>
                   </button>
-                  {openMenuId === m.userId && (
-                    <div className="absolute right-4 top-12 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-10 w-48 py-2 animate-fade-in-up">
+                  {openMenuId === m.userId && menuAnchor && (
+                    <div className="fixed z-50 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl w-48 py-2 animate-fade-in-up"
+                      style={{ top: menuAnchor.top, right: menuAnchor.right }}>
                       <button 
                         onClick={() => { transferHost(m.userId); setOpenMenuId(null); }}
                         className="w-full text-left px-4 py-2 font-label-md text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2"

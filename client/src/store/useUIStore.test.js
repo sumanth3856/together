@@ -19,8 +19,13 @@ describe('useUIStore', () => {
     expect(state.toasts.length).toBe(1);
     expect(state.toasts[0].message).toBe('Hello');
 
-    // Fast forward 4 seconds
+    // Fast forward 4 seconds: toast is marked as leaving so the exit animation plays
     vi.advanceTimersByTime(4000);
+    state = useUIStore.getState();
+    expect(state.toasts[0].leaving).toBe(true);
+
+    // After the exit animation duration it is fully removed
+    vi.advanceTimersByTime(250);
     state = useUIStore.getState();
     expect(state.toasts.length).toBe(0);
   });
@@ -34,6 +39,11 @@ describe('useUIStore', () => {
     const idToRemove = state.toasts[0].id;
     useUIStore.getState().removeToast(idToRemove);
 
+    state = useUIStore.getState();
+    expect(state.toasts[0].leaving).toBe(true);
+    expect(state.toasts.length).toBe(2);
+
+    vi.advanceTimersByTime(250);
     state = useUIStore.getState();
     expect(state.toasts.length).toBe(1);
     expect(state.toasts[0].message).toBe('Toast 2');

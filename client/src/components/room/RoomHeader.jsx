@@ -26,28 +26,28 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
       <header className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-outline-variant h-16 flex items-center justify-between px-4 md:px-8">
         
         {/* Left: Brand */}
-        <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-2xl fill-1">play_circle</span>
-            <span className="font-display-lg text-xl font-bold tracking-tight text-on-background">Being Us</span>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="material-symbols-outlined text-primary text-2xl fill-1 shrink-0">play_circle</span>
+            <span className="font-display-lg text-xl font-bold tracking-tight text-on-background truncate">Being Us</span>
         </div>
 
         {/* Center: Room Code */}
         {roomId && (
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center">
+          <div className="flex items-center shrink-0 mx-1 sm:mx-4">
               <button 
                 onClick={handleCopyCode}
                 title="Click to copy room code"
-                className="bg-surface-container hover:bg-surface-container-high transition-colors px-4 py-1.5 rounded-full border border-outline-variant flex items-center gap-2 group"
+                className="bg-surface-container hover:bg-surface-container-high transition-colors px-2 sm:px-4 py-1.5 rounded-full border border-outline-variant flex items-center gap-1.5 sm:gap-2 group max-w-[45vw]"
               >
-                  <span className="font-label-sm text-on-surface-variant uppercase tracking-widest">Room</span>
-                  <span className="font-display-lg font-bold text-primary tracking-widest">{roomId}</span>
-                  <span className="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-primary transition-colors">content_copy</span>
+                  <span className="hidden sm:inline font-label-sm text-on-surface-variant uppercase tracking-widest">Room</span>
+                  <span className="font-display-lg font-bold text-primary tracking-widest truncate text-base sm:text-xl">{roomId}</span>
+                  <span className="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-primary transition-colors shrink-0">content_copy</span>
               </button>
           </div>
         )}
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
             {user && (
               <button 
                 onClick={() => setIsProfileModalOpen(true)}

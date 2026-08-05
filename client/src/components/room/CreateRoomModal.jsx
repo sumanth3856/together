@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 
 export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
   const [loading, setLoading] = useState(false);
   const [mood, setMood] = useState('cosy'); // default mood
   const [roomName, setRoomName] = useState('');
+
+  useLockBodyScroll(isOpen);
 
   if (!isOpen) return null;
 
@@ -39,12 +42,12 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center font-body-md">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center font-body-md p-4 overflow-y-auto">
         {/* Backdrop */}
         <div className="absolute inset-0 bg-surface/90 backdrop-blur-md" onClick={onClose}></div>
         
         {/* Modal Container */}
-        <div className="relative z-10 w-full max-w-[540px] bg-surface-container-lowest rounded-3xl shadow-2xl overflow-hidden border border-outline-variant animate-fade-in-up">
+        <div className="relative z-10 my-auto w-full max-w-[540px] bg-surface-container-lowest rounded-3xl shadow-2xl overflow-hidden border border-outline-variant animate-fade-in-up">
             
             {/* Header */}
             <div className="p-6 pb-4 flex justify-between items-start border-b border-outline-variant/50">

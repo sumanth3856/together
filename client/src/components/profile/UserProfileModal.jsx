@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useUIStore } from '../../store/useUIStore';
 import { ConfirmationModal } from '../common/ConfirmationModal';
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 
 export function UserProfileModal({ isOpen, onClose, user }) {
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
@@ -9,6 +10,8 @@ export function UserProfileModal({ isOpen, onClose, user }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   const setToastNotification = useUIStore(state => state.setToastNotification);
+
+  useLockBodyScroll(isOpen);
 
   React.useEffect(() => {
     setDisplayName(user?.user_metadata?.full_name || '');

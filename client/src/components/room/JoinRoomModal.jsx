@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 
 export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user }) {
   const [code, setCode] = useState(initialRoomId ? initialRoomId.split('').concat(Array(6 - initialRoomId.length).fill('')) : ['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const inputRefs = useRef([]);
+
+  useLockBodyScroll(isOpen);
 
   useEffect(() => {
     if (isOpen && inputRefs.current[0]) {
@@ -87,12 +90,12 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user
   const isComplete = code.every(char => char !== '');
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center font-body-md">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center font-body-md p-4 overflow-y-auto">
         {/* Backdrop */}
         <div className="absolute inset-0 bg-surface/90 backdrop-blur-md" onClick={onClose}></div>
         
         {/* Modal Container */}
-        <div className="relative z-10 w-full max-w-[480px] bg-surface-container-lowest rounded-3xl shadow-2xl overflow-hidden border border-outline-variant animate-fade-in-up">
+        <div className="relative z-10 my-auto w-full max-w-[480px] bg-surface-container-lowest rounded-3xl shadow-2xl overflow-hidden border border-outline-variant animate-fade-in-up">
             
             {/* Header */}
             <div className="p-6 pb-0 flex justify-between items-start">

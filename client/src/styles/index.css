@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     background-color: theme('colors.background');
     color: theme('colors.on-background');
@@ -20,6 +23,43 @@
 .custom-scrollbar::-webkit-scrollbar-thumb {
     background-color: theme('colors.outline-variant');
     border-radius: theme('borderRadius.full');
+}
+
+/* Toast Notifications */
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(24px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+.toast-in {
+    animation: toast-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes toast-out {
+    from {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(24px) scale(0.98);
+    }
+}
+.toast-out {
+    animation: toast-out 0.25s ease-in forwards;
+}
+
+@keyframes toast-progress {
+    from { width: 100%; }
+    to { width: 0%; }
+}
+.toast-progress {
+    animation: toast-progress 4s linear forwards;
 }
 
 /* Sync Glow Effect */
@@ -60,10 +100,34 @@
     box-shadow: 0 4px 20px rgba(205, 0, 0, 0.15);
 }
 
+/* Landing product preview animations */
+@keyframes preview-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+}
+.preview-shimmer {
+    animation: preview-shimmer 2.5s ease-in-out infinite;
+}
+
+@keyframes preview-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+.preview-play-btn {
+    animation: preview-breathe 3s ease-in-out infinite;
+}
+
 /* Ambient background effect */
 .ambient-bg {
     background: radial-gradient(circle at 50% 0%, rgba(205, 0, 0, 0.05) 0%, transparent 50%),
                 radial-gradient(circle at 80% 50%, rgba(226, 223, 222, 0.4) 0%, transparent 40%);
+}
+
+/* Mobile sticky player (keeps the video visible while browsing tabs below) */
+.mobile-sticky-player {
+    position: sticky;
+    top: 64px;
+    z-index: 30;
 }
 
 /* Material Symbols Adjustments */
@@ -76,7 +140,9 @@
 
 /* 6-digit Code Input Slots */
 .code-input-slot {
-    width: 48px;
+    flex: 1 1 0;
+    max-width: 48px;
+    min-width: 0;
     height: 64px;
     text-align: center;
     font-size: 32px;
@@ -87,6 +153,12 @@
     border-radius: 4px;
     color: theme('colors.primary-container');
     transition: all 0.3s ease;
+}
+@media (max-width: 420px) {
+    .code-input-slot {
+        height: 54px;
+        font-size: 26px;
+    }
 }
 .code-input-slot:focus {
     outline: none;

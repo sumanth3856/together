@@ -89,42 +89,42 @@ describe('LandingPage', () => {
     expect(screen.queryByTestId('user-profile-modal')).not.toBeInTheDocument();
   });
 
-  it('opens JoinRoomModal when initialRoomId is provided', () => {
+  it('opens JoinRoomModal when initialRoomId is provided', async () => {
     render(<LandingPage {...defaultProps} initialRoomId="room-123" />);
 
-    expect(screen.getByTestId('join-room-modal')).toBeInTheDocument();
+    expect(await screen.findByTestId('join-room-modal')).toBeInTheDocument();
     expect(screen.getByTestId('modal-initial-room-id')).toHaveTextContent('room-123');
   });
 
 
-  it('opens CreateRoomModal via Start Watching Now button in hero section', () => {
+  it('opens CreateRoomModal via Start Watching Now button in hero section', async () => {
     render(<LandingPage {...defaultProps} />);
 
     const createPrivateRoomBtn = screen.getByRole('button', { name: /Start Watching Now/i });
     fireEvent.click(createPrivateRoomBtn);
 
-    expect(screen.getByTestId('create-room-modal')).toBeInTheDocument();
+    expect(await screen.findByTestId('create-room-modal')).toBeInTheDocument();
   });
 
-  it('opens JoinRoomModal via Join a Room button in hero section', () => {
+  it('opens JoinRoomModal via Join a Room button in hero section', async () => {
     render(<LandingPage {...defaultProps} />);
 
     const joinRoomBtn = screen.getByRole('button', { name: /Join a Room/i });
     fireEvent.click(joinRoomBtn);
 
-    expect(screen.getByTestId('join-room-modal')).toBeInTheDocument();
+    expect(await screen.findByTestId('join-room-modal')).toBeInTheDocument();
   });
 
-  it('opens CreateRoomModal and handles mouse events via Create Your Room button in CTA section', () => {
+  it('opens CreateRoomModal and handles mouse events via Create Your Room button in CTA section', async () => {
     render(<LandingPage {...defaultProps} />);
 
     const createYourRoomBtn = screen.getAllByRole('button', { name: /Create Your Room/i })[0];
 
     fireEvent.click(createYourRoomBtn);
-    expect(screen.getByTestId('create-room-modal')).toBeInTheDocument();
+    expect(await screen.findByTestId('create-room-modal')).toBeInTheDocument();
   });
 
-  it('renders user profile button with full_name when user is provided', () => {
+  it('renders user profile button with full_name when user is provided', async () => {
     const user = {
       id: 'user-1',
       user_metadata: {
@@ -134,12 +134,12 @@ describe('LandingPage', () => {
 
     render(<LandingPage {...defaultProps} user={user} />);
 
-    expect(screen.getByText('Alice Cooper')).toBeInTheDocument();
+    expect(screen.getByText('Alice')).toBeInTheDocument();
 
-    const profileBtn = screen.getByText('Alice Cooper').closest('button');
+    const profileBtn = screen.getByText('Alice').closest('button');
     fireEvent.click(profileBtn);
 
-    expect(screen.getByTestId('user-profile-modal')).toBeInTheDocument();
+    expect(await screen.findByTestId('user-profile-modal')).toBeInTheDocument();
     expect(screen.getByTestId('profile-user-id')).toHaveTextContent('user-1');
 
     // Close profile modal
@@ -149,7 +149,7 @@ describe('LandingPage', () => {
     expect(screen.queryByTestId('user-profile-modal')).not.toBeInTheDocument();
   });
 
-  it('renders user profile button with fallback text "My Profile" when full_name is missing', () => {
+  it('renders user profile button with fallback text "Profile" when full_name is missing', () => {
     const user = {
       id: 'user-2',
       user_metadata: {},
@@ -157,7 +157,7 @@ describe('LandingPage', () => {
 
     render(<LandingPage {...defaultProps} user={user} />);
 
-    expect(screen.getByText('My Profile')).toBeInTheDocument();
+    expect(screen.getByText('Profile')).toBeInTheDocument();
   });
 
   it('handles window scroll event to update header style', () => {

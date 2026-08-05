@@ -14,6 +14,7 @@ export function UserAvatar({ user, size = 32, style = {} }) {
       <img
         src={avatarUrl}
         alt="User Avatar"
+        loading="lazy"
         style={{
           width: size,
           height: size,

@@ -53,30 +53,14 @@ export function EmojiReactions({ incomingReaction, onSendReaction }) {
       </div>
 
       {/* Reaction Buttons Bar */}
-      <div 
-        style={{
-          padding: '6px 10px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: '4px',
-          background: 'var(--bg-input)',
-          borderBottom: '1px solid var(--border-subtle)'
-        }}
-      >
+      <div className="flex items-center justify-between gap-1 px-2 py-1.5 bg-surface-container border-b border-outline-variant/50 shrink-0">
         {REACTION_EMOJIS.map((emoji) => (
           <button
             key={emoji}
             onClick={() => handleEmojiClick(emoji)}
-            className="btn btn-ghost"
-            style={{
-              minHeight: '32px',
-              padding: 0,
-              width: '32px',
-              height: '32px',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: '1.1rem'
-            }}
+            className="flex-1 max-w-[38px] h-8 min-w-0 flex items-center justify-center rounded-lg text-base transition-colors hover:bg-surface-container-high"
             title={`React ${emoji}`}
+            aria-label={`React ${emoji}`}
           >
             {emoji}
           </button>

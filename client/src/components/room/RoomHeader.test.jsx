@@ -78,12 +78,18 @@ describe('RoomHeader', () => {
     expect(screen.queryByLabelText('Toggle Member Controls')).not.toBeInTheDocument();
   });
 
-  it('calls onLeaveRoom when Leave button is clicked', () => {
+  it('opens the leave confirmation and calls onLeaveRoom when confirmed', () => {
     render(<RoomHeader {...defaultProps} />);
 
     const leaveBtn = screen.getByRole('button', { name: /leave room/i });
     fireEvent.click(leaveBtn);
 
+    // Confirmation modal opens, but onLeaveRoom is not called yet
+    expect(screen.getByText('Are you sure you want to leave this room?')).toBeInTheDocument();
+    expect(mockOnLeaveRoom).not.toHaveBeenCalled();
+
+    // Confirm leave
+    fireEvent.click(screen.getByRole('button', { name: 'Leave' }));
     expect(mockOnLeaveRoom).toHaveBeenCalledTimes(1);
   });
 
