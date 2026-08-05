@@ -195,7 +195,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
             <span className="material-symbols-outlined text-primary text-xl sm:text-2xl fill-1">play_circle</span>
             <span className="font-display-lg text-lg sm:text-xl font-bold tracking-tight text-on-background">Being Us.</span>
           </div>
-          <p className="font-body-sm text-on-surface-variant text-sm">© 2026 Being Us. All rights reserved.</p>
+          <p className="font-body-sm text-on-surface-variant text-sm">Â© 2026 Being Us. All rights reserved.</p>
           <div className="flex gap-4 sm:gap-6">
             {['Privacy','Terms','Help'].map(l => (
               <a key={l} href="#" className="text-on-surface-variant hover:text-primary transition-colors font-label-sm text-sm">{l}</a>
