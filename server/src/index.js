@@ -24,12 +24,30 @@ app.use(helmet({
 }));
 
 // A05: Security Misconfiguration - Restrict CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://10.234.101.105:3000'];
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [
+      // Production origins
+      'https://beingus.vercel.app',
+      // Local development origins
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:3001',
+      'http://10.234.101.105:3000',
+    ];
+
+// Smart origin function: always allow in dev, check allowlist in production
+const corsOriginFn = (origin, callback) => {
+  // Allow non-browser requests (curl, server-to-server) and same-origin
+  if (!origin) return callback(null, true);
+  // Allow any Vercel preview deployment (*.vercel.app)
+  if (origin.endsWith('.vercel.app')) return callback(null, true);
+  if (allowedOrigins.includes(origin)) return callback(null, true);
+  callback(new Error(`CORS: origin ${origin} not allowed`));
+};
 
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
+  origin: process.env.NODE_ENV === 'production' ? corsOriginFn : '*',
   methods: ['GET', 'POST']
 }));
 
@@ -118,7 +136,7 @@ if (fs.existsSync(clientDistPath)) {
 // Configure Socket.io for Vercel Serverless
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
+    origin: process.env.NODE_ENV === 'production' ? corsOriginFn : '*',
     methods: ['GET', 'POST']
   },
   transports: ['polling', 'websocket'],
