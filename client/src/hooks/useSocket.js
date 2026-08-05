@@ -133,7 +133,19 @@ export function useSocket() {
       });
 
       socket.on('playback_synced', (data) => {
-        useRoomStore.getState().setSyncedPlaybackEvent(data);
+        const store = useRoomStore.getState();
+        store.setSyncedPlaybackEvent(data);
+        // Keep room state consistent on all members (badge, overlay, etc.)
+        const currentState = store.roomState;
+        if (currentState && data?.playback) {
+          store.setRoomState({
+            ...currentState,
+            playback: {
+              ...currentState.playback,
+              ...data.playback
+            }
+          });
+        }
       });
 
       socket.on('toast_notification', (data) => {

@@ -1,5 +1,4 @@
 import React, { memo, useState } from 'react';
-import { Play, Pause, Signal, Volume2, VolumeX, Lock } from 'lucide-react';
 
 const formatTime = (secs) => {
   const m = Math.floor(secs / 60);
@@ -28,13 +27,8 @@ export const PlaybackControls = memo(function PlaybackControls({
     <div className="mt-4 p-4 md:px-6 bg-surface-container rounded-3xl border border-outline-variant w-full flex flex-col gap-3 shadow-md ambient-shadow">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         
-        {/* Left: Sync Status */}
-        <div className="flex items-center gap-2 flex-1">
-          <div className={`flex items-center gap-1.5 font-label-sm ${locked ? 'text-on-surface-variant' : 'text-primary'}`}>
-            {locked ? <Lock size={14} /> : <span className="material-symbols-outlined text-[16px] fill-1">bolt</span>}
-            <span className="hidden sm:inline tracking-wide uppercase">{locked ? 'Host Only' : 'Synced'}</span>
-          </div>
-        </div>
+        {/* Left: spacer to keep the play button centered */}
+        <div className="flex-1" aria-hidden="true" />
 
         {/* Center: Play/Pause */}
         <div className="flex items-center justify-center">

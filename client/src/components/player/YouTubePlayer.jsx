@@ -39,12 +39,36 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
     }
     return false;
   });
+  const [syncPromptDismissed, setSyncPromptDismissed] = useState(false);
   const isSelfSyncing = useRef(0);
   const hasJoinSyncedRef = useRef(false);
+  // Synchronous mirror of the player's actual play/pause state (React state lags)
+  const localPlayingRef = useRef(false);
+  const playerCreatedRef = useRef(false);
+  // Lets the video-change effect rebuild the player if its handle goes stale
+  const initPlayerRef = useRef(null);
+  // Set when a video change arrives while the player isn't ready yet
+  const pendingVideoRef = useRef(null);
 
   // Use refs to avoid stale closures in YouTube iframe event listeners
   const onPlaybackChangeRef = useRef(onPlaybackChange);
   const onVideoEndedRef = useRef(onVideoEnded);
+
+  // Update ONLY the local room store (no network broadcast) so the sender's
+  // badge/state reflects the player even when the echo-blocker suppresses a sync.
+  const syncLocalPlaybackState = (isPlaying, currentTime) => {
+    const currentState = useRoomStore.getState().roomState;
+    if (!currentState) return;
+    useRoomStore.getState().setRoomState({
+      ...currentState,
+      playback: {
+        ...currentState.playback,
+        isPlaying,
+        currentTime,
+        updatedAt: Date.now()
+      }
+    });
+  };
 
   // Throttled sync specifically for aggressive slider dragging
   const throttledSyncRef = useRef(
@@ -78,9 +102,12 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
     let checkYtInterval = null;
 
     const initPlayer = () => {
+      if (playerCreatedRef.current) return;
       if (!window.YT || !window.YT.Player) return;
+      const hostEl = document.getElementById('yt-player-element');
+      if (!hostEl) return; // element not mounted yet — will retry on next poll
 
-      playerRef.current = new window.YT.Player('yt-player-element', {
+      const player = new window.YT.Player(hostEl, {
         height: '100%',
         width: '100%',
         videoId: extractVideoId(youtubeId),
@@ -102,6 +129,13 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
             setDuration(event.target.getDuration() || 0);
             event.target.setVolume(volume);
             if (isMuted) event.target.mute();
+            // If a video change arrived while this player was initialising, apply it now
+            const pending = pendingVideoRef.current;
+            if (pending && typeof event.target.loadVideoById === 'function') {
+              pendingVideoRef.current = null;
+              isSelfSyncing.current = Date.now();
+              event.target.loadVideoById({ videoId: pending.id, startSeconds: pending.start });
+            }
           },
           onStateChange: (event) => {
             const player = event.target;
@@ -110,10 +144,13 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
 
             if (state === window.YT.PlayerState.PLAYING) {
               setLocalPlaying(true);
+              localPlayingRef.current = true;
             } else if (state === window.YT.PlayerState.PAUSED) {
               setLocalPlaying(false);
+              localPlayingRef.current = false;
             } else if (state === window.YT.PlayerState.ENDED) {
               setLocalPlaying(false);
+              localPlayingRef.current = false;
               if (onVideoEndedRef.current) {
                 onVideoEndedRef.current();
               }
@@ -126,7 +163,14 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
             }
 
             // Skip if we triggered this state change ourselves
-            if (Date.now() - isSelfSyncing.current < 800) return;
+            if (Date.now() - isSelfSyncing.current < 800) {
+              // Echo-blocked, but keep the local store accurate anyway (e.g. native
+              // YouTube controls used right after a remote sync). No broadcast here.
+              if (state === window.YT.PlayerState.PLAYING || state === window.YT.PlayerState.PAUSED) {
+                syncLocalPlaybackState(state === window.YT.PlayerState.PLAYING, nowTime);
+              }
+              return;
+            }
 
             // Broadcast
             if (state === window.YT.PlayerState.PLAYING) {
@@ -137,7 +181,10 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
           }
         }
       });
+      playerRef.current = player;
+      playerCreatedRef.current = true;
     };
+    initPlayerRef.current = initPlayer;
 
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -150,35 +197,47 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
       }
     }
 
-    if (window.YT && window.YT.Player) {
-      initPlayer();
-    } else {
+    // Poll until both the API and the host element are ready, then build the player once
+    initPlayer();
+    if (!playerCreatedRef.current) {
       checkYtInterval = setInterval(() => {
-        if (window.YT && window.YT.Player) {
-          clearInterval(checkYtInterval);
-          initPlayer();
-        }
+        initPlayer();
+        if (playerCreatedRef.current) clearInterval(checkYtInterval);
       }, 200);
     }
 
     return () => {
       if (checkYtInterval) clearInterval(checkYtInterval);
-      if (playerRef.current && playerRef.current.destroy) {
-        playerRef.current.destroy();
+      initPlayerRef.current = null;
+      playerCreatedRef.current = false;
+      pendingVideoRef.current = null;
+      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+        try { playerRef.current.destroy(); } catch (_) {}
       }
+      playerRef.current = null;
     };
   }, []);
 
   // Update video when youtubeId changes — auto-play immediately
   useEffect(() => {
-    if (isPlayerReady && playerRef.current) {
-      const currentIdInPlayer = playerRef.current.getVideoData ? playerRef.current.getVideoData().video_id : '';
-      const targetId = extractVideoId(youtubeId);
+    if (!isPlayerReady) return;
 
-      if (currentIdInPlayer !== targetId && targetId) {
-        isSelfSyncing.current = Date.now();
-        playerRef.current.loadVideoById({ videoId: targetId, startSeconds: playback?.currentTime || 0 });
-      }
+    const targetId = extractVideoId(youtubeId);
+    const player = playerRef.current;
+
+    if (!player || typeof player.loadVideoById !== 'function') {
+      // Player handle is stale/invalid (e.g. its iframe was recreated by React).
+      // Queue the change and rebuild the player — onReady applies the pending video.
+      pendingVideoRef.current = { id: targetId, start: playback?.currentTime || 0 };
+      playerCreatedRef.current = false;
+      if (initPlayerRef.current) initPlayerRef.current();
+      return;
+    }
+
+    const currentIdInPlayer = player.getVideoData ? player.getVideoData().video_id : '';
+    if (currentIdInPlayer !== targetId && targetId) {
+      isSelfSyncing.current = Date.now();
+      player.loadVideoById({ videoId: targetId, startSeconds: playback?.currentTime || 0 });
     }
   }, [youtubeId, isPlayerReady]);
 
@@ -223,6 +282,15 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
     }
   }, [syncedPlaybackEvent, isPlayerReady]);
 
+  // Reset the dismissed sync prompt for a new video or once the room pauses
+  useEffect(() => {
+    setSyncPromptDismissed(false);
+  }, [youtubeId]);
+
+  useEffect(() => {
+    if (!playback?.isPlaying) setSyncPromptDismissed(false);
+  }, [playback?.isPlaying]);
+
   // Progress ticker
   useEffect(() => {
     const timer = setInterval(() => {
@@ -247,7 +315,7 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
     isSelfSyncing.current = Date.now();
     
     const nowTime = playerRef.current.getCurrentTime() || 0;
-    const newIsPlaying = !localPlaying;
+    const newIsPlaying = !localPlayingRef.current;
     
     newIsPlaying ? playerRef.current.playVideo() : playerRef.current.pauseVideo();
     
@@ -314,6 +382,27 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Live position of the room (server timestamp extrapolated), used to tell the
+  // member how far behind they are and to catch them up when they hit sync.
+  const roomLiveTime = playback?.isPlaying
+    ? playback.currentTime + (Date.now() - (playback.updatedAt || Date.now())) / 1000
+    : null;
+  const behindSeconds = roomLiveTime != null ? Math.max(0, roomLiveTime - currentTime) : null;
+  const behindLabel = behindSeconds != null && behindSeconds > 1
+    ? `You're ${formatTime(Math.floor(behindSeconds))} behind the room`
+    : 'Tap to resume playback';
+
+  const handleSyncResume = () => {
+    if (!playerRef.current) return;
+    const player = playerRef.current;
+    isSelfSyncing.current = Date.now();
+    player.playVideo();
+    // Catch up to the room's live position if we're meaningfully behind
+    if (roomLiveTime != null && Math.abs((player.getCurrentTime() || 0) - roomLiveTime) > 2) {
+      player.seekTo(roomLiveTime, true);
+    }
+  };
+
   return (
     <div className="relative w-full flex flex-col">
       {/* 16:9 Cinema Frame */}
@@ -326,20 +415,37 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
           className="absolute top-0 left-0 w-full h-full"
         />
 
-        {/* Autoplay Blocked Overlay */}
-        {isPlayerReady && playback?.isPlaying && !localPlaying && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 animate-fade-in-up">
-            <button
-              onClick={() => {
-                if (playerRef.current) {
-                  playerRef.current.playVideo();
-                }
-              }}
-              className="bg-primary/90 backdrop-blur-md text-on-primary px-6 py-2.5 rounded-full font-label-lg shadow-[0_4px_20px_rgba(205,0,0,0.4)] flex items-center gap-2 hover:bg-primary transition-colors"
-            >
-              <span className="material-symbols-outlined fill-1">play_arrow</span>
-              <span>Click to Sync</span>
-            </button>
+        {/* Autoplay Blocked Overlay — "Click to Sync" pill */}
+        {isPlayerReady && playback?.isPlaying && !localPlaying && !syncPromptDismissed && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/15">
+            <div className="pointer-events-auto flex w-full max-w-[92%] flex-col items-center gap-3 px-4 animate-fade-in-up">
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSyncResume}
+                  aria-label="Resume playback and sync with the room"
+                  className="group flex items-center gap-2.5 rounded-full bg-primary px-5 py-2.5 text-on-primary shadow-[0_8px_30px_rgba(205,0,0,0.45)] ring-1 ring-white/20 transition-all hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:px-7 sm:py-3"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25 sm:h-8 sm:w-8">
+                    <span className="material-symbols-outlined fill-1">play_arrow</span>
+                  </span>
+                  <span className="font-label-lg whitespace-nowrap">Click to Sync</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSyncPromptDismissed(true)}
+                  aria-label="Dismiss sync prompt"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white/80 backdrop-blur-md transition-colors hover:bg-black/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:h-10 sm:w-10"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              </div>
+
+              <p className="max-w-[90%] text-center text-xs font-medium tracking-wide text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)] sm:text-sm">
+                {behindLabel}
+              </p>
+            </div>
           </div>
         )}
       </div>

@@ -3,6 +3,8 @@ import xss from 'xss';
 import jwt from 'jsonwebtoken';
 
 const rateLimits = new Map();
+// socketId -> { roomId, data, timer } — newest sync payload awaiting a retry
+const pendingSyncs = new Map();
 
 const checkRateLimit = (socketId, action, limitMs) => {
   const key = `${socketId}:${action}`;
@@ -51,6 +53,55 @@ export function setupSocketHandlers(io) {
       if (room) {
         io.to(roomId).emit('room_state_updated', RoomManager.getRoomStateDTO(room));
       }
+    };
+
+    // Process a playback sync (play/pause/seek/load video). Shared by the
+    // immediate path and the retried (rate-limited) path so behavior is identical.
+    const processSyncPlayback = (socket, roomId, data) => {
+      // When loading a new video, force isPlaying:true so it auto-plays for everyone
+      const enrichedData = { ...data };
+      if (data.youtubeId) {
+        enrichedData.isPlaying = true;
+        enrichedData.currentTime = 0;
+      }
+
+      const result = RoomManager.updatePlayback(roomId, socket.id, enrichedData);
+      if (result && result.error) {
+        socket.emit('error_message', { message: result.error });
+        return;
+      }
+
+      if (result && result.room) {
+        if (data.youtubeId) {
+          // Video changed: broadcast full state to ALL users immediately
+          io.to(roomId).emit('room_state_updated', RoomManager.getRoomStateDTO(result.room));
+        } else {
+          // Regular play/pause/seek: lightweight sync to peers only (no full state broadcast)
+          socket.to(roomId).emit('playback_synced', {
+            playback: result.room.playback,
+            currentVideo: result.room.currentVideo,
+            senderId: socket.id
+          });
+        }
+      }
+    };
+
+    // If a sync arrives inside the rate-limit window, DON'T drop it — a dropped
+    // pause would leave other members playing indefinitely. Keep the newest
+    // payload (last-write-wins) and apply it right after the window closes.
+    const scheduleSyncPlayback = (socket, roomId, data) => {
+      const existing = pendingSyncs.get(socket.id);
+      if (existing) clearTimeout(existing.timer);
+
+      const timer = setTimeout(() => {
+        pendingSyncs.delete(socket.id);
+        // Only apply if the socket is still connected and still in this room
+        if (socket.connected && currentRoomId === roomId) {
+          processSyncPlayback(socket, roomId, data);
+        }
+      }, 100);
+
+      pendingSyncs.set(socket.id, { roomId, data, timer });
     };
 
     // 1. Create Room
@@ -143,34 +194,12 @@ export function setupSocketHandlers(io) {
     // 4. Playback Synchronization (Play, Pause, Seek, Load Video)
     socket.on('sync_playback', (data) => {
       if (!currentRoomId) return;
+      if (!data || typeof data !== 'object') return;
 
-      if (!checkRateLimit(socket.id, 'sync', 100)) return; // Allow 10 syncs per second max
-
-      // When loading a new video, force isPlaying:true so it auto-plays for everyone
-      const enrichedData = { ...data };
-      if (data.youtubeId) {
-        enrichedData.isPlaying = true;
-        enrichedData.currentTime = 0;
-      }
-
-      const result = RoomManager.updatePlayback(currentRoomId, socket.id, enrichedData);
-      if (result && result.error) {
-        socket.emit('error_message', { message: result.error });
-        return;
-      }
-
-      if (result && result.room) {
-        if (data.youtubeId) {
-          // Video changed: broadcast full state to ALL users immediately
-          io.to(currentRoomId).emit('room_state_updated', RoomManager.getRoomStateDTO(result.room));
-        } else {
-          // Regular play/pause/seek: lightweight sync to peers only (no full state broadcast)
-          socket.to(currentRoomId).emit('playback_synced', {
-            playback: result.room.playback,
-            currentVideo: result.room.currentVideo,
-            senderId: socket.id
-          });
-        }
+      if (checkRateLimit(socket.id, 'sync', 100)) {
+        processSyncPlayback(socket, currentRoomId, data);
+      } else {
+        scheduleSyncPlayback(socket, currentRoomId, data);
       }
     });
 
@@ -261,6 +290,13 @@ export function setupSocketHandlers(io) {
       // Cleanup rate limits to prevent memory leaks
       for (const key of rateLimits.keys()) {
         if (key.startsWith(`${socket.id}:`)) rateLimits.delete(key);
+      }
+
+      // Cleanup any queued (rate-limited) playback sync for this socket
+      const pending = pendingSyncs.get(socket.id);
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingSyncs.delete(socket.id);
       }
 
       if (currentRoomId) {
