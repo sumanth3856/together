@@ -7,17 +7,20 @@ import { useRoomStore } from '../store/useRoomStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '../store/useUIStore';
 import { supabase } from '../lib/supabase';
+import { Skeleton } from '../components/common/Skeleton';
+import { LoadingScreen } from '../components/common/LoadingScreen';
 
-const LandingPage = dynamic(() => import('../components/landing/LandingPage').then((mod) => mod.LandingPage), { ssr: false });
-const RoomHeader = dynamic(() => import('../components/room/RoomHeader').then((mod) => mod.RoomHeader), { ssr: false });
-const YouTubePlayer = dynamic(() => import('../components/player/YouTubePlayer').then((mod) => mod.YouTubePlayer), { ssr: false });
-const VideoDetailsCard = dynamic(() => import('../components/player/VideoDetailsCard').then((mod) => mod.VideoDetailsCard), { ssr: false });
-const MemberList = dynamic(() => import('../components/room/MemberList').then((mod) => mod.MemberList), { ssr: false });
-const ChatPanel = dynamic(() => import('../components/chat/ChatPanel').then((mod) => mod.ChatPanel), { ssr: false });
-const SearchAndQueuePanel = dynamic(() => import('../components/player/SearchAndQueuePanel').then((mod) => mod.SearchAndQueuePanel), { ssr: false });
+const LoadingPageFallback = () => <LoadingScreen label="Loading Being Us" />;
+
+const LandingPage = dynamic(() => import('../components/landing/LandingPage').then((mod) => mod.LandingPage), { ssr: false, loading: LoadingPageFallback });
+const RoomHeader = dynamic(() => import('../components/room/RoomHeader').then((mod) => mod.RoomHeader), { ssr: false, loading: () => <Skeleton className="h-16 w-full rounded-none" /> });
+const YouTubePlayer = dynamic(() => import('../components/player/YouTubePlayer').then((mod) => mod.YouTubePlayer), { ssr: false, loading: () => <Skeleton className="aspect-video w-full rounded-2xl" /> });
+const VideoDetailsCard = dynamic(() => import('../components/player/VideoDetailsCard').then((mod) => mod.VideoDetailsCard), { ssr: false, loading: () => <Skeleton className="h-44 w-full rounded-3xl" /> });
+const MemberList = dynamic(() => import('../components/room/MemberList').then((mod) => mod.MemberList), { ssr: false, loading: () => <Skeleton className="h-28 w-full rounded-3xl" /> });
+const ChatPanel = dynamic(() => import('../components/chat/ChatPanel').then((mod) => mod.ChatPanel), { ssr: false, loading: () => <Skeleton className="h-full min-h-[320px] w-full rounded-3xl" /> });
+const SearchAndQueuePanel = dynamic(() => import('../components/player/SearchAndQueuePanel').then((mod) => mod.SearchAndQueuePanel), { ssr: false, loading: () => <Skeleton className="h-[400px] w-full rounded-3xl" /> });
 const MobileTabBar = dynamic(() => import('../components/room/MobileTabBar').then((mod) => mod.MobileTabBar), { ssr: false });
 const ToastStack = dynamic(() => import('../components/common/ToastStack').then((mod) => mod.ToastStack), { ssr: false });
-import { AlertCircle, Wifi, WifiOff } from 'lucide-react';
 
 export default function Page() {
   const {
@@ -212,7 +215,7 @@ export default function Page() {
           padding: '6px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
         }}>
-          <WifiOff size={13} color="#f59e0b" />
+          <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#f59e0b' }}>wifi_off</span>
           <span style={{ fontSize: '0.78rem', color: '#fbbf24', fontWeight: '600' }}>
             Connection lost — reconnecting…
           </span>
@@ -243,18 +246,18 @@ export default function Page() {
             <h2 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '6px' }}>Rejoining your room…</h2>
             <p style={{ color: '#5e3f3a', fontSize: '0.875rem' }}>Restoring your session, please wait.</p>
           </div>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`}</style>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
         </div>
       )}
 
       {/* ── Main Content ── */}
       {!hasCheckedSession && !roomId ? (
-        <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', height: '100vh', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          <div className="skeleton" style={{ height: '60px', width: '100%', borderRadius: '12px' }} />
-          <div className="skeleton" style={{ height: '400px', width: '100%', borderRadius: '16px' }} />
-          <div style={{ display: 'flex', gap: '16px' }}>
-             <div className="skeleton" style={{ height: '200px', flex: 1, borderRadius: '12px' }} />
-             <div className="skeleton" style={{ height: '200px', flex: 1, borderRadius: '12px' }} />
+        <div className="mx-auto flex min-h-screen w-full max-w-[1200px] flex-col gap-8 px-6 py-24">
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="aspect-video w-full rounded-2xl" />
+          <div className="flex gap-4">
+            <Skeleton className="h-48 flex-1 rounded-xl" />
+            <Skeleton className="h-48 flex-1 rounded-xl" />
           </div>
         </div>
       ) : !roomId ? (
@@ -270,7 +273,7 @@ export default function Page() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: '20px', boxShadow: '0 0 40px rgba(244,63,94,0.12)',
             }}>
-              <AlertCircle size={36} color="#ba1a1a" />
+              <span className="material-symbols-outlined" style={{ fontSize: 36, color: '#ba1a1a' }}>error</span>
             </div>
             <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', fontFamily: "var(--font-oswald), sans-serif" }}>
               Session Ended
@@ -307,8 +310,8 @@ export default function Page() {
           {!isMobileScreen ? (
             /* ── Desktop / Tablet Grid ── */
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-104px)]">
-              {/* Left Column: Video & Queue */}
-              <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
+              {/* Left Column: Video & Queue (primary content) */}
+              <main className="lg:col-span-8 xl:col-span-9 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
                 <YouTubePlayer
                   youtubeId={currentVideo?.youtubeId}
                   onVideoEnded={handleVideoEnded}
@@ -337,12 +340,12 @@ export default function Page() {
                         />
                     </div>
                 </div>
-              </div>
+              </main>
 
-              {/* Right Column: Moments Chat */}
-              <div className="lg:col-span-4 xl:col-span-3 h-full">
+              {/* Right Column: Moments Chat (complementary) */}
+              <aside className="lg:col-span-4 xl:col-span-3 h-full">
                 <ChatPanel />
-              </div>
+              </aside>
             </div>
           ) : (
             /* ── Mobile View ── */
@@ -399,7 +402,6 @@ export default function Page() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
       `}</style>
     </div>
   );

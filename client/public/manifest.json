@@ -1,11 +1,11 @@
 {
-  "name": "Together - Watch Party",
-  "short_name": "Together",
-  "description": "A premium YouTube co-watching experience.",
+  "name": "Being Us - Watch Together",
+  "short_name": "Being Us",
+  "description": "A premium YouTube co-watching experience. Watch videos in perfect sync with friends, anywhere in the world.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#14130A",
-  "theme_color": "#14130A",
+  "background_color": "#efede6",
+  "theme_color": "#cd0000",
   "icons": [
     {
       "src": "/icon-192x192.png",

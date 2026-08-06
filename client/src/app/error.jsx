@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 export default function ErrorPage({ error, reset }) {
   useEffect(() => {
@@ -17,7 +16,7 @@ export default function ErrorPage({ error, reset }) {
       <div className="w-full max-w-md text-center animate-in fade-in slide-in-from-bottom-4 duration-500 bg-surface-container-lowest p-8 rounded-3xl border border-outline-variant shadow-lg ambient-shadow">
         
         <div className="w-16 h-16 rounded-full bg-error-container/30 border border-error/20 flex items-center justify-center mx-auto mb-6">
-          <AlertTriangle size={32} className="text-error" strokeWidth={1.8} />
+          <span className="material-symbols-outlined text-[32px] text-error">warning</span>
         </div>
 
         <h1 className="font-headline-lg text-2xl text-on-background mb-3">
@@ -43,7 +42,7 @@ export default function ErrorPage({ error, reset }) {
             onClick={reset}
             className="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-label-lg hover:bg-surface-tint hover:-translate-y-0.5 transition-all shadow-md"
           >
-            <RefreshCw size={16} />
+            <span className="material-symbols-outlined text-[16px]">refresh</span>
             <span>Try Again</span>
           </button>
 
@@ -51,7 +50,7 @@ export default function ErrorPage({ error, reset }) {
             onClick={() => { window.location.href = '/'; }}
             className="flex items-center gap-2 bg-surface-container text-on-surface hover:bg-surface-container-high px-6 py-3 rounded-full font-label-lg transition-all border border-outline-variant"
           >
-            <Home size={16} />
+            <span className="material-symbols-outlined text-[16px]">home</span>
             <span>Back to Home</span>
           </button>
         </div>

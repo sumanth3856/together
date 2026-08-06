@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-import { AlertOctagon, RefreshCw } from 'lucide-react';
 
 export default function GlobalError({ error, reset }) {
   return (
@@ -11,7 +10,7 @@ export default function GlobalError({ error, reset }) {
           <div className="w-full max-w-md text-center animate-in fade-in slide-in-from-bottom-4 duration-500 bg-surface-container-lowest p-8 rounded-3xl border border-outline-variant shadow-lg ambient-shadow">
             
             <div className="w-16 h-16 rounded-full bg-error-container/30 border border-error/20 flex items-center justify-center mx-auto mb-6">
-              <AlertOctagon size={32} className="text-error" strokeWidth={1.8} />
+              <span className="material-symbols-outlined text-[32px] text-error">report</span>
             </div>
 
             <h1 className="font-headline-lg text-2xl text-on-background mb-3">
@@ -26,7 +25,7 @@ export default function GlobalError({ error, reset }) {
               onClick={reset}
               className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-label-lg hover:bg-surface-tint hover:-translate-y-0.5 transition-all shadow-md"
             >
-              <RefreshCw size={16} />
+              <span className="material-symbols-outlined text-[16px]">refresh</span>
               <span>Restart Application</span>
             </button>
           </div>

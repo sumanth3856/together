@@ -97,13 +97,13 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                   placeholder="Search YouTube..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-on-background focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-shadow"
+                  className="input w-full pl-11 bg-surface-container-lowest"
                 />
               </div>
               <button 
                 type="submit" 
                 disabled={loading} 
-                className="bg-primary text-on-primary px-5 rounded-xl font-label-lg hover:bg-surface-tint transition-all disabled:opacity-50 flex items-center justify-center min-w-[64px]"
+                className="btn btn-primary px-5 rounded-xl min-w-[64px]"
               >
                 {loading ? <span className="material-symbols-outlined animate-spin">progress_activity</span> : 'Go'}
               </button>
@@ -135,7 +135,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                 </div>
               )}
               {results.map((v) => (
-                <div key={v.youtubeId} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant hover:border-primary-container transition-colors group">
+                <div key={v.youtubeId} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant hover:border-primary-container hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 group">
                   <div className="w-[100px] h-[56px] shrink-0 rounded-lg overflow-hidden relative">
                      <img 
                         src={v.thumbnail} 
@@ -183,7 +183,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
               </div>
             ) : (
               queue.map((v, index) => (
-                <div key={v.id} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant relative hover:border-primary-container transition-colors group">
+                <div key={v.id} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant relative hover:border-primary-container hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 group">
                   <div className="absolute -top-2 -left-2 bg-primary text-on-primary text-[10px] font-label-lg w-5 h-5 rounded-full flex items-center justify-center shadow-md">
                     {index + 1}
                   </div>

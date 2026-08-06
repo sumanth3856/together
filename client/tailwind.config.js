@@ -55,12 +55,18 @@ module.exports = {
         "primary-fixed-dim": "#ffb4a8",
         "on-error-container": "#93000a",
         "secondary": "#5f5f59",
-        "on-primary-fixed-variant": "#930000"
+        "on-primary-fixed-variant": "#930000",
+        "success": "#2e7d32",
+        "on-success": "#ffffff",
+        "success-container": "#d8ebd8",
+        "on-success-container": "#123c16"
       },
       "borderRadius": {
         "DEFAULT": "0.25rem",
         "lg": "0.5rem",
         "xl": "0.75rem",
+        "2xl": "1rem",
+        "3xl": "1.5rem",
         "full": "9999px"
       },
       "spacing": {
@@ -83,6 +89,8 @@ module.exports = {
         "body-md": ["var(--font-chivo)", "sans-serif"],
         "label-lg": ["var(--font-oswald)", "sans-serif"],
         "headline-lg": ["var(--font-oswald)", "sans-serif"],
+        "title-md": ["var(--font-oswald)", "sans-serif"],
+        "title-sm": ["var(--font-oswald)", "sans-serif"],
         "display-accent": ["var(--font-playfair-display)", "serif"]
       },
       "fontSize": {
@@ -94,8 +102,24 @@ module.exports = {
         "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
         "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600" }],
         "headline-lg": ["48px", { "lineHeight": "56px", "fontWeight": "700" }],
+        "title-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+        "title-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
         "display-accent": ["64px", { "lineHeight": "72px", "fontWeight": "400" }]
-      }
+      },
+      "boxShadow": {
+        "soft": "0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.05)",
+        "card": "0 1px 3px rgba(0, 0, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.07)",
+        "lift": "0 2px 4px rgba(0, 0, 0, 0.05), 0 12px 32px rgba(0, 0, 0, 0.12)",
+        "glow": "0 0 0 1px rgba(205, 0, 0, 0.08), 0 8px 32px rgba(205, 0, 0, 0.16)"
+      },
+      "transitionTimingFunction": {
+        "expo": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "expo-in-out": "cubic-bezier(0.87, 0, 0.13, 1)"
+      },
+      "transitionDuration": {
+        "fast": "120ms",
+        "slow": "350ms"
+      },
     },
   },
   plugins: [],

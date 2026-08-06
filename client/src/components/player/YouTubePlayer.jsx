@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause } from 'lucide-react';
 import throttle from 'lodash/throttle';
 import { PlaybackControls } from './PlaybackControls';
+import { Spinner } from '../common/Spinner';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useSocket } from '../../hooks/useSocket';
 
@@ -40,6 +40,7 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
     return false;
   });
   const [syncPromptDismissed, setSyncPromptDismissed] = useState(false);
+  const [videoLoadError, setVideoLoadError] = useState(false);
   const isSelfSyncing = useRef(0);
   const hasJoinSyncedRef = useRef(false);
   // Synchronous mirror of the player's actual play/pause state (React state lags)
@@ -125,6 +126,7 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
         },
         events: {
           onReady: (event) => {
+            setVideoLoadError(false);
             setIsPlayerReady(true);
             setDuration(event.target.getDuration() || 0);
             event.target.setVolume(volume);
@@ -178,6 +180,9 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
             } else if (state === window.YT.PlayerState.PAUSED) {
               onPlaybackChangeRef.current({ isPlaying: false, currentTime: nowTime });
             }
+          },
+          onError: () => {
+            setVideoLoadError(true);
           }
         }
       });
@@ -218,8 +223,27 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
     };
   }, []);
 
+  // Boot timeout: if the player never fires onReady, surface a recovery UI
+  useEffect(() => {
+    if (isPlayerReady || videoLoadError) return;
+    const timer = setTimeout(() => {
+      if (!playerCreatedRef.current) return; // still waiting on API/host — keep waiting
+      setVideoLoadError(true);
+    }, 12000);
+    return () => clearTimeout(timer);
+  }, [isPlayerReady, videoLoadError, youtubeId]);
+
+  const handleRetryPlayer = () => {
+    setVideoLoadError(false);
+    setIsPlayerReady(false);
+    playerCreatedRef.current = false;
+    pendingVideoRef.current = null;
+    if (initPlayerRef.current) initPlayerRef.current();
+  };
+
   // Update video when youtubeId changes — auto-play immediately
   useEffect(() => {
+    setVideoLoadError(false);
     if (!isPlayerReady) return;
 
     const targetId = extractVideoId(youtubeId);
@@ -414,6 +438,32 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
           id="yt-player-element"
           className="absolute top-0 left-0 w-full h-full"
         />
+
+        {/* Load / Error Overlay — covers the black frame until the player is ready */}
+        {(!isPlayerReady || videoLoadError) && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black px-6">
+            {videoLoadError ? (
+              <div className="flex w-full max-w-[92%] flex-col items-center gap-4 text-center animate-fade-in-up">
+                <span className="material-symbols-outlined text-5xl text-white/85" aria-hidden="true">videocam_off</span>
+                <p className="font-label-sm text-xs uppercase tracking-widest text-white/70">This video can't be played</p>
+                <button
+                  type="button"
+                  onClick={handleRetryPlayer}
+                  aria-label="Retry loading the video"
+                  className="btn bg-white/10 text-white hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white px-5 py-2.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">refresh</span>
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3">
+                <Spinner size="text-4xl" label="Loading video" />
+                <p className="font-label-sm text-xs uppercase tracking-widest text-white/60">Loading video…</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Autoplay Blocked Overlay — "Click to Sync" pill */}
         {isPlayerReady && playback?.isPlaying && !localPlaying && !syncPromptDismissed && (

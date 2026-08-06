@@ -58,7 +58,7 @@ export function EmojiReactions({ incomingReaction, onSendReaction }) {
           <button
             key={emoji}
             onClick={() => handleEmojiClick(emoji)}
-            className="flex-1 max-w-[38px] h-8 min-w-0 flex items-center justify-center rounded-lg text-base transition-colors hover:bg-surface-container-high"
+            className="flex-1 max-w-[38px] h-8 min-w-0 flex items-center justify-center rounded-lg text-base transition-all duration-150 hover:bg-surface-container-high hover:scale-110 active:scale-90"
             title={`React ${emoji}`}
             aria-label={`React ${emoji}`}
           >

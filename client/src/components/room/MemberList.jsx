@@ -40,7 +40,7 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
           </div>
           <span className="font-headline-md text-lg text-on-background">Watching Together</span>
         </div>
-        <span className="bg-success/10 border border-success/20 text-success px-3 py-1 rounded-full font-label-sm text-[11px] uppercase tracking-wider">
+        <span className="chip bg-success/10 border border-success/20 text-success text-[11px] uppercase tracking-wider">
           {members.length} online
         </span>
       </div>
@@ -56,7 +56,7 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
           return (
             <div
               key={m.userId}
-              className={`flex items-center gap-4 p-3 rounded-2xl relative ${isYou ? 'bg-primary-container/20 border border-primary-container/50' : 'hover:bg-surface-container-high border border-transparent'} transition-colors`}
+              className={`flex items-center gap-4 p-3 rounded-2xl relative transition-all duration-200 ${isYou ? 'bg-primary-container/20 border border-primary-container/50 shadow-soft' : 'hover:bg-surface-container-high hover:-translate-y-px border border-transparent'} `}
             >
               {/* Avatar */}
               <div className="shrink-0">

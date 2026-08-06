@@ -23,36 +23,37 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-outline-variant h-16 flex items-center justify-between px-4 md:px-8">
+      <header className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-outline-variant h-16 flex md:grid md:grid-cols-[1fr_auto_1fr] items-center justify-between md:justify-items-stretch gap-2 sm:gap-4 px-4 md:px-8">
         
         {/* Left: Brand */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <a href="/" aria-label="Being Us – home"
+          className="flex items-center gap-2 justify-self-start min-w-0">
             <span className="material-symbols-outlined text-primary text-2xl fill-1 shrink-0">play_circle</span>
             <span className="font-display-lg text-xl font-bold tracking-tight text-on-background truncate">Being Us</span>
-        </div>
+        </a>
 
         {/* Center: Room Code */}
         {roomId && (
-          <div className="flex items-center shrink-0 mx-1 sm:mx-4">
+          <div className="flex items-center md:justify-self-center min-w-0 max-w-full mx-1 sm:mx-4">
               <button 
                 onClick={handleCopyCode}
                 title="Click to copy room code"
-                className="bg-surface-container hover:bg-surface-container-high transition-colors px-2 sm:px-4 py-1.5 rounded-full border border-outline-variant flex items-center gap-1.5 sm:gap-2 group max-w-[45vw]"
+                className="bg-surface-container hover:bg-surface-container-high transition-colors px-2 sm:px-4 py-1.5 rounded-full border border-outline-variant flex items-center gap-1.5 sm:gap-2 group max-w-[38vw] sm:max-w-[45vw]"
               >
                   <span className="hidden sm:inline font-label-sm text-on-surface-variant uppercase tracking-widest">Room</span>
-                  <span className="font-display-lg font-bold text-primary tracking-widest truncate text-base sm:text-xl">{roomId}</span>
+                  <span className="font-display-lg font-bold text-primary tracking-widest truncate text-sm sm:text-xl">{roomId}</span>
                   <span className="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-primary transition-colors shrink-0">content_copy</span>
               </button>
           </div>
         )}
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
+        <div className="flex items-center gap-2 sm:gap-3 justify-self-end shrink-0 min-w-0">
             {user && (
               <button 
                 onClick={() => setIsProfileModalOpen(true)}
                 aria-label="Open User Profile"
-                className="w-10 h-10 rounded-full bg-error-container text-primary flex items-center justify-center font-label-lg hover:bg-primary-container hover:text-on-primary transition-colors border border-outline-variant"
+                className="w-10 h-10 rounded-full bg-error-container text-primary flex items-center justify-center font-label-lg hover:bg-primary-container hover:text-on-primary transition-all border border-outline-variant shadow-soft hover:shadow-card"
               >
                   {initial}
               </button>
@@ -61,7 +62,7 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
             <button 
               onClick={() => setShowLeaveConfirm(true)}
               aria-label="Leave Room"
-              className="bg-surface-container text-on-surface px-4 py-2 rounded-full font-label-lg hover:bg-error hover:text-on-error transition-all border border-outline-variant flex items-center gap-2"
+              className="btn btn-secondary px-2.5 sm:px-4 py-2 hover:bg-error hover:text-on-error border-outline-variant"
             >
                 <span className="material-symbols-outlined text-[18px]">logout</span>
                 <span className="hidden sm:inline">Leave</span>

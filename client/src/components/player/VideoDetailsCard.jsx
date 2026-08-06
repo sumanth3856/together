@@ -28,9 +28,9 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
             {currentVideo?.title || 'No Video Loaded'}
           </h3>
           <div className="flex items-center gap-3">
-             <div className="flex items-center gap-1.5 bg-success/10 text-success px-2.5 py-0.5 rounded-full border border-success/20">
+             <div className="chip bg-success/10 text-success border border-success/20 text-[10px] uppercase tracking-wider">
                <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></div>
-               <span className="font-label-sm text-[10px] uppercase tracking-wider">{isPlaying ? 'Live' : 'Paused'}</span>
+               <span>{isPlaying ? 'Live' : 'Paused'}</span>
              </div>
              <span className="text-on-surface-variant font-label-sm text-[11px] uppercase tracking-wider flex items-center gap-1">
                  <span className="material-symbols-outlined text-[14px]">group</span>
@@ -62,16 +62,16 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
             name="videoUrl"
             type="text"
             placeholder="Paste YouTube URL or ID..."
-            className="flex-1 bg-surface-container-lowest border border-outline-variant rounded-xl px-4 py-2 font-body-md text-on-background focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-shadow"
+            className="input flex-1 bg-surface-container-lowest"
           />
-          <button type="submit" className="bg-surface-container-highest text-on-surface hover:bg-outline-variant px-5 py-2 rounded-xl font-label-lg transition-colors border border-outline-variant">
+          <button type="submit" className="btn btn-secondary px-5 py-2 rounded-xl">
             Load
           </button>
         </form>
 
         <button 
           onClick={handleCopyShareLink} 
-          className="w-full bg-surface-container hover:bg-surface-container-high text-on-background px-4 py-3 rounded-xl font-label-lg transition-colors border border-outline-variant flex items-center justify-center gap-2"
+          className="btn btn-secondary w-full py-3 rounded-xl"
         >
           {copiedLink ? <span className="material-symbols-outlined text-[18px] text-success">check</span> : <span className="material-symbols-outlined text-[18px]">share</span>}
           <span>{copiedLink ? 'Link Copied!' : 'Copy Share Link'}</span>

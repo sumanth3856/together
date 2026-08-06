@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-import { Compass, Home, ArrowLeft } from 'lucide-react';
 
 export default function NotFound() {
   return (
@@ -14,7 +13,7 @@ export default function NotFound() {
         </div>
 
         <div className="w-14 h-14 rounded-full bg-primary-container/30 border border-primary/20 flex items-center justify-center mx-auto mb-6">
-          <Compass size={28} className="text-primary" strokeWidth={1.8} />
+          <span className="material-symbols-outlined text-[28px] text-primary">explore</span>
         </div>
 
         <h1 className="font-headline-lg text-2xl text-on-background mb-3">
@@ -30,7 +29,7 @@ export default function NotFound() {
             href="/"
             className="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-label-lg hover:bg-surface-tint hover:-translate-y-0.5 transition-all shadow-md"
           >
-            <Home size={16} />
+            <span className="material-symbols-outlined text-[16px]">home</span>
             <span>Back to Home</span>
           </a>
 
@@ -38,7 +37,7 @@ export default function NotFound() {
             onClick={() => window.history.back()}
             className="flex items-center gap-2 bg-surface-container text-on-surface hover:bg-surface-container-high px-6 py-3 rounded-full font-label-lg transition-all border border-outline-variant"
           >
-            <ArrowLeft size={16} />
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
             <span>Go Back</span>
           </button>
         </div>

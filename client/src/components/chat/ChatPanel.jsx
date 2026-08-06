@@ -177,7 +177,7 @@ export const ChatPanel = memo(function ChatPanel() {
         <input
           ref={inputRef}
           type="text"
-          className="flex-1 bg-surface-container border border-outline-variant rounded-full px-4 py-2.5 font-body-md text-on-background focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-shadow min-w-0"
+          className="input flex-1 rounded-full"
           placeholder="Share a moment…"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
@@ -186,7 +186,7 @@ export const ChatPanel = memo(function ChatPanel() {
         <button
           type="submit"
           disabled={!inputText.trim()}
-          className="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-surface-tint transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          className="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-surface-tint transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-md hover:shadow-lift"
           aria-label="Send message"
         >
           <span className="material-symbols-outlined text-[20px]">send</span>

@@ -56,7 +56,7 @@ export function UserProfileModal({ isOpen, onClose, user }) {
   const initial = displayName ? displayName.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || 'U');
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center font-body-md p-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="profile-title" className="fixed inset-0 z-[100] flex items-center justify-center font-body-md p-4">
         {/* Backdrop */}
         <div className="absolute inset-0 bg-surface/90 backdrop-blur-md" onClick={onClose}></div>
         
@@ -68,13 +68,13 @@ export function UserProfileModal({ isOpen, onClose, user }) {
                 <div className="w-32 h-32 rounded-full bg-error-container text-primary flex items-center justify-center text-5xl font-display-lg mb-6 border-4 border-surface-container-lowest shadow-lg ambient-shadow">
                     {initial}
                 </div>
-                <h2 className="font-headline-md text-2xl mb-1 text-on-background">{displayName || 'User'}</h2>
+                <h2 id="profile-title" className="font-headline-md text-2xl mb-1 text-on-background">{displayName || 'User'}</h2>
                 <p className="font-label-sm text-on-surface-variant break-all">{user?.email}</p>
                 <div className="mt-auto pt-8 w-full">
                     <button 
                         onClick={() => setShowSignoutConfirm(true)}
                         disabled={isLoggingOut}
-                        className="w-full py-3 rounded-xl font-label-lg text-error hover:bg-error/10 transition-colors flex items-center justify-center gap-2 border border-transparent hover:border-error/20"
+                        className="btn w-full py-3 text-error hover:bg-error/10 border border-transparent hover:border-error/20"
                     >
                         {isLoggingOut ? (
                             <span className="material-symbols-outlined animate-spin">progress_activity</span>
@@ -92,7 +92,7 @@ export function UserProfileModal({ isOpen, onClose, user }) {
             <div className="w-full md:w-2/3 p-8">
                 <div className="flex justify-between items-center mb-8">
                     <h3 className="font-headline-lg text-3xl text-on-background">Account Settings</h3>
-                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors">
+                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors" aria-label="Close">
                         <span className="material-symbols-outlined">close</span>
                     </button>
                 </div>
@@ -102,7 +102,7 @@ export function UserProfileModal({ isOpen, onClose, user }) {
                         <label className="block font-label-lg text-on-surface">Display Name</label>
                         <input 
                             type="text" 
-                            className="w-full bg-surface-container border border-outline-variant rounded-xl px-4 py-3 font-body-md text-on-background focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-shadow"
+                            className="input"
                             value={displayName}
                             onChange={(e) => setDisplayName(e.target.value)}
                             disabled={isSaving}
@@ -114,7 +114,7 @@ export function UserProfileModal({ isOpen, onClose, user }) {
                         <label className="block font-label-lg text-on-surface">Email Address</label>
                         <input 
                             type="email" 
-                            className="w-full bg-surface-container/50 border border-outline-variant/50 rounded-xl px-4 py-3 font-body-md text-on-surface-variant cursor-not-allowed"
+                            className="input bg-surface-container/50 border-outline-variant/50 text-on-surface-variant cursor-not-allowed"
                             value={user?.email || ''}
                             disabled
                         />
@@ -127,7 +127,7 @@ export function UserProfileModal({ isOpen, onClose, user }) {
                         <button 
                             type="submit" 
                             disabled={isSaving || !displayName.trim()}
-                            className="bg-primary text-on-primary px-8 py-3 rounded-full font-label-lg hover:bg-surface-tint transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
+                            className="btn btn-primary px-8 py-3"
                         >
                             {isSaving ? (
                                 <span className="material-symbols-outlined animate-spin">progress_activity</span>

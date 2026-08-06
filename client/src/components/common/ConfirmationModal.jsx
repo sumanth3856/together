@@ -52,7 +52,7 @@ export function ConfirmationModal({
   const styles = getVariantStyles();
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="confirmation-modal-title" className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-background/80 backdrop-blur-md animate-fade-in"
@@ -70,7 +70,7 @@ export function ConfirmationModal({
           </span>
         </div>
         
-        <h2 className="font-display-lg text-2xl md:text-3xl font-bold text-on-background mb-4">
+        <h2 id="confirmation-modal-title" className="font-display-lg text-2xl md:text-3xl font-bold text-on-background mb-4">
           {title}
         </h2>
         
@@ -81,13 +81,13 @@ export function ConfirmationModal({
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 px-6 py-3.5 rounded-full font-label-lg bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant"
+            className="btn btn-secondary flex-1 px-6 py-3.5"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`flex-1 px-6 py-3.5 rounded-full font-label-lg transition-all shadow-md hover:shadow-lg ${styles.buttonClass}`}
+            className={`btn flex-1 px-6 py-3.5 shadow-md ${styles.buttonClass}`}
           >
             {confirmText}
           </button>
