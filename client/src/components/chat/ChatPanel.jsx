@@ -65,6 +65,15 @@ export const ChatPanel = memo(function ChatPanel() {
     }
   }, [chatHistory, rowVirtualizer]);
 
+  // Scroll to bottom when component mounts (e.g. when switching back to chat tab)
+  useEffect(() => {
+    if (chatContainerRef.current && chatHistory.length > 0) {
+      setTimeout(() => {
+        rowVirtualizer.scrollToIndex(chatHistory.length - 1, { align: 'end' });
+      }, 50);
+    }
+  }, []); // Run once on mount
+
   const handleSend = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -182,10 +191,10 @@ export const ChatPanel = memo(function ChatPanel() {
         )}
       </div>
 
-      {/* Input — sticky so it stays at the bottom of the chat panel without leaking out */}
+      {/* Input — fixed on mobile to stay above tab bar, sticky on desktop */}
       <form
         onSubmit={handleSend}
-        className="sticky bottom-0 left-0 right-0 p-3 bg-surface-container-lowest border-t border-outline-variant flex gap-2 shrink-0 z-20"
+        className="fixed md:sticky bottom-0 left-0 right-0 p-3 bg-surface-container-lowest border-t border-outline-variant flex gap-2 shrink-0 z-40 md:z-20"
         style={{
           paddingBottom: `calc(${formBottom}px + env(safe-area-inset-bottom) + 0.75rem)`
         }}
