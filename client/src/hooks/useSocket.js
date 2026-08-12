@@ -58,11 +58,12 @@ const executeJoin = (socket, roomId, userId, nickname, avatar, retriesLeft) => {
         saveSession(roomId, userId, nickname, avatar);
         resolve(response.roomState);
       } else if (response.error === 'Room not found' && retriesLeft > 0) {
+        const delay = 2000 * (4 - retriesLeft + 1); // exponential backoff: 2s, 4s, 6s, 8s
         setTimeout(() => {
           executeJoin(socket, roomId, userId, nickname, avatar, retriesLeft - 1)
             .then(resolve)
             .catch(reject);
-        }, 2000);
+        }, delay);
       } else {
         reject(response.error || 'Failed to join');
       }

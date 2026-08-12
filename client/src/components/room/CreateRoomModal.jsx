@@ -6,6 +6,7 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
   const [loading, setLoading] = useState(false);
   const [mood, setMood] = useState('cosy'); // default mood
   const [roomName, setRoomName] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useLockBodyScroll(isOpen);
 
@@ -32,10 +33,11 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
     const avatar = user.user_metadata.avatar_url || null;
 
     setLoading(true);
+    setErrorMsg('');
     try {
       await onCreateRoom(user.id, nickname, avatar, roomName, mood);
     } catch (err) {
-      alert('Error: ' + err);
+      setErrorMsg(String(err));
     } finally {
       setLoading(false);
     }
@@ -135,23 +137,31 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
 
             {/* Footer / CTA */}
             {user && (
-              <div className="p-6 bg-surface-container border-t border-outline-variant flex items-center justify-between">
-                  <p className="font-body-sm text-on-surface-variant max-w-[200px]">You'll get an invite code on the next screen.</p>
-                  <button 
-                      form="create-room-form"
-                      type="submit" 
-                      disabled={loading}
-                      className="btn btn-primary px-8 py-3"
-                  >
-                      {loading ? (
-                          <span className="material-symbols-outlined animate-spin">progress_activity</span>
-                      ) : (
-                          <>
-                            <span className="material-symbols-outlined">add</span>
-                            Start Room
-                          </>
-                      )}
-                  </button>
+              <div className="p-6 bg-surface-container border-t border-outline-variant flex flex-col gap-3">
+                  {errorMsg && (
+                    <p className="text-error text-sm font-label-md flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px]">error</span>
+                      {errorMsg}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <p className="font-body-sm text-on-surface-variant max-w-[200px]">You'll get an invite code on the next screen.</p>
+                    <button 
+                        form="create-room-form"
+                        type="submit" 
+                        disabled={loading}
+                        className="btn btn-primary px-8 py-3"
+                    >
+                        {loading ? (
+                            <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                        ) : (
+                            <>
+                              <span className="material-symbols-outlined">add</span>
+                              Start Room
+                            </>
+                        )}
+                    </button>
+                  </div>
               </div>
             )}
         </div>

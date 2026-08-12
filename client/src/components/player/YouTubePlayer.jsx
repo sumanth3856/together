@@ -315,8 +315,16 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
     if (!playback?.isPlaying) setSyncPromptDismissed(false);
   }, [playback?.isPlaying]);
 
-  // Progress ticker
+  // Progress ticker — pauses when video is not playing to avoid unnecessary re-renders
   useEffect(() => {
+    if (!localPlaying) {
+      // Update once so the paused position is accurate
+      if (playerRef.current?.getCurrentTime) {
+        setCurrentTime(playerRef.current.getCurrentTime() || 0);
+        if (playerRef.current.getDuration) setDuration(playerRef.current.getDuration() || 0);
+      }
+      return;
+    }
     const timer = setInterval(() => {
       if (playerRef.current && playerRef.current.getCurrentTime) {
         setCurrentTime(playerRef.current.getCurrentTime() || 0);
@@ -324,7 +332,7 @@ export const YouTubePlayer = React.memo(function YouTubePlayer({
       }
     }, 500);
     return () => clearInterval(timer);
-  }, []);
+  }, [localPlaying]);
 
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60);

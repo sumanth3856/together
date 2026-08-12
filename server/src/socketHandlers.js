@@ -121,6 +121,7 @@ export function setupSocketHandlers(io) {
       const finalUserId = socket.user?.sub ? socket.user.sub : userId;
 
       const room = RoomManager.createRoom(finalUserId, socket.id, cleanName, avatar, roomName, mood);
+      room._io = io; // Store io ref so async grace-period timer can emit events
       currentRoomId = room.roomId;
       socket.join(room.roomId);
 
@@ -157,6 +158,7 @@ export function setupSocketHandlers(io) {
       }
 
       const { room, wasReconnect } = result;
+      room._io = io; // Ensure io ref is always fresh
       currentRoomId = room.roomId;
       socket.join(room.roomId);
 

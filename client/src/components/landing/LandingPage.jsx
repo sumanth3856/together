@@ -23,18 +23,26 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
   const [atmosphereImageLoaded, setAtmosphereImageLoaded] = useState(false);
 
   useEffect(() => {
+    let rafId = null;
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-      const sections = ['home', 'features', 'story'];
-      let current = 'home';
-      for (const section of sections) {
-        const el = document.getElementById(section);
-        if (el && el.getBoundingClientRect().top <= 250) current = section;
-      }
-      setActiveSection(current);
+      if (rafId) return; // already scheduled
+      rafId = requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 20);
+        const sections = ['home', 'features', 'story'];
+        let current = 'home';
+        for (const section of sections) {
+          const el = document.getElementById(section);
+          if (el && el.getBoundingClientRect().top <= 250) current = section;
+        }
+        setActiveSection(current);
+        rafId = null;
+      });
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   return (

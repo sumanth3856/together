@@ -1,5 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRoomStore } from '../../store/useRoomStore';
+
+// Module-level API URL — computed once, not on every search
+const getApiUrl = () => {
+  if (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL) {
+    return process.env.NEXT_PUBLIC_SOCKET_SERVER_URL;
+  }
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `${protocol}//${hostname}:4000`;
+    }
+  }
+  return '';
+};
+const API_BASE_URL = getApiUrl();
 
 export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) {
   const [activeTab, setActiveTab] = useState('search');
@@ -7,6 +22,8 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Cache the last search results so switching tabs doesn't clear them
+  const lastResultsRef = useRef([]);
 
   const roomState = useRoomStore((s) => s.roomState);
   const socketId = useRoomStore((s) => s.socketId);
@@ -22,26 +39,16 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
     setLoading(true);
     setError(null);
     try {
-      const getApiUrl = () => {
-        if (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL) {
-          return process.env.NEXT_PUBLIC_SOCKET_SERVER_URL;
-        }
-        if (typeof window !== 'undefined') {
-          const { protocol, hostname } = window.location;
-          if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return `${protocol}//${hostname}:4000`;
-          }
-        }
-        return '';
-      };
-
-      const baseUrl = getApiUrl();
-      const res = await fetch(`${baseUrl}/api/youtube/search?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`${API_BASE_URL}/api/youtube/search?q=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
-      setResults(data.results || []);
+      const videos = data.results || [];
+      setResults(videos);
+      lastResultsRef.current = videos; // cache for tab-switch persistence
     } catch (err) {
       setError('Failed to load search results.');
+      // Restore last results so the user doesn't lose their previous search
+      if (lastResultsRef.current.length > 0) setResults(lastResultsRef.current);
     } finally {
       setLoading(false);
     }

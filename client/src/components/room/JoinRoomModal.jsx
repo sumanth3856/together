@@ -5,6 +5,7 @@ import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user }) {
   const [code, setCode] = useState(initialRoomId ? initialRoomId.split('').concat(Array(6 - initialRoomId.length).fill('')) : ['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const inputRefs = useRef([]);
 
   useLockBodyScroll(isOpen);
@@ -70,9 +71,10 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user
     
     const roomId = code.join('');
     if (roomId.length !== 6) {
-      alert('Please enter a 6-digit Room Code');
+      setErrorMsg('Please enter a 6-character Room Code.');
       return;
     }
+    setErrorMsg('');
 
     const nickname = user.user_metadata.full_name || 'Guest';
     const avatar = user.user_metadata.avatar_url || null;
@@ -81,7 +83,7 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user
     try {
       await onJoinRoom(roomId, user.id, nickname, avatar);
     } catch (err) {
-      alert('Error: ' + err);
+      setErrorMsg(String(err));
     } finally {
       setLoading(false);
     }
@@ -145,6 +147,14 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user
                               />
                           ))}
                       </div>
+
+                      {/* Inline error message */}
+                      {errorMsg && (
+                        <p className="text-error text-sm font-label-md mb-4 text-center flex items-center gap-2 justify-center">
+                          <span className="material-symbols-outlined text-[16px]">error</span>
+                          {errorMsg}
+                        </p>
+                      )}
 
                       <div className="w-full space-y-4">
                           <button 

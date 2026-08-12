@@ -4,14 +4,25 @@ export const rooms = new Map();
 // Track disconnected users awaiting reconnect: userId -> { roomId, timer }
 const pendingReconnects = new Map();
 
-// Helper to generate a 6-digit room code
+// Helper to generate a unique 6-digit room code (collision-safe)
 function generateRoomCode() {
   const chars = '0123456789';
   let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  let attempts = 0;
+  do {
+    code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    attempts++;
+  } while (rooms.has(code) && attempts < 100); // Retry on collision
   return code;
+}
+
+// Helper to push a system/chat message with automatic 100-msg cap
+function pushChatMessage(room, msg) {
+  room.chatHistory.push(msg);
+  if (room.chatHistory.length > 100) room.chatHistory.shift();
 }
 
 // Grace period before a disconnected host/member's room is deleted (30 seconds)
@@ -53,7 +64,8 @@ export const RoomManager = {
           isSystem: true,
           timestamp: Date.now()
         }
-      ]
+      ],
+      _io: null // set by socketHandlers after creation
     };
 
     rooms.set(roomId, room);
@@ -97,7 +109,7 @@ export const RoomManager = {
         clearTimeout(pendingReconnects.get(actualUserId).timer);
         pendingReconnects.delete(actualUserId);
         
-        room.chatHistory.push({
+        pushChatMessage(room, {
           id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           sender: 'System',
           text: `${member.nickname} reconnected.`,
@@ -123,7 +135,7 @@ export const RoomManager = {
       joinedAt: Date.now()
     };
 
-    room.chatHistory.push({
+    pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `${member.nickname} joined the room.`,
@@ -131,7 +143,6 @@ export const RoomManager = {
       timestamp: Date.now()
     });
 
-    if (room.chatHistory.length > 100) room.chatHistory.shift();
     room.members.set(actualUserId, member);
 
     return { room, member, wasReconnect: false };
@@ -152,43 +163,50 @@ export const RoomManager = {
         // Otherwise, they are fully disconnected from this room
         room.members.delete(member.userId);
 
-        // Schedule grace-period deletion
-        const timer = setTimeout(() => {
-          pendingReconnects.delete(member.userId);
-          const currentRoom = rooms.get(roomId);
-          if (!currentRoom) return; 
-          
-          if (currentRoom.members.size === 0) {
-            rooms.delete(roomId);
-            return { roomId, sessionEnded: true };
-          } else if (currentRoom.hostId === member.userId) {
-            // Auto-promote the oldest surviving member
-            const nextHost = Array.from(currentRoom.members.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
-            if (nextHost) {
-              currentRoom.hostId = nextHost.userId;
-              currentRoom.chatHistory.push({
-                id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                sender: 'System',
-                text: `${nextHost.nickname} is the new host.`,
-                isSystem: true,
-                timestamp: Date.now()
-              });
-            }
-          }
-        }, RECONNECT_GRACE_MS);
-
-        pendingReconnects.set(member.userId, {
-          roomId,
-          timer
-        });
-
-        room.chatHistory.push({
+        // Push disconnect message immediately so remaining users see it
+        pushChatMessage(room, {
           id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           sender: 'System',
           text: `${member.nickname} disconnected.`,
           isSystem: true,
           timestamp: Date.now()
         });
+
+        // Schedule grace-period cleanup — if they don't reconnect, promote host or delete room
+        const timer = setTimeout(() => {
+          pendingReconnects.delete(member.userId);
+          const currentRoom = rooms.get(roomId);
+          if (!currentRoom) return;
+
+          if (currentRoom.members.size === 0) {
+            rooms.delete(roomId);
+            // Notify any lingering sockets (e.g. slow clients) via stored io ref
+            if (currentRoom._io) currentRoom._io.to(roomId).emit('session_ended');
+            return;
+          }
+
+          if (currentRoom.hostId === member.userId) {
+            // Auto-promote the oldest surviving member
+            const nextHost = Array.from(currentRoom.members.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
+            if (nextHost) {
+              currentRoom.hostId = nextHost.userId;
+              pushChatMessage(currentRoom, {
+                id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                sender: 'System',
+                text: `${nextHost.nickname} is the new host.`,
+                isSystem: true,
+                timestamp: Date.now()
+              });
+              // Broadcast the updated state after host promotion
+              if (currentRoom._io) {
+                const { getRoomStateDTO } = RoomManager;
+                currentRoom._io.to(roomId).emit('room_state_updated', getRoomStateDTO(currentRoom));
+              }
+            }
+          }
+        }, RECONNECT_GRACE_MS);
+
+        pendingReconnects.set(member.userId, { roomId, timer });
 
         return { roomId, room, member, sessionEnded: false };
       }
@@ -218,7 +236,7 @@ export const RoomManager = {
             const nextHost = Array.from(room.members.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
             if (nextHost) {
               room.hostId = nextHost.userId;
-              room.chatHistory.push({
+              pushChatMessage(room, {
                 id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
                 sender: 'System',
                 text: `${nextHost.nickname} is the new host.`,
@@ -228,7 +246,7 @@ export const RoomManager = {
             }
           }
 
-          room.chatHistory.push({
+          pushChatMessage(room, {
             id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
             sender: 'System',
             text: `${member.nickname} left the room.`,
@@ -261,7 +279,7 @@ export const RoomManager = {
         youtubeId,
         title: title || 'YouTube Video'
       };
-      room.chatHistory.push({
+      pushChatMessage(room, {
         id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         sender: 'System',
         text: `${member.nickname} changed the video.`,
@@ -305,7 +323,7 @@ export const RoomManager = {
         updatedAt: Date.now()
       };
       
-      room.chatHistory.push({
+      pushChatMessage(room, {
         id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         sender: 'System',
         text: `${member.nickname} started playing "${video.title}".`,
@@ -321,7 +339,7 @@ export const RoomManager = {
       addedBy: member.nickname
     });
 
-    room.chatHistory.push({
+    pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `${member.nickname} added "${video.title}" to the queue.`,

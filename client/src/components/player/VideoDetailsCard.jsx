@@ -1,13 +1,16 @@
 import React, { memo, useState } from 'react';
 import { useRoomStore } from '../../store/useRoomStore';
+import { useUIStore } from '../../store/useUIStore';
 
 export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId, onLoadVideo }) {
   const [copiedLink, setCopiedLink] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
 
   const roomId = useRoomStore(state => state.roomState?.roomId);
   const currentVideo = useRoomStore(state => state.roomState?.currentVideo);
   const isPlaying = useRoomStore(state => state.roomState?.playback?.isPlaying);
   const memberCount = useRoomStore(state => state.roomState?.members?.length || 0);
+  const setToastNotification = useUIStore(state => state.setToastNotification);
 
   const handleCopyShareLink = () => {
     const shareUrl = `${window.location.origin}?room=${roomId}`;
@@ -51,9 +54,15 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
             if (match && match[1]) {
               if (onLoadVideo) onLoadVideo({ youtubeId: match[1] });
               e.target.reset();
+              setToastNotification({ type: 'success', message: 'Video loaded! Syncing with room…' });
+              setVideoLoaded(true);
+              setTimeout(() => setVideoLoaded(false), 2000);
             } else if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
               if (onLoadVideo) onLoadVideo({ youtubeId: url });
               e.target.reset();
+              setToastNotification({ type: 'success', message: 'Video loaded! Syncing with room…' });
+            } else {
+              setToastNotification({ type: 'error', message: 'Invalid YouTube URL or ID.' });
             }
           }}
           className="flex gap-2 w-full"

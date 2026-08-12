@@ -14,6 +14,7 @@ export const ChatPanel = memo(function ChatPanel() {
   const { sendChatMessage: onSendMessage, sendReaction: onSendReaction } = useSocket();
   const [inputText, setInputText] = useState('');
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -51,6 +52,13 @@ export const ChatPanel = memo(function ChatPanel() {
     };
   }, [chatHistory.length, rowVirtualizer]);
 
+  // Track isMobile with a resize listener
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   useEffect(() => {
     if (chatContainerRef.current && chatHistory.length > 0) {
       rowVirtualizer.scrollToIndex(chatHistory.length - 1, { align: 'end' });
@@ -65,9 +73,17 @@ export const ChatPanel = memo(function ChatPanel() {
   };
 
   const INPUT_DOCK_HEIGHT = 62;
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const formBottom = keyboardOffset > 0 ? keyboardOffset : (isMobile ? 70 : 0);
   const scrollPaddingBottom = INPUT_DOCK_HEIGHT + formBottom + 8;
+
+  // Format a timestamp as a relative string ("just now", "2 min ago", etc.)
+  const formatRelativeTime = (ts) => {
+    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
 
   return (
     <div
@@ -149,8 +165,8 @@ export const ChatPanel = memo(function ChatPanel() {
                         {isMe ? 'You' : msg.sender}
                       </span>
                       {msg.isHost && <span className="material-symbols-outlined text-[14px] text-primary" title="Host">star</span>}
-                      <span className="text-[10px] text-on-surface-variant font-label-sm">
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <span className="text-[10px] text-on-surface-variant font-label-sm" title={new Date(msg.timestamp).toLocaleTimeString()}>
+                        {formatRelativeTime(msg.timestamp)}
                       </span>
                     </div>
                     <div 
@@ -166,12 +182,12 @@ export const ChatPanel = memo(function ChatPanel() {
         )}
       </div>
 
-      {/* Input */}
+      {/* Input — sticky so it stays at the bottom of the chat panel without leaking out */}
       <form
         onSubmit={handleSend}
-        className="fixed md:absolute left-0 right-0 p-4 bg-surface-container-lowest border-t border-outline-variant flex gap-2 shrink-0 z-50 md:z-20"
+        className="sticky bottom-0 left-0 right-0 p-3 bg-surface-container-lowest border-t border-outline-variant flex gap-2 shrink-0 z-20"
         style={{
-           bottom: `calc(${formBottom}px + env(safe-area-inset-bottom))`
+          paddingBottom: `calc(${formBottom}px + env(safe-area-inset-bottom) + 0.75rem)`
         }}
       >
         <input

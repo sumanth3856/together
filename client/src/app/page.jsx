@@ -275,7 +275,7 @@ export default function Page() {
             }}>
               <span className="material-symbols-outlined" style={{ fontSize: 36, color: '#ba1a1a' }}>error</span>
             </div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', fontFamily: "var(--font-oswald), sans-serif" }}>
+            <h2 className="font-display-lg text-3xl md:text-4xl font-extrabold mb-3 text-on-background">
               Session Ended
             </h2>
             <p style={{ color: '#5e3f3a', marginBottom: '28px', maxWidth: '300px', lineHeight: 1.6, fontSize: '0.9rem' }}>
@@ -300,7 +300,7 @@ export default function Page() {
         ) : null
       ) : (
         /* ── Main Co-Watching Room View ── */
-        <div className="min-h-screen bg-background pt-20 pb-6 px-4 md:px-8 max-w-[1600px] mx-auto">
+        <div className="min-h-screen bg-background pt-16 md:pt-20 pb-6 px-4 md:px-8 max-w-[1600px] mx-auto">
           <RoomHeader
             onLeaveRoom={handleLeaveRoom}
             roomId={roomId}

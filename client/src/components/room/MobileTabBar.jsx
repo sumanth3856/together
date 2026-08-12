@@ -2,7 +2,10 @@ import React from 'react';
 
 export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-surface-container-lowest border-t border-outline-variant flex items-center justify-around px-2 z-50 md:hidden">
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-surface-container-lowest border-t border-outline-variant flex items-center justify-around px-2 z-50 md:hidden"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)', minHeight: '64px' }}
+    >
       <button 
         className={`flex flex-col items-center justify-center w-20 h-full transition-colors ${activeTab === 'video' ? 'text-primary' : 'text-on-surface-variant hover:text-on-background'}`}
         onClick={() => onSelectTab('video')}

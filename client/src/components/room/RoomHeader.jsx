@@ -34,15 +34,15 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
 
         {/* Center: Room Code */}
         {roomId && (
-          <div className="flex items-center md:justify-self-center min-w-0 max-w-full mx-1 sm:mx-4">
+          <div className="flex items-center md:justify-self-center min-w-0 mx-1 sm:mx-4">
               <button 
                 onClick={handleCopyCode}
                 title="Click to copy room code"
-                className="bg-surface-container hover:bg-surface-container-high transition-colors px-2 sm:px-4 py-1.5 rounded-full border border-outline-variant flex items-center gap-1.5 sm:gap-2 group max-w-[38vw] sm:max-w-[45vw]"
+                className="bg-surface-container hover:bg-surface-container-high transition-colors px-2 sm:px-4 py-1.5 rounded-full border border-outline-variant flex items-center gap-1.5 sm:gap-2 group"
               >
-                  <span className="hidden sm:inline font-label-sm text-on-surface-variant uppercase tracking-widest">Room</span>
-                  <span className="font-display-lg font-bold text-primary tracking-widest truncate text-sm sm:text-xl">{roomId}</span>
-                  <span className="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-primary transition-colors shrink-0">content_copy</span>
+                  <span className="hidden sm:inline font-label-sm text-on-surface-variant uppercase tracking-widest whitespace-nowrap">Room</span>
+                  <span className="font-display-lg font-bold text-primary text-[0.7rem] sm:text-xl tracking-[0.2em] sm:tracking-widest whitespace-nowrap select-all">{roomId}</span>
+                  <span className="material-symbols-outlined text-[14px] sm:text-[16px] text-on-surface-variant group-hover:text-primary transition-colors shrink-0">content_copy</span>
               </button>
           </div>
         )}

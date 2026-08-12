@@ -93,6 +93,29 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// Simple LRU cache for YouTube search results (5-minute TTL, 50-item cap)
+const searchCache = new Map();
+const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const SEARCH_CACHE_MAX = 50;
+
+function getCachedSearch(query) {
+  const entry = searchCache.get(query);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > SEARCH_CACHE_TTL) {
+    searchCache.delete(query);
+    return null;
+  }
+  return entry.results;
+}
+
+function setCachedSearch(query, results) {
+  if (searchCache.size >= SEARCH_CACHE_MAX) {
+    // Evict oldest entry
+    searchCache.delete(searchCache.keys().next().value);
+  }
+  searchCache.set(query, { results, ts: Date.now() });
+}
+
 // YouTube Search endpoint
 app.get('/api/youtube/search', async (req, res) => {
   try {
@@ -100,6 +123,13 @@ app.get('/api/youtube/search', async (req, res) => {
     if (!query) {
       return res.status(400).json({ error: 'Missing query parameter "q"' });
     }
+
+    // Serve from cache if available
+    const cached = getCachedSearch(query);
+    if (cached) {
+      return res.json({ results: cached, cached: true });
+    }
+
     const r = await ytSearch(query);
     // Return top 15 video results
     const videos = r.videos.slice(0, 15).map(v => ({
@@ -109,6 +139,7 @@ app.get('/api/youtube/search', async (req, res) => {
       duration: v.timestamp,
       author: v.author.name
     }));
+    setCachedSearch(query, videos);
     res.json({ results: videos });
   } catch (err) {
     console.error('YouTube search error:', err);
