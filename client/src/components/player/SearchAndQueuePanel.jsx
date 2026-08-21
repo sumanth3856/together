@@ -31,6 +31,8 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
 
   const currentMember = roomState?.members?.find((m) => m.socketIds?.includes(socketId));
   const isHost = roomState?.hostId === currentMember?.userId;
+  const allowMemberControls = roomState?.settings?.allowMemberControls ?? true;
+  const canControl = isHost || allowMemberControls;
   const queue = roomState?.videoQueue || [];
 
   const handleSearch = async (e) => {
@@ -249,15 +251,32 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                       {v.author || 'Video'}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1.5 shrink-0 justify-center pr-1">
-                    <button type="button" onClick={() => handleAddToQueue(v)} className="w-8 h-8 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary flex items-center justify-center transition-colors shadow-soft" title="Add to Queue" data-testid={`add-queue-${v.youtubeId}`}>
-                       <span className="material-symbols-outlined text-[18px]">add</span>
+                  <div className="flex sm:flex-row flex-col gap-1.5 shrink-0 justify-center items-center pr-1">
+                    <button 
+                      type="button" 
+                      onClick={() => handlePlayNow(v)} 
+                      disabled={!canControl}
+                      className={`flex items-center justify-center gap-1 px-2.5 sm:px-3 h-8 sm:h-9 rounded-xl font-label-md text-xs transition-all shadow-xs active:scale-95 ${!canControl ? 'bg-surface-container text-on-surface-variant/40 cursor-not-allowed' : 'bg-primary text-on-primary hover:bg-surface-tint hover:shadow-sm'}`}
+                      title={canControl ? "Play Now" : "Controls restricted"}
+                      aria-label={`Play ${v.title} now`}
+                      data-testid={`play-now-${v.youtubeId}`}
+                    >
+                      <span className="material-symbols-outlined text-[16px] sm:text-[18px] fill-1">play_arrow</span>
+                      <span className="hidden sm:inline font-semibold">Play</span>
                     </button>
-                    {isHost && (
-                      <button type="button" onClick={() => handlePlayNow(v)} className="w-8 h-8 rounded-xl bg-primary text-on-primary hover:bg-surface-tint flex items-center justify-center transition-colors shadow-soft" title="Play Now" data-testid={`play-now-${v.youtubeId}`}>
-                        <span className="material-symbols-outlined text-[18px] fill-1">play_arrow</span>
-                      </button>
-                    )}
+
+                    <button 
+                      type="button" 
+                      onClick={() => handleAddToQueue(v)} 
+                      disabled={!canControl}
+                      className={`flex items-center justify-center gap-1 px-2.5 sm:px-3 h-8 sm:h-9 rounded-xl font-label-md text-xs transition-all shadow-xs active:scale-95 ${!canControl ? 'bg-surface-container text-on-surface-variant/40 cursor-not-allowed' : 'bg-surface-container-high hover:bg-primary-container text-primary hover:text-on-primary-container'}`}
+                      title={canControl ? "Add to Queue" : "Queue restricted"}
+                      aria-label={`Add ${v.title} to queue`}
+                      data-testid={`add-queue-${v.youtubeId}`}
+                    >
+                      <span className="material-symbols-outlined text-[16px] sm:text-[18px]">playlist_add</span>
+                      <span className="hidden sm:inline font-semibold">Queue</span>
+                    </button>
                   </div>
                 </div>
               ))}
