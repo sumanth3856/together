@@ -154,7 +154,7 @@ export const ChatPanel = memo(function ChatPanel() {
                   key={msg.id || index}
                   className="w-full flex justify-center py-1 animate-fade-in"
                 >
-                  <span className="bg-surface-container-highest/80 backdrop-blur-xs text-on-surface-variant px-3 py-0.5 rounded-full font-label-sm text-[10px] sm:text-[11px] uppercase tracking-wider border border-outline-variant/30 shadow-2xs text-center max-w-[90%] truncate">
+                  <span className="bg-surface-container-highest/80 backdrop-blur-xs text-on-surface-variant px-3 py-0.5 rounded-full font-label-sm text-xs uppercase tracking-wider border border-outline-variant/30 shadow-2xs text-center max-w-[90%] truncate">
                     {msg.text}
                   </span>
                 </div>
@@ -171,32 +171,32 @@ export const ChatPanel = memo(function ChatPanel() {
                 {/* Avatar */}
                 <div className="shrink-0 pt-0.5">
                   {msg.avatar ? (
-                    <img src={msg.avatar} alt="Avatar" loading="lazy" className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-outline-variant object-cover shadow-2xs" />
+                    <img src={msg.avatar} alt="Avatar" loading="lazy" className="w-8 h-8 rounded-full border border-outline-variant object-cover shadow-2xs" />
                   ) : (
-                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[12px] font-label-sm shadow-2xs ${isMe ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant border border-outline-variant'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-label-sm shadow-2xs ${isMe ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant border border-outline-variant'}`}>
                       {msg.sender?.charAt(0).toUpperCase() || '?'}
                     </div>
                   )}
                 </div>
 
                 {/* Content Bubble */}
-                <div className={`flex flex-col min-w-0 max-w-[82%] sm:max-w-[78%] ${isMe ? 'items-end' : 'items-start'}`}>
+                <div className={`flex flex-col min-w-0 max-w-[84%] sm:max-w-[78%] ${isMe ? 'items-end' : 'items-start'}`}>
                   <div className={`flex items-center gap-1.5 mb-1 px-1 flex-wrap ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <span className="font-label-sm text-[12px] text-on-surface font-semibold truncate max-w-[120px]">
+                    <span className="font-label-sm text-xs sm:text-sm text-on-surface font-semibold truncate max-w-[140px]">
                       {isMe ? 'You' : msg.sender}
                     </span>
                     {msg.isHost && (
-                      <span className="material-symbols-outlined text-[13px] text-primary" title="Room Host">
+                      <span className="material-symbols-outlined text-[14px] text-primary" title="Room Host">
                         star
                       </span>
                     )}
-                    <span className="text-[10px] text-on-surface-variant/70 font-label-sm" title={new Date(msg.timestamp).toLocaleTimeString()}>
+                    <span className="text-[11px] sm:text-xs text-on-surface-variant/80 font-label-sm" title={new Date(msg.timestamp).toLocaleTimeString()}>
                       {formatRelativeTime(msg.timestamp)}
                     </span>
                   </div>
                   
                   <div 
-                    className={`px-3.5 py-2 text-xs sm:text-sm font-body-md shadow-xs break-words leading-relaxed ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-xs' : 'bg-surface-container-lowest text-on-background rounded-2xl rounded-tl-xs border border-outline-variant/60'}`}
+                    className={`px-3.5 py-2 text-sm font-body-md shadow-xs break-words leading-relaxed ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-xs' : 'bg-surface-container-lowest text-on-background rounded-2xl rounded-tl-xs border border-outline-variant/60'}`}
                   >
                     {msg.text}
                   </div>
@@ -220,7 +220,7 @@ export const ChatPanel = memo(function ChatPanel() {
           <input
             ref={inputRef}
             type="text"
-            className="input w-full rounded-full pl-4 pr-10 py-2 text-xs sm:text-sm bg-surface-container border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-on-surface-variant/60"
+            className="input w-full rounded-full pl-4 pr-10 py-2 text-sm sm:text-base bg-surface-container border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-on-surface-variant/60"
             placeholder="Share a moment…"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

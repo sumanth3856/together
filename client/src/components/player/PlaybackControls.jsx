@@ -120,12 +120,12 @@ export const PlaybackControls = memo(function PlaybackControls({
         </div>
 
         {/* Timestamp Pill at the ending of progress track */}
-        <div className="flex items-center justify-center px-2.5 py-0.5 bg-surface-container-lowest rounded-full border border-outline-variant/60 text-xs font-label-sm shrink-0 select-none shadow-2xs">
-          <span className="text-on-surface font-medium tabular-nums">
+        <div className="flex items-center justify-center px-2.5 py-0.5 bg-surface-container-lowest rounded-full border border-outline-variant/60 text-xs sm:text-sm font-label-sm shrink-0 select-none shadow-2xs">
+          <span className="text-on-surface font-semibold tabular-nums">
             {formatTime(displayTime)}
           </span>
           <span className="mx-1 text-on-surface-variant/40">/</span>
-          <span className="text-on-surface-variant/80 tabular-nums">
+          <span className="text-on-surface-variant/80 font-medium tabular-nums">
             {formatTime(effectiveDuration)}
           </span>
         </div>

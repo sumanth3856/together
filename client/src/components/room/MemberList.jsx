@@ -120,14 +120,14 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
               <div className="flex-1 min-w-0 flex flex-col">
                 <div className="flex items-center gap-2 flex-wrap">
                   {isHost && <span className="material-symbols-outlined text-[16px] text-primary" title="Host">star</span>}
-                  <span className="font-label-lg text-on-background truncate">
+                  <span className="font-label-lg text-sm sm:text-base text-on-background truncate">
                     {m.nickname}
                   </span>
                   {isYou && (
-                    <span className="text-[10px] text-primary font-label-sm tracking-widest uppercase bg-primary/10 px-2 py-0.5 rounded-sm">(You)</span>
+                    <span className="text-xs text-primary font-label-sm tracking-wider uppercase bg-primary/10 px-2 py-0.5 rounded-sm font-semibold">(You)</span>
                   )}
                 </div>
-                <span className="text-xs font-body-md text-on-surface-variant">
+                <span className="text-xs sm:text-sm font-body-md text-on-surface-variant">
                   {isHost ? 'Host' : 'Viewer'}
                 </span>
               </div>
@@ -153,13 +153,13 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
                       <div className="py-1">
                         <button 
                           onClick={() => handleWave(m.nickname)}
-                          className="w-full text-left px-3.5 py-2 font-label-md text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
+                          className="w-full text-left px-3.5 py-2 font-label-md text-xs sm:text-sm text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
                         >
                           <span className="text-[16px]">👋</span> Send Wave
                         </button>
                         <button 
                           onClick={() => handleCopyNickname(m.nickname)}
-                          className="w-full text-left px-3.5 py-2 font-label-md text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
+                          className="w-full text-left px-3.5 py-2 font-label-md text-xs sm:text-sm text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
                         >
                           <span className="material-symbols-outlined text-[18px] text-on-surface-variant">content_copy</span> Copy Nickname
                         </button>
@@ -169,13 +169,13 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
                         <div className="py-1">
                           <button 
                             onClick={() => handleTransferHost(m.userId, m.nickname)}
-                            className="w-full text-left px-3.5 py-2 font-label-md text-primary hover:bg-primary-container/20 transition-colors flex items-center gap-2.5"
+                            className="w-full text-left px-3.5 py-2 font-label-md text-xs sm:text-sm text-primary hover:bg-primary-container/20 transition-colors flex items-center gap-2.5"
                           >
                             <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span> Make Host
                           </button>
                           <button 
                             onClick={() => handleKickUser(m.userId, m.nickname)}
-                            className="w-full text-left px-3.5 py-2 font-label-md text-error hover:bg-error/10 transition-colors flex items-center gap-2.5"
+                            className="w-full text-left px-3.5 py-2 font-label-md text-xs sm:text-sm text-error hover:bg-error/10 transition-colors flex items-center gap-2.5"
                           >
                             <span className="material-symbols-outlined text-[18px]">person_remove</span> Kick from Room
                           </button>

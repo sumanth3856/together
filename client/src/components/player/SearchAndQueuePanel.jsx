@@ -160,14 +160,14 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                     placeholder="Search YouTube..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-xs sm:text-sm bg-surface-container-lowest rounded-xl border border-outline-variant/70 focus:border-primary"
+                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-sm sm:text-base bg-surface-container-lowest rounded-xl border border-outline-variant/70 focus:border-primary"
                     data-testid="search-input"
                   />
                 </div>
                 <button 
                   type="submit" 
                   disabled={loading} 
-                  className="btn btn-primary px-4 h-10 rounded-xl min-w-[54px] text-xs font-semibold shrink-0 shadow-sm"
+                  className="btn btn-primary px-4 h-10 rounded-xl min-w-[54px] text-xs sm:text-sm font-semibold shrink-0 shadow-sm"
                   data-testid="search-submit-btn"
                 >
                   {loading ? <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> : 'Go'}
@@ -183,14 +183,14 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                     placeholder="Paste link (SoundCloud, Vimeo, MP4)..."
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
-                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-xs sm:text-sm bg-surface-container-lowest rounded-xl border border-outline-variant/70 focus:border-primary"
+                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-sm sm:text-base bg-surface-container-lowest rounded-xl border border-outline-variant/70 focus:border-primary"
                     data-testid="direct-url-input"
                   />
                 </div>
                 <button 
                   type="submit" 
                   disabled={urlLoading || !urlInput.trim()} 
-                  className="btn bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface px-3.5 h-10 rounded-xl text-xs font-semibold shrink-0 transition-colors"
+                  className="btn bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface px-3.5 h-10 rounded-xl text-xs sm:text-sm font-semibold shrink-0 transition-colors"
                   data-testid="direct-url-submit-btn"
                 >
                   {urlLoading ? <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> : 'Add'}
@@ -239,15 +239,15 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                         }}
                      />
                      {v.duration && (
-                       <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] px-1.5 py-0.5 rounded font-label-sm font-semibold">
+                       <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-label-sm font-semibold">
                            {v.duration}
                        </div>
                      )}
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <div className="font-label-md text-xs sm:text-sm text-on-background line-clamp-2 group-hover:text-primary transition-colors leading-snug">{v.title}</div>
-                    <div className="font-label-sm text-[11px] text-on-surface-variant truncate mt-1 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[13px]">person</span>
+                    <div className="font-label-md text-sm sm:text-base text-on-background line-clamp-2 group-hover:text-primary transition-colors leading-snug">{v.title}</div>
+                    <div className="font-label-sm text-xs sm:text-sm text-on-surface-variant truncate mt-1 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">person</span>
                       {v.author || 'Video'}
                     </div>
                   </div>
@@ -256,7 +256,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                       type="button" 
                       onClick={() => handlePlayNow(v)} 
                       disabled={!canControl}
-                      className={`flex items-center justify-center gap-1 px-2.5 sm:px-3 h-8 sm:h-9 rounded-xl font-label-md text-xs transition-all shadow-xs active:scale-95 ${!canControl ? 'bg-surface-container text-on-surface-variant/40 cursor-not-allowed' : 'bg-primary text-on-primary hover:bg-surface-tint hover:shadow-sm'}`}
+                      className={`flex items-center justify-center gap-1 px-2.5 sm:px-3 h-8 sm:h-9 rounded-xl font-label-md text-xs sm:text-sm transition-all shadow-xs active:scale-95 ${!canControl ? 'bg-surface-container text-on-surface-variant/40 cursor-not-allowed' : 'bg-primary text-on-primary hover:bg-surface-tint hover:shadow-sm'}`}
                       title={canControl ? "Play Now" : "Controls restricted"}
                       aria-label={`Play ${v.title} now`}
                       data-testid={`play-now-${v.youtubeId}`}
@@ -269,7 +269,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                       type="button" 
                       onClick={() => handleAddToQueue(v)} 
                       disabled={!canControl}
-                      className={`flex items-center justify-center gap-1 px-2.5 sm:px-3 h-8 sm:h-9 rounded-xl font-label-md text-xs transition-all shadow-xs active:scale-95 ${!canControl ? 'bg-surface-container text-on-surface-variant/40 cursor-not-allowed' : 'bg-surface-container-high hover:bg-primary-container text-primary hover:text-on-primary-container'}`}
+                      className={`flex items-center justify-center gap-1 px-2.5 sm:px-3 h-8 sm:h-9 rounded-xl font-label-md text-xs sm:text-sm transition-all shadow-xs active:scale-95 ${!canControl ? 'bg-surface-container text-on-surface-variant/40 cursor-not-allowed' : 'bg-surface-container-high hover:bg-primary-container text-primary hover:text-on-primary-container'}`}
                       title={canControl ? "Add to Queue" : "Queue restricted"}
                       aria-label={`Add ${v.title} to queue`}
                       data-testid={`add-queue-${v.youtubeId}`}

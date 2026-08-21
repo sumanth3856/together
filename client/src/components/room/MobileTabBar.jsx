@@ -11,7 +11,7 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
         onClick={() => onSelectTab('video')}
       >
         <span className={`material-symbols-outlined text-[24px] ${activeTab === 'video' ? 'fill-1' : ''}`}>movie</span>
-        <span className="font-label-sm text-[10px] mt-1">Video</span>
+        <span className="font-label-sm text-xs font-semibold mt-1 tracking-wide">Video</span>
       </button>
 
       <button 
@@ -19,9 +19,9 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
         onClick={() => onSelectTab('chat')}
       >
         <span className={`material-symbols-outlined text-[24px] ${activeTab === 'chat' ? 'fill-1' : ''}`}>chat_bubble</span>
-        <span className="font-label-sm text-[10px] mt-1">Chat</span>
+        <span className="font-label-sm text-xs font-semibold mt-1 tracking-wide">Chat</span>
         {chatCount > 0 && (
-          <span className="absolute top-1 right-3 bg-error text-on-error text-[9px] font-label-lg w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
+          <span className="absolute top-1 right-2.5 bg-error text-on-error text-[10px] font-label-lg font-bold w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-sm">
             {chatCount > 99 ? '99+' : chatCount}
           </span>
         )}
@@ -32,7 +32,7 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
         onClick={() => onSelectTab('members')}
       >
         <span className={`material-symbols-outlined text-[24px] ${activeTab === 'members' ? 'fill-1' : ''}`}>groups</span>
-        <span className="font-label-sm text-[10px] mt-1">Guests ({memberCount})</span>
+        <span className="font-label-sm text-xs font-semibold mt-1 tracking-wide">Guests ({memberCount})</span>
       </button>
     </nav>
   );

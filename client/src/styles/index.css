@@ -5,6 +5,9 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    /* Fluid typography scaling adaptive to viewport width */
+    font-size: clamp(15px, 0.4vw + 13.5px, 16px);
+    -webkit-text-size-adjust: 100%;
   }
   body {
     background-color: theme('colors.background');
@@ -56,9 +59,9 @@
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-full whitespace-nowrap select-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none;
     font-family: var(--font-oswald), sans-serif;
-    font-size: 14px;
-    line-height: 20px;
-    letter-spacing: 0.05em;
+    font-size: clamp(13px, 0.5vw + 11px, 15px);
+    line-height: 1.4;
+    letter-spacing: 0.04em;
     font-weight: 600;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
