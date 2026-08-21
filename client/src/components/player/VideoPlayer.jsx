@@ -66,6 +66,7 @@ export function VideoPlayer({
   }, [onVideoEnded]);
 
   const roomState = useRoomStore((state) => state.roomState);
+  const syncedPlaybackEvent = useRoomStore((state) => state.syncedPlaybackEvent);
   const socketId = useRoomStore((state) => state.socketId);
 
   const playback = roomState?.playback;
@@ -86,7 +87,7 @@ export function VideoPlayer({
   useEffect(() => {
     throttledSyncRef.current = throttle((isPlaying, time) => {
       dispatchPlaybackChange(isPlaying, time);
-    }, 250);
+    }, 200);
   }, [dispatchPlaybackChange]);
 
   // Reset state when video changes
@@ -97,35 +98,55 @@ export function VideoPlayer({
     setDuration(0);
   }, [videoUrl]);
 
-  // Handle incoming remote sync events
+  // Handle incoming remote sync events with latency compensation and drift correction
   useEffect(() => {
     if (!playback) return;
 
-    // Ignore syncs if we triggered them recently (echo blocker)
-    if (Date.now() - isSelfSyncing.current < 1000) return;
-
-    const { isPlaying: remoteIsPlaying, currentTime: remoteTime } = playback;
-    const player = playerRef.current;
-    if (!player || typeof player.getCurrentTime !== 'function' || typeof player.seekTo !== 'function') {
-      setLocalPlaying(remoteIsPlaying);
+    // Ignore sync echoes triggered by our own socket
+    if (syncedPlaybackEvent?.senderId && syncedPlaybackEvent.senderId === socketId) {
       return;
     }
 
-    const localTime = player.getCurrentTime() || 0;
-    const timeDiff = Math.abs(localTime - remoteTime);
+    const { isPlaying: remoteIsPlaying, currentTime: remoteTime, updatedAt } = playback;
+    
+    // Latency compensation: add transit delay if actively playing
+    const transitDelay = remoteIsPlaying && updatedAt ? Math.max(0, (Date.now() - updatedAt) / 1000) : 0;
+    const targetTime = remoteIsPlaying ? remoteTime + transitDelay : remoteTime;
 
     setLocalPlaying(remoteIsPlaying);
 
-    if (timeDiff > 1.5) {
-      isSelfSyncing.current = Date.now();
-      player.seekTo(remoteTime, 'seconds');
-      setCurrentTime(remoteTime);
+    const player = playerRef.current;
+    if (player && typeof player.getCurrentTime === 'function' && typeof player.seekTo === 'function') {
+      const localTime = player.getCurrentTime() || 0;
+      const timeDiff = Math.abs(localTime - targetTime);
+
+      // On pause / seek, sync with high precision (tolerance <= 0.3s)
+      // On continuous play, tolerate minor jitter (<= 1.2s) to prevent audio/video stutter
+      const syncThreshold = !remoteIsPlaying ? 0.3 : 1.2;
+      if (timeDiff > syncThreshold) {
+        player.seekTo(targetTime, 'seconds');
+        setCurrentTime(targetTime);
+      }
     }
-  }, [playback]);
+  }, [playback, syncedPlaybackEvent, socketId]);
 
   const handleDuration = (dur) => {
     if (dur && dur > 0) {
       setDuration(dur);
+    }
+  };
+
+  const handleReady = () => {
+    setIsPlayerReady(true);
+    if (playback) {
+      const { isPlaying: remoteIsPlaying, currentTime: remoteTime, updatedAt } = playback;
+      const transitDelay = remoteIsPlaying && updatedAt ? Math.max(0, (Date.now() - updatedAt) / 1000) : 0;
+      const targetTime = remoteIsPlaying ? remoteTime + transitDelay : remoteTime;
+      if (targetTime > 0 && playerRef.current && typeof playerRef.current.seekTo === 'function') {
+        playerRef.current.seekTo(targetTime, 'seconds');
+        setCurrentTime(targetTime);
+      }
+      setLocalPlaying(remoteIsPlaying);
     }
   };
 
@@ -141,7 +162,6 @@ export function VideoPlayer({
 
   const handlePlay = () => {
     if (!hasInteracted) setHasInteracted(true);
-    isSelfSyncing.current = Date.now();
     setLocalPlaying(true);
     const time = playerRef.current && typeof playerRef.current.getCurrentTime === 'function' ? playerRef.current.getCurrentTime() : currentTime;
     dispatchPlaybackChange(true, time);
@@ -149,7 +169,6 @@ export function VideoPlayer({
 
   const handlePause = () => {
     if (!hasInteracted) setHasInteracted(true);
-    isSelfSyncing.current = Date.now();
     setLocalPlaying(false);
     const time = playerRef.current && typeof playerRef.current.getCurrentTime === 'function' ? playerRef.current.getCurrentTime() : currentTime;
     dispatchPlaybackChange(false, time);
@@ -177,7 +196,6 @@ export function VideoPlayer({
 
   const handleManualPlayPause = () => {
     if (!hasInteracted) setHasInteracted(true);
-    isSelfSyncing.current = Date.now();
     const newIsPlaying = !localPlaying;
     setLocalPlaying(newIsPlaying);
     const time = playerRef.current && typeof playerRef.current.getCurrentTime === 'function' ? playerRef.current.getCurrentTime() : currentTime;
@@ -253,7 +271,7 @@ export function VideoPlayer({
               playing={isPlayerReady ? localPlaying : false}
               volume={volume / 100}
               muted={isMuted || !hasInteracted}
-              onReady={() => setIsPlayerReady(true)}
+              onReady={handleReady}
               onProgress={handleProgress}
               onDuration={handleDuration}
               onPlay={handlePlay}

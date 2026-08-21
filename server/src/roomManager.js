@@ -375,7 +375,7 @@ export const RoomManager = {
     return null;
   },
 
-  updatePlayback(roomId, socketId, { isPlaying, currentTime, youtubeId, title, hasEnded }) {
+  updatePlayback(roomId, socketId, { isPlaying, currentTime, youtubeId, videoUrl, title, hasEnded }) {
     const room = this.getRoom(roomId);
     if (!room) return null;
 
@@ -386,10 +386,12 @@ export const RoomManager = {
       return { error: 'Only the host can control playback.' };
     }
 
-    if (youtubeId && youtubeId !== room.currentVideo.youtubeId) {
+    const nextId = youtubeId || videoUrl;
+    if (nextId && (nextId !== room.currentVideo.youtubeId && nextId !== room.currentVideo.videoUrl)) {
       room.currentVideo = {
-        youtubeId,
-        title: title || 'YouTube Video'
+        youtubeId: nextId,
+        videoUrl: nextId,
+        title: title || 'Media Track'
       };
       pushChatMessage(room, {
         id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -402,7 +404,7 @@ export const RoomManager = {
 
     room.playback = {
       isPlaying: typeof isPlaying === 'boolean' ? isPlaying : room.playback.isPlaying,
-      currentTime: typeof currentTime === 'number' ? currentTime : room.playback.currentTime,
+      currentTime: typeof currentTime === 'number' ? Math.max(0, currentTime) : room.playback.currentTime,
       hasEnded: hasEnded === true,
       updatedAt: Date.now()
     };

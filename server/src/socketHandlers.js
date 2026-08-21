@@ -55,12 +55,11 @@ export function setupSocketHandlers(io) {
       }
     };
 
-    // Process a playback sync (play/pause/seek/load video). Shared by the
-    // immediate path and the retried (rate-limited) path so behavior is identical.
     const processSyncPlayback = (socket, roomId, data) => {
       // When loading a new video, force isPlaying:true so it auto-plays for everyone
       const enrichedData = { ...data };
-      if (data.youtubeId) {
+      const isNewVideo = Boolean(data.youtubeId || data.videoUrl);
+      if (isNewVideo) {
         enrichedData.isPlaying = true;
         enrichedData.currentTime = 0;
       }
@@ -72,7 +71,7 @@ export function setupSocketHandlers(io) {
       }
 
       if (result && result.room) {
-        if (data.youtubeId) {
+        if (isNewVideo) {
           // Video changed: broadcast full state to ALL users immediately
           io.to(roomId).emit('room_state_updated', RoomManager.getRoomStateDTO(result.room));
         } else {
