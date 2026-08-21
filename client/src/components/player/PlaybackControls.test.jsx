@@ -61,7 +61,7 @@ describe('PlaybackControls Component', () => {
     fireEvent.click(muteBtn);
     expect(onMuteToggle).toHaveBeenCalledTimes(1);
 
-    const volumeSlider = screen.getAllByRole('slider')[0];
+    const volumeSlider = screen.getByLabelText('Volume slider');
     fireEvent.change(volumeSlider, { target: { value: '50' } });
     expect(onVolumeChange).toHaveBeenCalled();
   });
@@ -70,7 +70,7 @@ describe('PlaybackControls Component', () => {
     const onSeekChange = vi.fn();
     render(<PlaybackControls {...defaultProps} onSeekChange={onSeekChange} />);
 
-    const seekSlider = screen.getAllByRole('slider')[1];
+    const seekSlider = screen.getByLabelText('Seek time scrubber');
     fireEvent.mouseDown(seekSlider);
     fireEvent.change(seekSlider, { target: { value: '150' } });
     fireEvent.mouseUp(seekSlider);
@@ -84,7 +84,7 @@ describe('PlaybackControls Component', () => {
     const playBtn = screen.getByTitle('Controls locked by host');
     expect(playBtn).toBeDisabled();
 
-    const seekSlider = screen.getAllByRole('slider')[1];
+    const seekSlider = screen.getByLabelText('Seek time scrubber');
     expect(seekSlider).toBeDisabled();
   });
 });
