@@ -152,9 +152,9 @@ export const ChatPanel = memo(function ChatPanel() {
               return (
                 <div
                   key={msg.id || index}
-                  className="w-full flex justify-center py-1 animate-fade-in"
+                  className="w-full flex justify-center py-0.5 animate-fade-in"
                 >
-                  <span className="bg-surface-container-highest/80 backdrop-blur-xs text-on-surface-variant px-3 py-0.5 rounded-full font-label-sm text-xs uppercase tracking-wider border border-outline-variant/30 shadow-2xs text-center max-w-[90%] truncate">
+                  <span className="bg-surface-container-highest/70 backdrop-blur-xs text-on-surface-variant px-3 py-1 rounded-full font-label-sm text-[11px] sm:text-xs tracking-wide border border-outline-variant/30 shadow-2xs text-center max-w-[85%] break-words leading-tight">
                     {msg.text}
                   </span>
                 </div>
@@ -180,9 +180,9 @@ export const ChatPanel = memo(function ChatPanel() {
                 </div>
 
                 {/* Content Bubble */}
-                <div className={`flex flex-col min-w-0 max-w-[84%] sm:max-w-[78%] ${isMe ? 'items-end' : 'items-start'}`}>
+                <div className={`flex flex-col min-w-0 max-w-[78%] sm:max-w-[72%] ${isMe ? 'items-end' : 'items-start'}`}>
                   <div className={`flex items-center gap-1.5 mb-1 px-1 flex-wrap ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <span className="font-label-sm text-xs sm:text-sm text-on-surface font-semibold truncate max-w-[140px]">
+                    <span className="font-label-sm text-xs sm:text-sm text-on-surface font-semibold truncate max-w-[130px]">
                       {isMe ? 'You' : msg.sender}
                     </span>
                     {msg.isHost && (
@@ -196,7 +196,7 @@ export const ChatPanel = memo(function ChatPanel() {
                   </div>
                   
                   <div 
-                    className={`px-3.5 py-2 text-sm font-body-md shadow-xs break-words leading-relaxed ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-xs' : 'bg-surface-container-lowest text-on-background rounded-2xl rounded-tl-xs border border-outline-variant/60'}`}
+                    className={`inline-block w-fit px-3.5 py-2 text-sm font-body-md shadow-xs break-all [overflow-wrap:anywhere] leading-relaxed ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-xs' : 'bg-surface-container-lowest text-on-background rounded-2xl rounded-tl-xs border border-outline-variant/60'}`}
                   >
                     {msg.text}
                   </div>
