@@ -27,6 +27,7 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
     const handleScroll = () => {
       if (rafId) return; // already scheduled
       rafId = requestAnimationFrame(() => {
+        rafId = null;
         setScrolled(window.scrollY > 20);
         const sections = ['home', 'features', 'story'];
         let current = 'home';
@@ -35,7 +36,6 @@ export function LandingPage({ initialRoomId, onCreateRoom, onJoinRoom, user }) {
           if (el && el.getBoundingClientRect().top <= 250) current = section;
         }
         setActiveSection(current);
-        rafId = null;
       });
     };
     window.addEventListener('scroll', handleScroll, { passive: true });

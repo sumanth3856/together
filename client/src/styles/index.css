@@ -223,12 +223,6 @@
                 radial-gradient(circle at 80% 50%, rgba(226, 223, 222, 0.4) 0%, transparent 40%);
 }
 
-/* Mobile sticky player (keeps the video visible while browsing tabs below) */
-.mobile-sticky-player {
-    position: sticky;
-    top: 64px;
-    z-index: 30;
-}
 
 /* Material Symbols Adjustments */
 .material-symbols-outlined {

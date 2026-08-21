@@ -133,7 +133,8 @@ export function setupSocketHandlers(io) {
     });
 
     // 2. Join Room (handles both fresh joins and seamless reconnects)
-    socket.on('join_room', ({ roomId, userId, nickname, avatar }, callback) => {
+    // Uses async ensureRoom to hydrate room from Redis if not in memory.
+    socket.on('join_room', async ({ roomId, userId, nickname, avatar }, callback) => {
       const cleanRoomId = sanitizeStr(roomId, 10).toUpperCase();
       const cleanName = sanitizeStr(nickname, 20);
 
@@ -149,6 +150,16 @@ export function setupSocketHandlers(io) {
 
       // If authenticated, enforce real userId
       const finalUserId = socket.user?.sub ? socket.user.sub : userId;
+
+      // Try memory first; if not found, attempt to load from Redis
+      const roomExists = RoomManager.getRoom(cleanRoomId);
+      if (!roomExists) {
+        const loaded = await RoomManager.ensureRoom(cleanRoomId);
+        if (!loaded) {
+          if (typeof callback === 'function') callback({ success: false, error: 'Room not found. It may have expired.' });
+          return;
+        }
+      }
 
       const result = RoomManager.joinRoom(cleanRoomId, finalUserId, socket.id, cleanName, avatar);
 

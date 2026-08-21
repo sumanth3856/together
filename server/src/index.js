@@ -10,6 +10,7 @@ import ytSearch from 'yt-search';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { setupSocketHandlers } from './socketHandlers.js';
+import { pingRedis } from './redisClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,10 +86,13 @@ app.get('/api/health', async (req, res) => {
     }
   }
 
+  const redisStatus = await pingRedis();
+
   res.json({ 
     status: 'ok', 
     service: 'Together-Server', 
     supabase: supabaseStatus,
+    redis: redisStatus,
     timestamp: new Date().toISOString() 
   });
 });
@@ -145,6 +149,136 @@ app.get('/api/youtube/search', async (req, res) => {
     console.error('YouTube search error:', err);
     res.status(500).json({ error: 'Failed to search YouTube' });
   }
+});
+
+// oEmbed Provider & Discovery endpoint
+app.get('/api/oembed', async (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl) {
+    return res.status(400).json({ error: 'Missing "url" parameter' });
+  }
+
+  // 1. Check known oEmbed endpoints first for fast direct resolution
+  const knownProviders = [
+    { pattern: /youtube\.com|youtu\.be/, endpoint: (u) => `https://www.youtube.com/oembed?url=${encodeURIComponent(u)}&format=json` },
+    { pattern: /vimeo\.com/, endpoint: (u) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(u)}` },
+    { pattern: /soundcloud\.com/, endpoint: (u) => `https://soundcloud.com/oembed?url=${encodeURIComponent(u)}&format=json` },
+    { pattern: /spotify\.com/, endpoint: (u) => `https://open.spotify.com/oembed?url=${encodeURIComponent(u)}` },
+    { pattern: /dailymotion\.com|dai\.ly/, endpoint: (u) => `https://www.dailymotion.com/services/oembed?url=${encodeURIComponent(u)}` },
+    { pattern: /tiktok\.com/, endpoint: (u) => `https://www.tiktok.com/oembed?url=${encodeURIComponent(u)}` },
+  ];
+
+  for (const prov of knownProviders) {
+    if (prov.pattern.test(targetUrl) && prov.endpoint) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3500);
+        const r = await fetch(prov.endpoint(targetUrl), { 
+          signal: controller.signal, 
+          headers: { 'User-Agent': 'Mozilla/5.0 Together-Watch/1.0' } 
+        });
+        clearTimeout(timeout);
+        if (r.ok) {
+          const data = await r.json();
+          return res.json({
+            title: data.title || '',
+            author: data.author_name || '',
+            provider: data.provider_name || '',
+            thumbnail: data.thumbnail_url || '',
+            html: data.html || null,
+            type: data.type || 'video',
+            url: targetUrl,
+            oembed: true
+          });
+        }
+      } catch (err) {
+        // Fall through to discovery
+      }
+    }
+  }
+
+  // 2. Fallback: oEmbed Autodiscovery & OpenGraph HTML Scraper
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const r = await fetch(targetUrl, { 
+      signal: controller.signal, 
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      } 
+    });
+    clearTimeout(timeout);
+    const html = await r.text();
+
+    // Check for <link rel="alternate" type="application/json+oembed" href="...">
+    const oembedLinkMatch = html.match(/<link[^>]+rel=["']alternate["'][^>]+type=["']application\/json\+oembed["'][^>]+href=["']([^"']+)["']/i) ||
+                            html.match(/<link[^>]+type=["']application\/json\+oembed["'][^>]+href=["']([^"']+)["']/i);
+    if (oembedLinkMatch && oembedLinkMatch[1]) {
+      try {
+        const oembedUrl = oembedLinkMatch[1];
+        const oembedRes = await fetch(oembedUrl);
+        if (oembedRes.ok) {
+          const oembedData = await oembedRes.json();
+          return res.json({
+            title: oembedData.title || '',
+            author: oembedData.author_name || '',
+            provider: oembedData.provider_name || '',
+            thumbnail: oembedData.thumbnail_url || '',
+            html: oembedData.html || null,
+            type: oembedData.type || 'video',
+            url: targetUrl,
+            oembed: true
+          });
+        }
+      } catch {}
+    }
+
+    // Fallback: Parse OpenGraph metadata & <title>
+    const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
+    const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
+    const ogSite = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i)?.[1];
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+
+    return res.json({
+      title: (ogTitle || titleMatch || targetUrl.split('/').pop() || 'External Media').trim(),
+      thumbnail: ogImage || '',
+      provider: ogSite || '',
+      url: targetUrl,
+      oembed: false
+    });
+  } catch (err) {
+    const fallbackTitle = targetUrl.split('/').pop()?.split('?')[0] || 'External Media';
+    return res.json({
+      title: fallbackTitle,
+      thumbnail: '',
+      provider: '',
+      url: targetUrl,
+      fallback: true
+    });
+  }
+});
+
+// Backward-compatible metadata endpoint
+app.get('/api/metadata', async (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl) {
+    return res.status(400).json({ error: 'Missing "url" parameter' });
+  }
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const response = await fetch(`http://localhost:${PORT || 4000}/api/oembed?url=${encodeURIComponent(targetUrl)}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (response.ok) {
+      const data = await response.json();
+      return res.json(data);
+    }
+  } catch {}
+  res.json({
+    title: targetUrl.split('/').pop()?.split('?')[0] || 'External Media',
+    url: targetUrl
+  });
 });
 
 // Serve static frontend build from client/dist if available

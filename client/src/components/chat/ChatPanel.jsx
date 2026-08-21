@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { EmojiReactions } from './EmojiReactions';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -18,13 +17,16 @@ export const ChatPanel = memo(function ChatPanel() {
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
 
-  const rowVirtualizer = useVirtualizer({
-    count: chatHistory.length,
-    getScrollElement: () => chatContainerRef.current,
-    estimateSize: () => 65,
-    overscan: 10,
-    getItemKey: (index) => chatHistory[index]?.id || index,
-  });
+  const chatBottomRef = useRef(null);
+
+  const scrollToBottom = (behavior = 'smooth') => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior,
+      });
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -37,10 +39,10 @@ export const ChatPanel = memo(function ChatPanel() {
       );
       setKeyboardOffset(keyboardHeight);
 
-      if (keyboardHeight > 0 && chatContainerRef.current && chatHistory.length > 0) {
-        setTimeout(() => {
-          rowVirtualizer.scrollToIndex(chatHistory.length - 1, { align: 'end' });
-        }, 100);
+      if (keyboardHeight > 0) {
+        requestAnimationFrame(() => {
+          scrollToBottom('auto');
+        });
       }
     };
 
@@ -50,7 +52,7 @@ export const ChatPanel = memo(function ChatPanel() {
       window.visualViewport.removeEventListener('resize', onViewportResize);
       window.visualViewport.removeEventListener('scroll', onViewportResize);
     };
-  }, [chatHistory.length, rowVirtualizer]);
+  }, []);
 
   // Track isMobile with a resize listener
   useEffect(() => {
@@ -59,20 +61,21 @@ export const ChatPanel = memo(function ChatPanel() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
-    if (chatContainerRef.current && chatHistory.length > 0) {
-      rowVirtualizer.scrollToIndex(chatHistory.length - 1, { align: 'end' });
+    if (chatHistory.length > 0) {
+      requestAnimationFrame(() => {
+        scrollToBottom('smooth');
+      });
     }
-  }, [chatHistory, rowVirtualizer]);
+  }, [chatHistory.length]);
 
-  // Scroll to bottom when component mounts (e.g. when switching back to chat tab)
+  // Scroll to bottom when component mounts
   useEffect(() => {
-    if (chatContainerRef.current && chatHistory.length > 0) {
-      setTimeout(() => {
-        rowVirtualizer.scrollToIndex(chatHistory.length - 1, { align: 'end' });
-      }, 50);
-    }
-  }, []); // Run once on mount
+    requestAnimationFrame(() => {
+      scrollToBottom('auto');
+    });
+  }, []);
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -113,90 +116,75 @@ export const ChatPanel = memo(function ChatPanel() {
       {/* Messages */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 pt-4 relative"
-        style={{ paddingBottom: 'var(--chat-scroll-padding)' }}
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 pt-4 relative flex flex-col gap-3"
+        style={{ paddingBottom: isMobile ? 'var(--chat-scroll-padding)' : '1rem' }}
       >
         {chatHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-on-surface-variant opacity-70">
+          <div className="flex flex-col items-center justify-center h-full text-on-surface-variant opacity-70 my-auto">
             <span className="material-symbols-outlined text-4xl mb-2">forum</span>
             <span className="font-label-sm">No moments yet.</span>
           </div>
         ) : (
-          <div
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const msg = chatHistory[virtualRow.index];
-
-              if (msg.isSystem) {
-                return (
-                  <div
-                    key={virtualRow.key}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                    className="absolute top-0 left-0 w-full flex justify-center py-2"
-                    style={{ transform: `translateY(${virtualRow.start}px)` }}
-                  >
-                    <span className="bg-surface-container-highest text-on-surface-variant px-3 py-1 rounded-full font-label-sm text-[11px] uppercase tracking-wider">{msg.text}</span>
-                  </div>
-                );
-              }
-
-              const isMe = msg.senderId === myUserId;
-
+          chatHistory.map((msg, index) => {
+            if (msg.isSystem) {
               return (
                 <div
-                  key={virtualRow.key}
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
-                  className={`absolute top-0 left-0 w-full flex gap-3 py-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
-                  style={{ transform: `translateY(${virtualRow.start}px)` }}
+                  key={msg.id || index}
+                  className="w-full flex justify-center py-1"
                 >
-                  {/* Avatar */}
-                  <div className="shrink-0 pt-1">
-                    {msg.avatar ? (
-                      <img src={msg.avatar} alt="Avatar" loading="lazy" className="w-8 h-8 rounded-full border border-outline-variant" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-label-sm border border-outline-variant">
-                         {msg.sender?.charAt(0).toUpperCase() || '?'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className={`flex flex-col min-w-0 flex-1 ${isMe ? 'items-end' : 'items-start'}`}>
-                    <div className={`flex items-center gap-2 mb-1 flex-wrap ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                      <span className="font-label-sm text-on-background">
-                        {isMe ? 'You' : msg.sender}
-                      </span>
-                      {msg.isHost && <span className="material-symbols-outlined text-[14px] text-primary" title="Host">star</span>}
-                      <span className="text-[10px] text-on-surface-variant font-label-sm" title={new Date(msg.timestamp).toLocaleTimeString()}>
-                        {formatRelativeTime(msg.timestamp)}
-                      </span>
-                    </div>
-                    <div 
-                      className={`px-4 py-2 text-sm font-body-md shadow-sm break-words ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-sm' : 'bg-surface-container-lowest text-on-background rounded-2xl rounded-tl-sm border border-outline-variant'}`}
-                    >
-                      {msg.text}
-                    </div>
-                  </div>
+                  <span className="bg-surface-container-highest text-on-surface-variant px-3 py-1 rounded-full font-label-sm text-[11px] uppercase tracking-wider">{msg.text}</span>
                 </div>
               );
-            })}
-          </div>
+            }
+
+            const isMe = msg.senderId === myUserId;
+
+            return (
+              <div
+                key={msg.id || index}
+                className={`w-full flex gap-3 py-1.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+              >
+                {/* Avatar */}
+                <div className="shrink-0 pt-1">
+                  {msg.avatar ? (
+                    <img src={msg.avatar} alt="Avatar" loading="lazy" className="w-8 h-8 rounded-full border border-outline-variant" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-label-sm border border-outline-variant">
+                       {msg.sender?.charAt(0).toUpperCase() || '?'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className={`flex flex-col min-w-0 flex-1 ${isMe ? 'items-end' : 'items-start'}`}>
+                  <div className={`flex items-center gap-2 mb-1 flex-wrap ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <span className="font-label-sm text-on-background">
+                      {isMe ? 'You' : msg.sender}
+                    </span>
+                    {msg.isHost && <span className="material-symbols-outlined text-[14px] text-primary" title="Host">star</span>}
+                    <span className="text-[10px] text-on-surface-variant font-label-sm" title={new Date(msg.timestamp).toLocaleTimeString()}>
+                      {formatRelativeTime(msg.timestamp)}
+                    </span>
+                  </div>
+                  <div 
+                    className={`px-4 py-2 text-sm font-body-md shadow-sm break-words ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-sm' : 'bg-surface-container-lowest text-on-background rounded-2xl rounded-tl-sm border border-outline-variant'}`}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
+              </div>
+            );
+          })
         )}
+        <div ref={chatBottomRef} />
       </div>
 
-      {/* Input — fixed on mobile to stay above tab bar, sticky on desktop */}
+      {/* Input — fixed on mobile to stay above tab bar, docked shrink-0 on desktop */}
       <form
         onSubmit={handleSend}
-        className="fixed md:sticky bottom-0 left-0 right-0 p-3 bg-surface-container-lowest border-t border-outline-variant flex gap-2 shrink-0 z-40 md:z-20"
+        className="fixed md:relative bottom-0 left-0 right-0 p-3 bg-surface-container-lowest border-t border-outline-variant flex gap-2 shrink-0 z-40 md:z-20"
         style={{
-          paddingBottom: `calc(${formBottom}px + env(safe-area-inset-bottom) + 0.75rem)`
+          paddingBottom: isMobile ? `calc(${formBottom}px + env(safe-area-inset-bottom) + 0.75rem)` : '0.75rem'
         }}
       >
         <input

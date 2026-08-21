@@ -7,6 +7,7 @@ import { useRoomStore } from '../store/useRoomStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '../store/useUIStore';
 import { supabase } from '../lib/supabase';
+import { sanitizeAuthUrl } from '../lib/urlSecurity';
 import { Skeleton } from '../components/common/Skeleton';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 
@@ -14,7 +15,7 @@ const LoadingPageFallback = () => <LoadingScreen label="Loading Being Us" />;
 
 const LandingPage = dynamic(() => import('../components/landing/LandingPage').then((mod) => mod.LandingPage), { ssr: false, loading: LoadingPageFallback });
 const RoomHeader = dynamic(() => import('../components/room/RoomHeader').then((mod) => mod.RoomHeader), { ssr: false, loading: () => <Skeleton className="h-16 w-full rounded-none" /> });
-const YouTubePlayer = dynamic(() => import('../components/player/YouTubePlayer').then((mod) => mod.YouTubePlayer), { ssr: false, loading: () => <Skeleton className="aspect-video w-full rounded-2xl" /> });
+const VideoPlayer = dynamic(() => import('../components/player/VideoPlayer').then((mod) => mod.VideoPlayer), { ssr: false, loading: () => <Skeleton className="aspect-video w-full rounded-2xl" /> });
 const VideoDetailsCard = dynamic(() => import('../components/player/VideoDetailsCard').then((mod) => mod.VideoDetailsCard), { ssr: false, loading: () => <Skeleton className="h-44 w-full rounded-3xl" /> });
 const MemberList = dynamic(() => import('../components/room/MemberList').then((mod) => mod.MemberList), { ssr: false, loading: () => <Skeleton className="h-28 w-full rounded-3xl" /> });
 const ChatPanel = dynamic(() => import('../components/chat/ChatPanel').then((mod) => mod.ChatPanel), { ssr: false, loading: () => <Skeleton className="h-full min-h-[320px] w-full rounded-3xl" /> });
@@ -62,19 +63,24 @@ export default function Page() {
   const incomingReaction = useUIStore(state => state.incomingReaction);
 
   const [initialRoomId, setInitialRoomId] = useState('');
+  const [desktopTab, setDesktopTab] = useState('search_queue');
   const [mobileActiveTab, setMobileActiveTab] = useState('video');
   const [isMobileScreen, setIsMobileScreen] = useState(false);
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
   const [user, setUser] = useState(null);
 
-  // Check Supabase Auth
+  // Check Supabase Auth & Purge Sensitive URL tokens
   useEffect(() => {
+    sanitizeAuthUrl();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
+      sanitizeAuthUrl();
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+      sanitizeAuthUrl();
     });
 
     return () => subscription.unsubscribe();
@@ -300,102 +306,130 @@ export default function Page() {
         ) : null
       ) : (
         /* ── Main Co-Watching Room View ── */
-        <div className="min-h-screen bg-background pt-16 md:pt-20 pb-6 px-4 md:px-8 max-w-[1600px] mx-auto">
+        <div className="h-screen max-h-screen overflow-hidden bg-background flex flex-col">
           <RoomHeader
             onLeaveRoom={handleLeaveRoom}
             roomId={roomId}
             user={user}
           />
 
-          {!isMobileScreen ? (
-            /* ── Desktop / Tablet Grid ── */
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-104px)]">
-              {/* Left Column: Video & Queue (primary content) */}
-              <main className="lg:col-span-8 xl:col-span-9 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
-                <YouTubePlayer
-                  youtubeId={currentVideo?.youtubeId}
-                  onVideoEnded={handleVideoEnded}
-                />
-                
-                {/* Meta details & queue could go here side-by-side or stacked */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div className="flex flex-col gap-6">
-                        <VideoDetailsCard
-                          currentVideo={currentVideo}
-                          roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
-                          currentSocketId={socketId}
-                          onLoadVideo={(vData) => actions.syncPlayback(vData)}
-                        />
-                        <MemberList
-                          members={members}
-                          currentSocketId={socketId}
-                        />
-                    </div>
-                    
-                    <div className="h-[400px] xl:h-auto">
-                        <SearchAndQueuePanel
-                          onAddVideo={(video) => actions.addToQueue(video)}
-                          onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
-                          onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
-                        />
-                    </div>
-                </div>
-              </main>
-
-              {/* Right Column: Moments Chat (complementary) */}
-              <aside className="lg:col-span-4 xl:col-span-3 h-full">
-                <ChatPanel />
-              </aside>
-            </div>
-          ) : (
-            /* ── Mobile View ── */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '70px' }}>
-              <div className="mobile-sticky-player">
-                <YouTubePlayer
-                  youtubeId={currentVideo?.youtubeId}
-                  onVideoEnded={handleVideoEnded}
-                />
-              </div>
-
-              {mobileActiveTab === 'video' && (
-                <>
-                  <VideoDetailsCard
-                    currentVideo={currentVideo}
-                    roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
-                    currentSocketId={socketId}
-                    onLoadVideo={(vData) => actions.syncPlayback(vData)}
+          <div className="flex-1 min-h-0 pt-16 md:pt-20 px-3 sm:px-4 md:px-6 pb-2 sm:pb-3 max-w-[1700px] w-full mx-auto">
+            {!isMobileScreen ? (
+              /* ── Desktop / Tablet Flex Grid (100% Viewport Locked) ── */
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 h-full min-h-0">
+                {/* Left Column: Video + Sub-tabbed Workspace (Search/Queue vs Room/Members) */}
+                <main className="lg:col-span-8 xl:col-span-9 flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                  <VideoPlayer
+                    videoUrl={currentVideo?.videoUrl || currentVideo?.youtubeId}
+                    onPlaybackChange={(pData) => actions.syncPlayback(pData)}
+                    onVideoEnded={handleVideoEnded}
                   />
-                  <div style={{ minHeight: '400px', flex: 1, marginTop: '14px' }}>
-                    <SearchAndQueuePanel
-                      onAddVideo={(video) => actions.addToQueue(video)}
-                      onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
-                      onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
+                  
+                  {/* Segmented Workspace Tabs below player */}
+                  <div className="mt-3 flex flex-col flex-1 min-h-0">
+                    <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2 mb-3 shrink-0">
+                      <button
+                        onClick={() => setDesktopTab('search_queue')}
+                        className={`px-4 py-1.5 rounded-xl text-xs sm:text-sm font-label-md transition-all flex items-center gap-2 ${desktopTab === 'search_queue' ? 'bg-surface-container-high text-primary font-semibold shadow-sm' : 'text-on-surface-variant hover:text-on-background'}`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">video_library</span>
+                        Search & Queue
+                        {videoQueueLength > 0 && (
+                          <span className="badge badge-primary px-1.5 py-0.2 text-[10px]">{videoQueueLength}</span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setDesktopTab('room_members')}
+                        className={`px-4 py-1.5 rounded-xl text-xs sm:text-sm font-label-md transition-all flex items-center gap-2 ${desktopTab === 'room_members' ? 'bg-surface-container-high text-primary font-semibold shadow-sm' : 'text-on-surface-variant hover:text-on-background'}`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">group</span>
+                        Room & Members ({members.length})
+                      </button>
+                    </div>
+
+                    <div className="flex-1 min-h-0 pb-2">
+                      {desktopTab === 'search_queue' && (
+                        <div className="h-[460px] min-h-[400px] flex flex-col">
+                          <SearchAndQueuePanel
+                            onAddVideo={(video) => actions.addToQueue(video)}
+                            onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
+                            onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
+                          />
+                        </div>
+                      )}
+                      {desktopTab === 'room_members' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <VideoDetailsCard
+                            currentVideo={currentVideo}
+                            roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
+                            currentSocketId={socketId}
+                            onLoadVideo={(vData) => actions.syncPlayback(vData)}
+                          />
+                          <MemberList
+                            members={members}
+                            currentSocketId={socketId}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </main>
+
+                {/* Right Column: Moments Chat (Permanently fixed in view) */}
+                <aside className="lg:col-span-4 xl:col-span-3 h-full min-h-0 flex flex-col">
+                  <ChatPanel />
+                </aside>
+              </div>
+            ) : (
+              /* ── Mobile View (Clean Tabbed Experience) ── */
+              <div className="flex flex-col h-full min-h-0 w-full overflow-hidden pb-16">
+                {mobileActiveTab === 'video' && (
+                  <div className="flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1">
+                    <VideoPlayer
+                      videoUrl={currentVideo?.videoUrl || currentVideo?.youtubeId}
+                      onPlaybackChange={(pData) => actions.syncPlayback(pData)}
+                      onVideoEnded={handleVideoEnded}
+                    />
+                    <div className="flex-1 min-h-[360px] flex flex-col">
+                      <SearchAndQueuePanel
+                        onAddVideo={(video) => actions.addToQueue(video)}
+                        onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
+                        onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {mobileActiveTab === 'chat' && (
+                  <div className="flex-1 min-h-0 h-full flex flex-col p-1">
+                    <ChatPanel />
+                  </div>
+                )}
+
+                {mobileActiveTab === 'members' && (
+                  <div className="flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1">
+                    <VideoDetailsCard
+                      currentVideo={currentVideo}
+                      roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
+                      currentSocketId={socketId}
+                      onLoadVideo={(vData) => actions.syncPlayback(vData)}
+                    />
+                    <MemberList
+                      members={members}
+                      currentSocketId={socketId}
                     />
                   </div>
-                </>
-              )}
+                )}
 
-              {mobileActiveTab === 'chat' && (
-                <div style={{ flex: 1, minHeight: 0 }}>
-                  <ChatPanel />
-                </div>
-              )}
-
-              {mobileActiveTab === 'members' && (
-                <MemberList
-                  members={members}
-                  currentSocketId={socketId}
+                <MobileTabBar
+                  activeTab={mobileActiveTab}
+                  onSelectTab={setMobileActiveTab}
+                  memberCount={members.length}
+                  chatCount={chatHistoryLength}
                 />
-              )}
-
-              <MobileTabBar
-                activeTab={mobileActiveTab}
-                onSelectTab={setMobileActiveTab}
-                memberCount={members.length}
-                chatCount={chatHistoryLength}
-              />
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

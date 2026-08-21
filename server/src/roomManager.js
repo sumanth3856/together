@@ -1,10 +1,112 @@
-// In-memory room manager for Together watch party app
+/**
+ * roomManager.js
+ *
+ * In-memory room store backed by Upstash Redis for persistence.
+ *
+ * Architecture — Hybrid Write-Through Cache:
+ *  • All reads/writes hit the in-memory Map first (zero latency for real-time sync).
+ *  • After every mutation, the room is asynchronously persisted to Redis (fire-and-forget
+ *    with error logging — never blocks the socket response).
+ *  • On a cache-miss (room not in memory), we check Redis before returning "not found".
+ *    This lets rooms survive server restarts, cold starts, and Render/Fly.io sleeps.
+ *
+ * Room Lifetime:
+ *  • Rooms persist in Redis for 7 days of inactivity (sliding TTL).
+ *  • The TTL refreshes on every save (join, chat, playback change, etc.).
+ *  • Rooms are only fully deleted from Redis when explicitly disbanded
+ *    (future: host presses "End Session") or when TTL expires.
+ *  • When all members leave, the room stays in Redis so users can rejoin later.
+ */
+
+import redis from './redisClient.js';
+
+const ROOM_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+// Namespace prefix — keeps Together keys separate from other projects in the same DB
+const ROOM_KEY = (id) => `together:room:${id}`;
+
+// ─── In-Memory Cache ─────────────────────────────────────────────────────────
 export const rooms = new Map();
 
 // Track disconnected users awaiting reconnect: userId -> { roomId, timer }
 const pendingReconnects = new Map();
 
-// Helper to generate a unique 6-digit room code (collision-safe)
+// ─── Serialization ────────────────────────────────────────────────────────────
+
+function serializeRoom(room) {
+  return {
+    ...room,
+    members: Array.from(room.members.entries()),
+    bannedUsers: Array.from(room.bannedUsers),
+    _io: undefined, // never persist socket.io instance
+  };
+}
+
+function deserializeRoom(data) {
+  return {
+    ...data,
+    members: new Map(data.members || []),
+    bannedUsers: new Set(data.bannedUsers || []),
+    _io: null,
+  };
+}
+
+// ─── Redis Persistence ────────────────────────────────────────────────────────
+
+/**
+ * Persist a room to Redis (fire-and-forget, non-blocking).
+ */
+async function saveRoom(room) {
+  if (!redis || !room) return;
+  try {
+    const serialized = JSON.stringify(serializeRoom(room));
+    await redis.set(ROOM_KEY(room.roomId), serialized, { ex: ROOM_TTL_SECONDS });
+  } catch (err) {
+    console.error(`[Redis] Failed to save room ${room.roomId}:`, err.message);
+  }
+}
+
+/**
+ * Fire-and-forget wrapper so save calls don't need to be awaited.
+ */
+function persistRoom(room) {
+  saveRoom(room).catch(() => {}); // Errors already logged inside saveRoom
+}
+
+/**
+ * Load a room from Redis into memory. Returns the hydrated room or null.
+ */
+async function loadRoomFromRedis(roomId) {
+  if (!redis) return null;
+  try {
+    const data = await redis.get(ROOM_KEY(roomId));
+    if (!data) return null;
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    const room = deserializeRoom(parsed);
+    rooms.set(room.roomId, room);
+    console.log(`[Redis] Hydrated room ${room.roomId} from Redis`);
+    return room;
+  } catch (err) {
+    console.error(`[Redis] Failed to load room ${roomId}:`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Delete a room from both memory and Redis.
+ */
+async function deleteRoom(roomId) {
+  rooms.delete(roomId);
+  if (redis) {
+    try {
+      await redis.del(ROOM_KEY(roomId));
+    } catch (err) {
+      console.error(`[Redis] Failed to delete room ${roomId}:`, err.message);
+    }
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function generateRoomCode() {
   const chars = '0123456789';
   let code = '';
@@ -15,24 +117,25 @@ function generateRoomCode() {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     attempts++;
-  } while (rooms.has(code) && attempts < 100); // Retry on collision
+  } while (rooms.has(code) && attempts < 100);
   return code;
 }
 
-// Helper to push a system/chat message with automatic 100-msg cap
 function pushChatMessage(room, msg) {
   room.chatHistory.push(msg);
   if (room.chatHistory.length > 100) room.chatHistory.shift();
 }
 
-// Grace period before a disconnected host/member's room is deleted (30 seconds)
 const RECONNECT_GRACE_MS = 30000;
 
+// ─── RoomManager ─────────────────────────────────────────────────────────────
+
 export const RoomManager = {
+
   createRoom(hostUserId, hostSocketId, hostNickname, hostAvatar, roomName, mood) {
     const roomId = generateRoomCode();
     const hostUser = {
-      userId: hostUserId || hostSocketId, // Fallback for backwards compatibility if needed
+      userId: hostUserId || hostSocketId,
       socketIds: [hostSocketId],
       nickname: hostNickname || 'Guest',
       avatar: hostAvatar || null,
@@ -65,19 +168,32 @@ export const RoomManager = {
           timestamp: Date.now()
         }
       ],
-      _io: null // set by socketHandlers after creation
+      _io: null
     };
 
     rooms.set(roomId, room);
+    persistRoom(room);
     return room;
   },
 
+  /**
+   * Synchronous get from memory only. Fast path for most operations.
+   */
   getRoom(roomId) {
     if (!roomId) return null;
-    // Strip everything except letters and numbers
     const normalized = roomId.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
     return rooms.get(normalized) || null;
+  },
+
+  /**
+   * Async get: tries memory first, then Redis. Use for join_room.
+   */
+  async ensureRoom(roomId) {
+    if (!roomId) return null;
+    const normalized = roomId.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const inMemory = rooms.get(normalized);
+    if (inMemory) return inMemory;
+    return await loadRoomFromRedis(normalized);
   },
 
   getMemberBySocketId(room, socketId) {
@@ -91,24 +207,22 @@ export const RoomManager = {
     const room = this.getRoom(roomId);
     if (!room) return { error: 'Room not found' };
 
-    const actualUserId = userId || socketId; // Fallback
-    
+    const actualUserId = userId || socketId;
+
     if (room.bannedUsers.has(actualUserId)) {
       return { error: 'You have been kicked from this room.' };
     }
 
-    // Check if user is already in the room (e.g. another tab)
     if (room.members.has(actualUserId)) {
       const member = room.members.get(actualUserId);
       if (!member.socketIds.includes(socketId)) {
         member.socketIds.push(socketId);
       }
-      
-      // Cancel any pending disconnect timer if they had completely disconnected previously
+
       if (pendingReconnects.has(actualUserId)) {
         clearTimeout(pendingReconnects.get(actualUserId).timer);
         pendingReconnects.delete(actualUserId);
-        
+
         pushChatMessage(room, {
           id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           sender: 'System',
@@ -117,16 +231,15 @@ export const RoomManager = {
           timestamp: Date.now()
         });
       }
+      persistRoom(room);
       return { room, member, wasReconnect: true };
     }
 
-    // Check if they are in pendingReconnects but somehow missing from the room (shouldn't happen, but just in case)
     if (pendingReconnects.has(actualUserId)) {
       clearTimeout(pendingReconnects.get(actualUserId).timer);
       pendingReconnects.delete(actualUserId);
     }
 
-    // Fresh join
     const member = {
       userId: actualUserId,
       socketIds: [socketId],
@@ -144,7 +257,7 @@ export const RoomManager = {
     });
 
     room.members.set(actualUserId, member);
-
+    persistRoom(room);
     return { room, member, wasReconnect: false };
   },
 
@@ -152,18 +265,14 @@ export const RoomManager = {
     for (const [roomId, room] of rooms.entries()) {
       const member = this.getMemberBySocketId(room, socketId);
       if (member) {
-        // Remove this specific socket
         member.socketIds = member.socketIds.filter(id => id !== socketId);
-        
-        // If the user still has other sockets open in this room, do not trigger a leave event
+
         if (member.socketIds.length > 0) {
           return { roomId, room, member, sessionEnded: false };
         }
 
-        // Otherwise, they are fully disconnected from this room
         room.members.delete(member.userId);
 
-        // Push disconnect message immediately so remaining users see it
         pushChatMessage(room, {
           id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           sender: 'System',
@@ -172,22 +281,25 @@ export const RoomManager = {
           timestamp: Date.now()
         });
 
-        // Schedule grace-period cleanup — if they don't reconnect, promote host or delete room
+        // Persist the room state (even with 0 members) so it survives restarts
+        persistRoom(room);
+
+        // If room is now empty, schedule a grace period for reconnect.
+        // After grace, just evict from memory (NOT from Redis) to save RAM.
         const timer = setTimeout(() => {
           pendingReconnects.delete(member.userId);
           const currentRoom = rooms.get(roomId);
           if (!currentRoom) return;
 
           if (currentRoom.members.size === 0) {
+            // Evict from memory only — Redis copy stays for future rejoin
             rooms.delete(roomId);
-            // Notify any lingering sockets (e.g. slow clients) via stored io ref
-            if (currentRoom._io) currentRoom._io.to(roomId).emit('session_ended');
             return;
           }
 
           if (currentRoom.hostId === member.userId) {
-            // Auto-promote the oldest surviving member
-            const nextHost = Array.from(currentRoom.members.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
+            const nextHost = Array.from(currentRoom.members.values())
+              .sort((a, b) => a.joinedAt - b.joinedAt)[0];
             if (nextHost) {
               currentRoom.hostId = nextHost.userId;
               pushChatMessage(currentRoom, {
@@ -197,17 +309,15 @@ export const RoomManager = {
                 isSystem: true,
                 timestamp: Date.now()
               });
-              // Broadcast the updated state after host promotion
               if (currentRoom._io) {
-                const { getRoomStateDTO } = RoomManager;
-                currentRoom._io.to(roomId).emit('room_state_updated', getRoomStateDTO(currentRoom));
+                currentRoom._io.to(roomId).emit('room_state_updated', RoomManager.getRoomStateDTO(currentRoom));
               }
+              persistRoom(currentRoom);
             }
           }
         }, RECONNECT_GRACE_MS);
 
         pendingReconnects.set(member.userId, { roomId, timer });
-
         return { roomId, room, member, sessionEnded: false };
       }
     }
@@ -218,7 +328,6 @@ export const RoomManager = {
     for (const [roomId, room] of rooms.entries()) {
       const member = this.getMemberBySocketId(room, socketId);
       if (member) {
-        // Fully remove user regardless of how many sockets they have open
         room.members.delete(member.userId);
 
         if (pendingReconnects.has(member.userId)) {
@@ -227,13 +336,16 @@ export const RoomManager = {
         }
 
         let sessionEnded = false;
+
         if (room.members.size === 0) {
+          // Evict from memory — Redis copy stays so host/guests can rejoin later
           rooms.delete(roomId);
+          persistRoom({ ...room }); // final save with 0 members before evicting
           sessionEnded = true;
         } else {
-          // If the host left, automatically promote the oldest member
           if (room.hostId === member.userId) {
-            const nextHost = Array.from(room.members.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
+            const nextHost = Array.from(room.members.values())
+              .sort((a, b) => a.joinedAt - b.joinedAt)[0];
             if (nextHost) {
               room.hostId = nextHost.userId;
               pushChatMessage(room, {
@@ -253,6 +365,8 @@ export const RoomManager = {
             isSystem: true,
             timestamp: Date.now()
           });
+
+          persistRoom(room);
         }
 
         return { roomId, room, member, sessionEnded };
@@ -266,9 +380,7 @@ export const RoomManager = {
     if (!room) return null;
 
     const member = this.getMemberBySocketId(room, socketId);
-    if (!member) {
-      return { error: 'User not found in room.' };
-    }
+    if (!member) return { error: 'User not found in room.' };
 
     if (!room.settings.allowMemberControls && room.hostId !== member.userId) {
       return { error: 'Only the host can control playback.' };
@@ -295,6 +407,7 @@ export const RoomManager = {
       updatedAt: Date.now()
     };
 
+    persistRoom(room);
     return { room };
   },
 
@@ -302,15 +415,12 @@ export const RoomManager = {
     const room = this.getRoom(roomId);
     if (!room) return null;
     const member = this.getMemberBySocketId(room, socketId);
-    if (!member) {
-      return { error: 'User not found in room.' };
-    }
+    if (!member) return { error: 'User not found in room.' };
 
     if (!room.settings.allowMemberControls && room.hostId !== member.userId) {
       return { error: 'Only the host can modify the queue.' };
     }
 
-    // If player is completely empty or the previous video ended, play it immediately instead of queueing
     if (!room.currentVideo.youtubeId || room.playback.hasEnded) {
       room.currentVideo = {
         youtubeId: video.youtubeId,
@@ -322,7 +432,6 @@ export const RoomManager = {
         hasEnded: false,
         updatedAt: Date.now()
       };
-      
       pushChatMessage(room, {
         id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         sender: 'System',
@@ -330,7 +439,12 @@ export const RoomManager = {
         isSystem: true,
         timestamp: Date.now()
       });
+      persistRoom(room);
       return { room };
+    }
+
+    if (room.videoQueue.length >= 50) {
+      return { error: 'Queue is full (maximum 50 videos).' };
     }
 
     room.videoQueue.push({
@@ -347,6 +461,7 @@ export const RoomManager = {
       timestamp: Date.now()
     });
 
+    persistRoom(room);
     return { room };
   },
 
@@ -361,6 +476,7 @@ export const RoomManager = {
     }
 
     room.videoQueue = room.videoQueue.filter(v => v.id !== queueId);
+    persistRoom(room);
     return { room };
   },
 
@@ -374,7 +490,7 @@ export const RoomManager = {
       return { error: 'Only the host can control playback.' };
     }
 
-    if (room.videoQueue.length === 0) return { room }; // Nothing to play
+    if (room.videoQueue.length === 0) return { room };
 
     const nextVideo = room.videoQueue.shift();
     room.currentVideo = {
@@ -389,7 +505,7 @@ export const RoomManager = {
       updatedAt: Date.now()
     };
 
-    room.chatHistory.push({
+    pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `Playing next: ${nextVideo.title}`,
@@ -397,6 +513,7 @@ export const RoomManager = {
       timestamp: Date.now()
     });
 
+    persistRoom(room);
     return { room };
   },
 
@@ -410,8 +527,8 @@ export const RoomManager = {
     }
 
     room.settings = { ...room.settings, ...newSettings };
-    
-    room.chatHistory.push({
+
+    pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `Host updated room settings.`,
@@ -419,6 +536,7 @@ export const RoomManager = {
       timestamp: Date.now()
     });
 
+    persistRoom(room);
     return { room };
   },
 
@@ -431,20 +549,16 @@ export const RoomManager = {
       return { error: 'Only the host can kick users.' };
     }
 
-    if (room.hostId === targetUserId) {
-      return { error: 'Cannot kick the host.' };
-    }
+    if (room.hostId === targetUserId) return { error: 'Cannot kick the host.' };
 
     const targetUser = room.members.get(targetUserId);
-    if (!targetUser) {
-      return { error: 'User not found.' };
-    }
+    if (!targetUser) return { error: 'User not found.' };
 
     const kickedSocketIds = [...targetUser.socketIds];
     room.bannedUsers.add(targetUserId);
     room.members.delete(targetUserId);
 
-    room.chatHistory.push({
+    pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `${targetUser.nickname} was kicked by the host.`,
@@ -452,6 +566,7 @@ export const RoomManager = {
       timestamp: Date.now()
     });
 
+    persistRoom(room);
     return { room, kickedSocketIds };
   },
 
@@ -465,13 +580,11 @@ export const RoomManager = {
     }
 
     const targetUser = room.members.get(targetUserId);
-    if (!targetUser) {
-      return { error: 'Target user not found.' };
-    }
+    if (!targetUser) return { error: 'Target user not found.' };
 
     room.hostId = targetUserId;
 
-    room.chatHistory.push({
+    pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
       text: `${targetUser.nickname} is the new host.`,
@@ -479,6 +592,7 @@ export const RoomManager = {
       timestamp: Date.now()
     });
 
+    persistRoom(room);
     return { room };
   },
 
@@ -503,6 +617,7 @@ export const RoomManager = {
     room.chatHistory.push(msg);
     if (room.chatHistory.length > 100) room.chatHistory.shift();
 
+    persistRoom(room);
     return { room, message: msg };
   },
 
@@ -530,26 +645,27 @@ export const RoomManager = {
     };
   }
 };
+
+// ─── Periodic Memory Eviction ─────────────────────────────────────────────────
+// Only evicts empty/inactive rooms from MEMORY (not Redis).
+// Keeps active rooms in memory. Redis is the source of truth for persistence.
 export const cleanupInterval = setInterval(() => {
   const now = Date.now();
-  
-  // O(P) pass to gather rooms with pending reconnects
   const roomsWithPending = new Set();
   for (const p of pendingReconnects.values()) {
     roomsWithPending.add(p.roomId);
   }
 
-  // O(R) pass to cleanup
   for (const [roomId, room] of rooms.entries()) {
-    if (room.members.size === 0) {
-      if (!roomsWithPending.has(roomId)) {
+    if (room.members.size === 0 && !roomsWithPending.has(roomId)) {
+      // Evict idle empty rooms from memory — they remain in Redis
+      rooms.delete(roomId);
+    } else {
+      // Evict rooms inactive for > 2 hours from memory (they are safe in Redis)
+      const isIdle = (now - room.playback.updatedAt > 2 * 60 * 60 * 1000);
+      if (isIdle && !roomsWithPending.has(roomId)) {
         rooms.delete(roomId);
       }
-    } else {
-      // Clean up rooms older than 24 hours to prevent memory leaks if they get orphaned
-      // using playback.updatedAt as a proxy for last activity
-      const isExpired = (now - room.playback.updatedAt > 86400000);
-      if (isExpired) rooms.delete(roomId);
     }
   }
-}, 600000);
+}, 600000); // every 10 minutes

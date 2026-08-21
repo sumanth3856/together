@@ -31,13 +31,8 @@ vi.mock('../profile/UserProfileModal', () => ({
   ),
 }));
 
-vi.mock('../common/UserAvatar', () => ({
-  UserAvatar: ({ user, size }) => (
-    <div data-testid="user-avatar" data-size={size}>
-      {user?.id}
-    </div>
-  ),
-}));
+
+
 
 describe('RoomHeader', () => {
   const mockOnLeaveRoom = vi.fn();

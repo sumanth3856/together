@@ -19,10 +19,11 @@ const API_BASE_URL = getApiUrl();
 export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) {
   const [activeTab, setActiveTab] = useState('search');
   const [query, setQuery] = useState('');
+  const [urlInput, setUrlInput] = useState('');
+  const [urlLoading, setUrlLoading] = useState(false);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // Cache the last search results so switching tabs doesn't clear them
   const lastResultsRef = useRef([]);
 
   const roomState = useRoomStore((s) => s.roomState);
@@ -44,13 +45,59 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
       const data = await res.json();
       const videos = data.results || [];
       setResults(videos);
-      lastResultsRef.current = videos; // cache for tab-switch persistence
+      lastResultsRef.current = videos;
     } catch (err) {
       setError('Failed to load search results.');
-      // Restore last results so the user doesn't lose their previous search
       if (lastResultsRef.current.length > 0) setResults(lastResultsRef.current);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddDirectUrl = async (e) => {
+    e.preventDefault();
+    const cleanUrl = urlInput.trim();
+    if (!cleanUrl) return;
+
+    setUrlLoading(true);
+    setError(null);
+
+    try {
+      let videoTitle = cleanUrl.split('/').pop()?.split('?')[0] || 'External Video';
+      let thumbnail = '';
+      let author = 'Web Media';
+      
+      // Attempt oEmbed / metadata fetch if it looks like a web URL
+      if (cleanUrl.startsWith('http')) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/oembed?url=${encodeURIComponent(cleanUrl)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.title) videoTitle = data.title;
+            if (data.thumbnail) thumbnail = data.thumbnail;
+            if (data.author || data.provider) author = data.author || data.provider;
+          }
+        } catch {
+          // Fallback title is already set
+        }
+      }
+
+      const videoObject = {
+        youtubeId: cleanUrl, // For backward compatibility across socket events
+        videoUrl: cleanUrl,
+        title: videoTitle,
+        thumbnail,
+        duration: 'External',
+        author
+      };
+
+      if (onAddVideo) onAddVideo(videoObject);
+      setUrlInput('');
+      setActiveTab('queue');
+    } catch (err) {
+      setError('Failed to add URL.');
+    } finally {
+      setUrlLoading(false);
     }
   };
 
@@ -71,19 +118,23 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
   };
 
   return (
-    <div className="bg-surface-container rounded-3xl border border-outline-variant shadow-sm overflow-hidden flex flex-col h-full max-h-full">
+    <div className="bg-surface-container rounded-3xl border border-outline-variant shadow-sm overflow-hidden flex flex-col h-full max-h-full" data-testid="search-and-queue-panel">
       {/* Tabs */}
-      <div className="flex border-b border-outline-variant/50 bg-surface-container-lowest shrink-0">
+      <div className="flex border-b border-outline-variant/50 bg-surface-container-lowest shrink-0 px-2">
         <button
+          type="button"
           onClick={() => setActiveTab('search')}
-          className={`flex-1 py-4 flex items-center justify-center gap-2 font-label-lg transition-colors border-b-2 ${activeTab === 'search' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-background'}`}
+          className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-label-md text-xs sm:text-sm transition-colors border-b-2 ${activeTab === 'search' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-background'}`}
+          data-testid="tab-search"
         >
           <span className="material-symbols-outlined text-[18px]">search</span>
           Search
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab('queue')}
-          className={`flex-1 py-4 flex items-center justify-center gap-2 font-label-lg transition-colors border-b-2 ${activeTab === 'queue' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-background'}`}
+          className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-label-md text-xs sm:text-sm transition-colors border-b-2 ${activeTab === 'queue' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-on-surface-variant hover:bg-surface-container hover:text-on-background'}`}
+          data-testid="tab-queue"
         >
           <span className="material-symbols-outlined text-[18px]">queue_music</span>
           Queue ({queue.length})
@@ -91,61 +142,91 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 bg-surface-container">
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 sm:p-4 bg-surface-container flex flex-col">
         
         {/* Search Tab */}
         {activeTab === 'search' && (
-          <div className="flex flex-col gap-4 h-full">
-            <form onSubmit={handleSearch} className="flex gap-2 shrink-0">
-              <div className="relative flex-1">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
-                <input
-                  type="text"
-                  placeholder="Search YouTube..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="input w-full pl-11 bg-surface-container-lowest"
-                />
-              </div>
-              <button 
-                type="submit" 
-                disabled={loading} 
-                className="btn btn-primary px-5 rounded-xl min-w-[64px]"
-              >
-                {loading ? <span className="material-symbols-outlined animate-spin">progress_activity</span> : 'Go'}
-              </button>
-            </form>
+          <div className="flex flex-col gap-3 h-full min-h-0 flex-1">
+            {/* Compact Dual Input Zone (Search YouTube + Paste Direct URL) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 shrink-0">
+              {/* YouTube Search Form */}
+              <form onSubmit={handleSearch} className="flex gap-1.5 items-center">
+                <div className="relative flex-1 min-w-0">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+                  <input
+                    type="text"
+                    placeholder="Search YouTube..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-xs sm:text-sm bg-surface-container-lowest rounded-xl border border-outline-variant/70 focus:border-primary"
+                    data-testid="search-input"
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={loading} 
+                  className="btn btn-primary px-4 h-10 rounded-xl min-w-[54px] text-xs font-semibold shrink-0 shadow-sm"
+                  data-testid="search-submit-btn"
+                >
+                  {loading ? <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> : 'Go'}
+                </button>
+              </form>
 
-            {error && <div className="text-error font-label-sm text-center bg-error-container/50 p-2 rounded-lg">{error}</div>}
+              {/* Direct External URL Form */}
+              <form onSubmit={handleAddDirectUrl} className="flex gap-1.5 items-center">
+                <div className="relative flex-1 min-w-0">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">link</span>
+                  <input
+                    type="text"
+                    placeholder="Paste link (SoundCloud, Vimeo, MP4)..."
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-xs sm:text-sm bg-surface-container-lowest rounded-xl border border-outline-variant/70 focus:border-primary"
+                    data-testid="direct-url-input"
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={urlLoading || !urlInput.trim()} 
+                  className="btn bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface px-3.5 h-10 rounded-xl text-xs font-semibold shrink-0 transition-colors"
+                  data-testid="direct-url-submit-btn"
+                >
+                  {urlLoading ? <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> : 'Add'}
+                </button>
+              </form>
+            </div>
 
-            <div className="flex flex-col gap-3 overflow-y-auto">
+            {error && <div className="text-error font-label-sm text-center bg-error-container/50 py-1.5 px-3 rounded-lg text-xs" data-testid="search-error">{error}</div>}
+
+            {/* Video Search Results List with Breathing Room */}
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-1">
               {results.length === 0 && !loading && !error && (
-                 <div className="flex flex-col items-center justify-center h-40 text-on-surface-variant opacity-70">
-                    <span className="material-symbols-outlined text-4xl mb-2">youtube_activity</span>
-                    <span className="font-label-sm">Search for videos to watch</span>
+                 <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant opacity-70">
+                    <span className="material-symbols-outlined text-4xl mb-2 text-primary/60">youtube_activity</span>
+                    <span className="font-label-sm text-xs sm:text-sm">Search videos or paste a link to queue and watch</span>
                  </div>
               )}
               {loading && (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2.5" data-testid="search-skeleton">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant animate-pulse">
-                      <div className="w-[100px] h-[56px] shrink-0 rounded-lg bg-surface-container-high"></div>
+                    <div key={i} className="flex gap-3 bg-surface-container-lowest p-2.5 rounded-2xl border border-outline-variant/60 animate-pulse">
+                      <div className="w-[100px] h-[58px] shrink-0 rounded-xl bg-surface-container-high"></div>
                       <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
                         <div className="h-4 bg-surface-container-high rounded-full w-3/4"></div>
                         <div className="h-3 bg-surface-container-high rounded-full w-1/2"></div>
                       </div>
-                      <div className="flex flex-col gap-1 shrink-0 justify-center pr-1">
-                        <div className="w-7 h-7 rounded-lg bg-surface-container-high"></div>
+                      <div className="flex flex-col gap-1.5 shrink-0 justify-center pr-1">
+                        <div className="w-8 h-8 rounded-xl bg-surface-container-high"></div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
               {results.map((v) => (
-                <div key={v.youtubeId} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant hover:border-primary-container hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 group">
-                  <div className="w-[100px] h-[56px] shrink-0 rounded-lg overflow-hidden relative">
+                <div key={v.youtubeId} className="flex gap-3 bg-surface-container-lowest p-2 sm:p-2.5 rounded-2xl border border-outline-variant/60 hover:border-primary/40 hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 group" data-testid={`video-result-${v.youtubeId}`}>
+                  <div className="w-[96px] sm:w-[110px] h-[56px] sm:h-[62px] shrink-0 rounded-xl overflow-hidden relative shadow-inner">
                      <img 
-                        src={v.thumbnail} 
+                        src={v.thumbnail || `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`} 
                         alt={v.title} 
                         loading="lazy"
                         className="w-full h-full object-cover bg-surface-container" 
@@ -155,21 +236,26 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                           }
                         }}
                      />
-                     <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] px-1 rounded font-label-sm">
-                         {v.duration}
-                     </div>
+                     {v.duration && (
+                       <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] px-1.5 py-0.5 rounded font-label-sm font-semibold">
+                           {v.duration}
+                       </div>
+                     )}
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <div className="font-label-md text-on-background truncate group-hover:text-primary transition-colors">{v.title}</div>
-                    <div className="font-label-sm text-xs text-on-surface-variant truncate mt-0.5">{v.author}</div>
+                    <div className="font-label-md text-xs sm:text-sm text-on-background line-clamp-2 group-hover:text-primary transition-colors leading-snug">{v.title}</div>
+                    <div className="font-label-sm text-[11px] text-on-surface-variant truncate mt-1 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">person</span>
+                      {v.author || 'Video'}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1 shrink-0 justify-center pr-1">
-                    <button type="button" onClick={() => handleAddToQueue(v)} className="w-7 h-7 rounded-lg bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary flex items-center justify-center transition-colors" title="Add to Queue">
-                       <span className="material-symbols-outlined text-[16px]">add</span>
+                  <div className="flex flex-col gap-1.5 shrink-0 justify-center pr-1">
+                    <button type="button" onClick={() => handleAddToQueue(v)} className="w-8 h-8 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary flex items-center justify-center transition-colors shadow-soft" title="Add to Queue" data-testid={`add-queue-${v.youtubeId}`}>
+                       <span className="material-symbols-outlined text-[18px]">add</span>
                     </button>
                     {isHost && (
-                      <button type="button" onClick={() => handlePlayNow(v)} className="w-7 h-7 rounded-lg bg-primary text-on-primary hover:bg-surface-tint flex items-center justify-center transition-colors" title="Play Now">
-                        <span className="material-symbols-outlined text-[16px] fill-1">play_arrow</span>
+                      <button type="button" onClick={() => handlePlayNow(v)} className="w-8 h-8 rounded-xl bg-primary text-on-primary hover:bg-surface-tint flex items-center justify-center transition-colors shadow-soft" title="Play Now" data-testid={`play-now-${v.youtubeId}`}>
+                        <span className="material-symbols-outlined text-[18px] fill-1">play_arrow</span>
                       </button>
                     )}
                   </div>
@@ -181,45 +267,49 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
 
         {/* Queue Tab */}
         {activeTab === 'queue' && (
-          <div className="flex flex-col gap-3 h-full overflow-y-auto">
+          <div className="flex flex-col gap-3 h-full overflow-y-auto" data-testid="queue-list-container">
             {queue.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-on-surface-variant opacity-70">
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-on-surface-variant opacity-70" data-testid="queue-empty-state">
                 <span className="material-symbols-outlined text-4xl mb-2">queue_music</span>
                 <span className="font-label-sm">Queue is empty</span>
-                <span className="text-[11px] mt-1">Search for videos to add them here.</span>
+                <span className="text-[11px] mt-1">Search for videos or paste a link to add them here.</span>
               </div>
             ) : (
               queue.map((v, index) => (
-                <div key={v.id} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant relative hover:border-primary-container hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 group">
+                <div key={v.id || index} className="flex gap-3 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant relative hover:border-primary-container hover:shadow-card hover:-translate-y-0.5 transition-all duration-200 group" data-testid={`queue-item-${index}`}>
                   <div className="absolute -top-2 -left-2 bg-primary text-on-primary text-[10px] font-label-lg w-5 h-5 rounded-full flex items-center justify-center shadow-md">
                     {index + 1}
                   </div>
-                  <div className="w-[100px] h-[56px] shrink-0 rounded-lg overflow-hidden ml-2">
-                     <img 
-                        src={v.thumbnail} 
-                        alt={v.title} 
-                        loading="lazy"
-                        className="w-full h-full object-cover bg-surface-container"
-                        onError={(e) => {
-                          if (e.target.src !== `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`) {
-                            e.target.src = `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`;
-                          }
-                        }}
-                     />
+                  <div className="w-[100px] h-[56px] shrink-0 rounded-lg overflow-hidden ml-2 bg-surface-container flex items-center justify-center">
+                     {v.thumbnail ? (
+                       <img 
+                          src={v.thumbnail} 
+                          alt={v.title} 
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            if (v.youtubeId && e.target.src !== `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`) {
+                              e.target.src = `https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`;
+                            }
+                          }}
+                       />
+                     ) : (
+                       <span className="material-symbols-outlined text-2xl text-on-surface-variant opacity-50">movie</span>
+                     )}
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="font-label-md text-on-background truncate group-hover:text-primary transition-colors">{v.title}</div>
                     <div className="font-label-sm text-[10px] text-on-surface-variant truncate mt-0.5 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[12px]">person</span>
-                        {v.addedBy}
+                        {v.addedBy || 'Member'}
                     </div>
                   </div>
                   {isHost && (
                     <div className="flex flex-col gap-1 shrink-0 justify-center pr-1">
-                      <button type="button" onClick={() => handlePlayNow(v)} className="w-7 h-7 rounded-lg bg-primary text-on-primary hover:bg-surface-tint flex items-center justify-center transition-colors" title="Play Now">
+                      <button type="button" onClick={() => handlePlayNow(v)} className="w-7 h-7 rounded-lg bg-primary text-on-primary hover:bg-surface-tint flex items-center justify-center transition-colors" title="Play Now" data-testid={`queue-play-${index}`}>
                         <span className="material-symbols-outlined text-[16px] fill-1">play_arrow</span>
                       </button>
-                      <button type="button" onClick={() => handleRemoveFromQueue(v.id)} className="w-7 h-7 rounded-lg bg-error/10 text-error hover:bg-error hover:text-on-error flex items-center justify-center transition-colors" title="Remove">
+                      <button type="button" onClick={() => handleRemoveFromQueue(v.id)} className="w-7 h-7 rounded-lg bg-error/10 text-error hover:bg-error hover:text-on-error flex items-center justify-center transition-colors" title="Remove" data-testid={`queue-remove-${index}`}>
                         <span className="material-symbols-outlined text-[16px]">delete</span>
                       </button>
                     </div>
