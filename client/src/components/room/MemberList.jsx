@@ -82,7 +82,7 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
       </div>
 
       {/* Member List */}
-      <div className="p-4 flex flex-col gap-2 overflow-y-auto custom-scrollbar max-h-[360px] relative rounded-b-3xl">
+      <div className="p-3 sm:p-4 flex flex-col gap-2 overflow-y-auto custom-scrollbar md:max-h-[380px] relative rounded-b-3xl">
         {/* Click outside backdrop when any menu is open */}
         {openMenu && (
           <div 
@@ -103,14 +103,14 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
           return (
             <div
               key={m.userId}
-              className={`flex items-center gap-4 p-3 rounded-2xl relative transition-all duration-200 ${isYou ? 'bg-primary-container/20 border border-primary-container/50 shadow-soft' : 'hover:bg-surface-container-high hover:-translate-y-px border border-transparent'} `}
+              className={`flex items-center gap-3.5 p-3 rounded-2xl relative transition-all duration-200 ${isYou ? 'bg-surface-container-lowest border border-outline-variant/80 ring-1 ring-primary/20 shadow-xs' : 'bg-surface-container-lowest/50 hover:bg-surface-container-high border border-outline-variant/40 hover:-translate-y-px'} `}
             >
               {/* Avatar */}
               <div className="shrink-0">
                 {m.avatar ? (
-                  <img src={m.avatar} alt="Avatar" loading="lazy" className="w-10 h-10 rounded-full border border-outline-variant" />
+                  <img src={m.avatar} alt="Avatar" loading="lazy" className="w-10 h-10 rounded-full border border-outline-variant object-cover shadow-2xs" />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-on-primary font-display-md shadow-sm">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-display-md shadow-sm ${isYou ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant border border-outline-variant'}`}>
                     {initial}
                   </div>
                 )}
@@ -119,16 +119,22 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
               {/* Info */}
               <div className="flex-1 min-w-0 flex flex-col">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {isHost && <span className="material-symbols-outlined text-[16px] text-primary" title="Host">star</span>}
-                  <span className="font-label-lg text-sm sm:text-base text-on-background truncate">
+                  {isHost && (
+                    <span className="material-symbols-outlined text-[15px] text-primary" title="Host">
+                      star
+                    </span>
+                  )}
+                  <span className="font-label-lg text-sm sm:text-base text-on-background font-semibold truncate">
                     {m.nickname}
                   </span>
                   {isYou && (
-                    <span className="text-xs text-primary font-label-sm tracking-wider uppercase bg-primary/10 px-2 py-0.5 rounded-sm font-semibold">(You)</span>
+                    <span className="text-[10px] sm:text-[11px] text-primary font-label-sm font-bold tracking-wider uppercase bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
+                      (You)
+                    </span>
                   )}
                 </div>
-                <span className="text-xs sm:text-sm font-body-md text-on-surface-variant">
-                  {isHost ? 'Host' : 'Viewer'}
+                <span className="text-xs font-body-md text-on-surface-variant">
+                  {isHost ? 'Room Host' : 'Viewer'}
                 </span>
               </div>
 
@@ -137,7 +143,7 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
                 <div className="relative">
                   <button
                     onClick={(e) => handleToggleMenu(m.userId, e)}
-                    className={`p-2 rounded-full transition-colors ${isMenuOpen ? 'bg-surface-container-highest text-primary' : 'text-on-surface-variant hover:bg-surface-container-highest hover:text-on-background'}`}
+                    className={`p-2 rounded-xl transition-colors ${isMenuOpen ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-background active:scale-95'}`}
                     title={`Actions for ${m.nickname}`}
                     aria-label={`Actions for ${m.nickname}`}
                     aria-expanded={isMenuOpen}

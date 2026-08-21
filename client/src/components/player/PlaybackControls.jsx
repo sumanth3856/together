@@ -174,19 +174,29 @@ export const PlaybackControls = memo(function PlaybackControls({
           </button>
 
           {/* Mute & Volume Slider */}
-          <div className="flex items-center gap-1.5 ml-1">
+          <div className="group/volume relative flex items-center gap-1 sm:gap-1.5 ml-1">
             <button
               onClick={onMuteToggle}
-              className="p-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-background"
+              className="p-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-background active:scale-95"
               title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
               aria-label={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted || volume === 0 ? (
                 <span className="material-symbols-outlined text-[20px] text-error">volume_off</span>
+              ) : volume <= 35 ? (
+                <span className="material-symbols-outlined text-[20px]">volume_mute</span>
+              ) : volume <= 70 ? (
+                <span className="material-symbols-outlined text-[20px]">volume_down</span>
               ) : (
                 <span className="material-symbols-outlined text-[20px]">volume_up</span>
               )}
             </button>
+
+            {/* Floating Percentage Tooltip on Hover */}
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-surface-container-lowest text-on-surface text-[10px] font-label-sm font-bold px-2 py-0.5 rounded-full border border-outline-variant/60 shadow-md pointer-events-none opacity-0 group-hover/volume:opacity-100 group-focus-within/volume:opacity-100 transition-opacity duration-150 whitespace-nowrap z-30">
+              {isMuted ? 'Muted' : `${volume}%`}
+            </div>
+
             <input
               type="range"
               min={0}
@@ -194,7 +204,10 @@ export const PlaybackControls = memo(function PlaybackControls({
               value={isMuted ? 0 : volume}
               onChange={onVolumeChange}
               aria-label="Volume slider"
-              className="w-14 sm:w-20 h-1.5 bg-outline-variant rounded-full appearance-none outline-none cursor-pointer accent-primary"
+              style={{
+                background: `linear-gradient(to right, #cd0000 0%, #cd0000 ${isMuted ? 0 : volume}%, rgba(146, 110, 105, 0.3) ${isMuted ? 0 : volume}%, rgba(146, 110, 105, 0.3) 100%)`
+              }}
+              className="w-20 sm:w-28 md:w-32 h-1.5 rounded-full appearance-none outline-none cursor-pointer accent-primary hover:h-2 transition-all"
             />
           </div>
         </div>

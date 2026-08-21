@@ -70,10 +70,10 @@ describe('VideoPlayer Component', () => {
     );
 
     fireEvent.click(screen.getByTestId('mock-play'));
-    expect(onPlaybackChange).toHaveBeenCalledWith({ isPlaying: true, currentTime: 0 });
+    expect(onPlaybackChange).toHaveBeenCalledWith(expect.objectContaining({ isPlaying: true, currentTime: 0 }));
 
     fireEvent.click(screen.getByTestId('mock-pause'));
-    expect(onPlaybackChange).toHaveBeenCalledWith({ isPlaying: false, currentTime: 0 });
+    expect(onPlaybackChange).toHaveBeenCalledWith(expect.objectContaining({ isPlaying: false, currentTime: 0 }));
 
     fireEvent.click(screen.getByTestId('mock-ended'));
     expect(onVideoEnded).toHaveBeenCalled();

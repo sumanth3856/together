@@ -48,12 +48,12 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
         )}
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2 sm:gap-3 justify-self-end shrink-0 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 justify-self-end shrink-0 min-w-0">
             {user && (
               <button 
                 onClick={() => setIsProfileModalOpen(true)}
                 aria-label="Open User Profile"
-                className="w-10 h-10 rounded-full bg-error-container text-primary flex items-center justify-center font-label-lg hover:bg-primary-container hover:text-on-primary transition-all border border-outline-variant shadow-soft hover:shadow-card"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label-lg font-bold hover:bg-primary hover:text-on-primary transition-all border border-outline-variant/70 shadow-2xs hover:shadow-soft text-sm"
               >
                   {initial}
               </button>
@@ -62,7 +62,7 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
             <button 
               onClick={() => setShowLeaveConfirm(true)}
               aria-label="Leave Room"
-              className="btn btn-secondary px-2.5 sm:px-4 py-2 hover:bg-error hover:text-on-error border-outline-variant"
+              className="btn btn-secondary px-2.5 sm:px-4 py-1.5 sm:py-2 hover:bg-error hover:text-on-error border-outline-variant/70 rounded-full text-xs sm:text-sm font-semibold shadow-2xs"
             >
                 <span className="material-symbols-outlined text-[18px]">logout</span>
                 <span className="hidden sm:inline">Leave</span>

@@ -77,8 +77,10 @@ export function setupSocketHandlers(io) {
         } else {
           // Regular play/pause/seek: lightweight sync to peers only (no full state broadcast)
           socket.to(roomId).emit('playback_synced', {
+            action: enrichedData.action || (enrichedData.isPlaying ? 'play' : 'pause'),
             playback: result.room.playback,
             currentVideo: result.room.currentVideo,
+            serverTimestamp: Date.now(),
             senderId: socket.id
           });
         }

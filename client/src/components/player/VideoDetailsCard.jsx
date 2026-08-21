@@ -22,20 +22,20 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
   return (
     <div className="bg-surface-container rounded-3xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
       {/* Video Info Header */}
-      <div className="p-4 md:p-6 border-b border-outline-variant/50 flex items-start gap-4 bg-surface-container-lowest">
-        <div className="w-12 h-12 rounded-2xl bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
-           <span className="material-symbols-outlined text-[24px]">movie</span>
+      <div className="p-4 md:p-6 border-b border-outline-variant/50 flex items-start gap-3.5 bg-surface-container-lowest">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+           <span className="material-symbols-outlined text-[22px] sm:text-[24px]">movie</span>
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-headline-md text-lg text-on-background mb-1 truncate">
+          <h3 className="font-headline-md text-base sm:text-lg text-on-background mb-1 line-clamp-2 leading-snug">
             {currentVideo?.title || 'No Video Loaded'}
           </h3>
-          <div className="flex items-center gap-3">
-             <div className="chip bg-success/10 text-success border border-success/20 text-[10px] uppercase tracking-wider">
+          <div className="flex items-center gap-2.5 flex-wrap">
+             <div className="chip bg-success/10 text-success border border-success/20 text-[10px] sm:text-[11px] uppercase tracking-wider">
                <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></div>
                <span>{isPlaying ? 'Live' : 'Paused'}</span>
              </div>
-             <span className="text-on-surface-variant font-label-sm text-[11px] uppercase tracking-wider flex items-center gap-1">
+             <span className="text-on-surface-variant font-label-sm text-[11px] sm:text-xs uppercase tracking-wider flex items-center gap-1">
                  <span className="material-symbols-outlined text-[14px]">group</span>
                  {memberCount} Watching
              </span>
@@ -44,7 +44,7 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
       </div>
 
       {/* Manual Load Form */}
-      <div className="p-4 md:p-6 flex flex-col gap-4">
+      <div className="p-4 md:p-6 flex flex-col gap-3.5">
         <form 
           onSubmit={async (e) => {
             e.preventDefault();
@@ -84,16 +84,16 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
             name="videoUrl"
             type="text"
             placeholder="Paste YouTube, SoundCloud, or Video URL..."
-            className="input flex-1 bg-surface-container-lowest text-xs"
+            className="input flex-1 bg-surface-container-lowest text-xs sm:text-sm py-2 px-3 rounded-xl border border-outline-variant/70 focus:border-primary"
           />
-          <button type="submit" className="btn btn-secondary px-5 py-2 rounded-xl">
+          <button type="submit" className="btn btn-primary px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs">
             Load
           </button>
         </form>
 
         <button 
           onClick={handleCopyShareLink} 
-          className="btn btn-secondary w-full py-3 rounded-xl"
+          className="btn btn-secondary w-full py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 border border-outline-variant/70 hover:bg-surface-container-high transition-colors"
         >
           {copiedLink ? <span className="material-symbols-outlined text-[18px] text-success">check</span> : <span className="material-symbols-outlined text-[18px]">share</span>}
           <span>{copiedLink ? 'Link Copied!' : 'Copy Share Link'}</span>

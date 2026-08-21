@@ -407,7 +407,7 @@ export default function Page() {
                 )}
 
                 {mobileActiveTab === 'members' && (
-                  <div className="flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1">
+                  <div className="flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1 pb-20">
                     <VideoDetailsCard
                       currentVideo={currentVideo}
                       roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}

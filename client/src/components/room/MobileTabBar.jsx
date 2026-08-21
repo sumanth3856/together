@@ -15,20 +15,22 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
       </button>
 
       <button 
-        className={`flex flex-col items-center justify-center w-20 h-full relative transition-colors ${activeTab === 'chat' ? 'text-primary' : 'text-on-surface-variant hover:text-on-background'}`}
+        className={`flex flex-col items-center justify-center w-24 h-full relative transition-colors ${activeTab === 'chat' ? 'text-primary' : 'text-on-surface-variant hover:text-on-background'}`}
         onClick={() => onSelectTab('chat')}
       >
-        <span className={`material-symbols-outlined text-[24px] ${activeTab === 'chat' ? 'fill-1' : ''}`}>chat_bubble</span>
+        <div className="relative flex items-center justify-center">
+          <span className={`material-symbols-outlined text-[24px] ${activeTab === 'chat' ? 'fill-1' : ''}`}>chat_bubble</span>
+          {chatCount > 0 && (
+            <span className="absolute -top-1 -right-2.5 bg-error text-on-error text-[10px] font-label-lg font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center shadow-sm tabular-nums">
+              {chatCount > 99 ? '99+' : chatCount}
+            </span>
+          )}
+        </div>
         <span className="font-label-sm text-xs font-semibold mt-1 tracking-wide">Chat</span>
-        {chatCount > 0 && (
-          <span className="absolute top-1 right-2.5 bg-error text-on-error text-[10px] font-label-lg font-bold w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-sm">
-            {chatCount > 99 ? '99+' : chatCount}
-          </span>
-        )}
       </button>
 
       <button 
-        className={`flex flex-col items-center justify-center w-20 h-full transition-colors ${activeTab === 'members' ? 'text-primary' : 'text-on-surface-variant hover:text-on-background'}`}
+        className={`flex flex-col items-center justify-center w-24 h-full transition-colors ${activeTab === 'members' ? 'text-primary' : 'text-on-surface-variant hover:text-on-background'}`}
         onClick={() => onSelectTab('members')}
       >
         <span className={`material-symbols-outlined text-[24px] ${activeTab === 'members' ? 'fill-1' : ''}`}>groups</span>
