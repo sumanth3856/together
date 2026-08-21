@@ -1,43 +1,36 @@
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo, useState } from 'react';
 import { useRoomStore } from '../../store/useRoomStore';
+import { useUIStore } from '../../store/useUIStore';
 import { useSocket } from '../../hooks/useSocket';
 
 export const MemberList = memo(function MemberList({ members = [], currentSocketId }) {
   const roomState = useRoomStore((s) => s.roomState);
-  const { kickUser, transferHost } = useSocket();
+  const { kickUser, transferHost, sendReaction } = useSocket();
   const hostId = roomState?.hostId;
   
   const [openMenuId, setOpenMenuId] = useState(null);
-  const [menuAnchor, setMenuAnchor] = useState(null);
 
-  const toggleMenu = (userId, e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMenuAnchor({
-      top: rect.bottom + 4,
-      right: Math.max(8, window.innerWidth - rect.right),
-    });
-    setOpenMenuId((prev) => (prev === userId ? null : userId));
+  const handleCopyNickname = (nickname) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(nickname);
+      useUIStore.getState().setToastNotification({
+        type: 'info',
+        message: `Copied "${nickname}" to clipboard`
+      });
+    }
+    setOpenMenuId(null);
   };
 
-  useEffect(() => {
-    if (!openMenuId) return;
-    const close = () => setOpenMenuId(null);
-    // Close on outside click, scroll, or resize
-    const onPointerDown = (e) => {
-      // If click is outside any menu trigger/dropdown, close
-      if (!e.target.closest('[data-menu-trigger]') && !e.target.closest('[data-menu-dropdown]')) {
-        close();
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
-    };
-  }, [openMenuId]);
+  const handleWave = (nickname) => {
+    if (sendReaction) {
+      sendReaction('👋');
+      useUIStore.getState().setToastNotification({
+        type: 'info',
+        message: `Waved to ${nickname} 👋`
+      });
+    }
+    setOpenMenuId(null);
+  };
 
   return (
     <div className="bg-surface-container rounded-3xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
@@ -55,12 +48,22 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
       </div>
 
       {/* Member List */}
-      <div className="p-4 flex flex-col gap-2 overflow-y-auto custom-scrollbar max-h-[300px]">
+      <div className="p-4 flex flex-col gap-2 overflow-y-auto custom-scrollbar max-h-[300px] relative">
+        {/* Click outside backdrop when any menu is open */}
+        {openMenuId && (
+          <div 
+            className="fixed inset-0 z-20" 
+            onClick={() => setOpenMenuId(null)}
+            aria-hidden="true"
+          />
+        )}
+
         {members.map((m) => {
           const isYou = m.socketIds && m.socketIds.includes(currentSocketId);
           const isHost = m.userId === hostId;
           const iAmHost = members.find(mem => mem.socketIds?.includes(currentSocketId))?.userId === hostId;
           const initial = m.nickname ? m.nickname.charAt(0).toUpperCase() : '?';
+          const isMenuOpen = openMenuId === m.userId;
 
           return (
             <div
@@ -94,34 +97,58 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
                 </span>
               </div>
 
-              {/* Host Controls */}
-              {iAmHost && !isYou && (
-                <div>
+              {/* Member Actions (3 dots menu) */}
+              {!isYou && (
+                <div className="relative">
                   <button
-                    data-menu-trigger
-                    onClick={(e) => toggleMenu(m.userId, e)}
-                    className="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest hover:text-on-background transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(isMenuOpen ? null : m.userId);
+                    }}
+                    className={`p-2 rounded-full transition-colors ${isMenuOpen ? 'bg-surface-container-highest text-primary' : 'text-on-surface-variant hover:bg-surface-container-highest hover:text-on-background'}`}
+                    title={`Actions for ${m.nickname}`}
+                    aria-label={`Actions for ${m.nickname}`}
+                    aria-expanded={isMenuOpen}
                   >
                     <span className="material-symbols-outlined text-[20px]">more_vert</span>
                   </button>
-                  {openMenuId === m.userId && menuAnchor && (
+
+                  {isMenuOpen && (
                     <div
-                      data-menu-dropdown
-                      className="fixed z-50 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl w-48 py-2 animate-fade-in-up"
-                      style={{ top: menuAnchor.top, right: menuAnchor.right }}
+                      className="absolute right-0 top-full mt-1.5 z-30 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-2xl w-48 py-1.5 flex flex-col animate-fade-in divide-y divide-outline-variant/30"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <button 
-                        onClick={() => { transferHost(m.userId); setOpenMenuId(null); }}
-                        className="w-full text-left px-4 py-2 font-label-md text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2"
-                      >
-                         <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span> Make Host
-                      </button>
-                      <button 
-                        onClick={() => { kickUser(m.userId); setOpenMenuId(null); }}
-                        className="w-full text-left px-4 py-2 font-label-md text-error hover:bg-error/10 transition-colors flex items-center gap-2 mt-1"
-                      >
-                         <span className="material-symbols-outlined text-[18px]">person_remove</span> Kick from Room
-                      </button>
+                      <div className="py-1">
+                        <button 
+                          onClick={() => handleWave(m.nickname)}
+                          className="w-full text-left px-3.5 py-2 font-label-md text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
+                        >
+                          <span className="text-[16px]">👋</span> Send Wave
+                        </button>
+                        <button 
+                          onClick={() => handleCopyNickname(m.nickname)}
+                          className="w-full text-left px-3.5 py-2 font-label-md text-on-background hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
+                        >
+                          <span className="material-symbols-outlined text-[18px] text-on-surface-variant">content_copy</span> Copy Nickname
+                        </button>
+                      </div>
+
+                      {iAmHost && (
+                        <div className="py-1">
+                          <button 
+                            onClick={() => { transferHost(m.userId); setOpenMenuId(null); }}
+                            className="w-full text-left px-3.5 py-2 font-label-md text-primary hover:bg-primary-container/20 transition-colors flex items-center gap-2.5"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span> Make Host
+                          </button>
+                          <button 
+                            onClick={() => { kickUser(m.userId); setOpenMenuId(null); }}
+                            className="w-full text-left px-3.5 py-2 font-label-md text-error hover:bg-error/10 transition-colors flex items-center gap-2.5"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">person_remove</span> Kick from Room
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
