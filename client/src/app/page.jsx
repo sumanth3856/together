@@ -318,7 +318,7 @@ export default function Page() {
               /* ── Desktop / Tablet Flex Grid (100% Viewport Locked) ── */
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 h-full min-h-0">
                 {/* Left Column: Video + Sub-tabbed Workspace (Search/Queue vs Room/Members) */}
-                <main className="lg:col-span-8 xl:col-span-9 flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                <main className="lg:col-span-8 xl:col-span-9 flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar scroll-smooth pr-1.5 pb-12 overscroll-contain">
                   <VideoPlayer
                     videoUrl={currentVideo?.videoUrl || currentVideo?.youtubeId}
                     onPlaybackChange={(pData) => actions.syncPlayback(pData)}
@@ -347,7 +347,7 @@ export default function Page() {
                       </button>
                     </div>
 
-                    <div className="flex-1 min-h-0 pb-2">
+                    <div className="flex-1 min-h-0 pb-6">
                       {desktopTab === 'search_queue' && (
                         <div className="h-[460px] min-h-[400px] flex flex-col">
                           <SearchAndQueuePanel
@@ -358,7 +358,7 @@ export default function Page() {
                         </div>
                       )}
                       {desktopTab === 'room_members' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8">
                           <VideoDetailsCard
                             currentVideo={currentVideo}
                             roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
