@@ -276,7 +276,7 @@ export function setupSocketHandlers(io) {
       }
     });
 
-    socket.on('transfer_host', handleAction(null, 0, RoomManager.transferHost, d => [d.newHostId]));
+    socket.on('transfer_host', handleAction(null, 0, RoomManager.transferHost.bind(RoomManager), d => [d?.newHostId || d?.targetUserId]));
 
     // 8. Floating Emoji Reaction Bursts
     socket.on('send_reaction', ({ emoji }) => {

@@ -44,6 +44,28 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
     setOpenMenu(null);
   };
 
+  const handleTransferHost = (userId, nickname) => {
+    if (transferHost) {
+      transferHost(userId);
+      useUIStore.getState().setToastNotification({
+        type: 'success',
+        message: `Made ${nickname} the room host.`
+      });
+    }
+    setOpenMenu(null);
+  };
+
+  const handleKickUser = (userId, nickname) => {
+    if (kickUser) {
+      kickUser(userId);
+      useUIStore.getState().setToastNotification({
+        type: 'info',
+        message: `Removed ${nickname} from the room.`
+      });
+    }
+    setOpenMenu(null);
+  };
+
   return (
     <div className="bg-surface-container rounded-3xl border border-outline-variant shadow-sm flex flex-col">
       {/* Header */}
@@ -146,13 +168,13 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
                       {iAmHost && (
                         <div className="py-1">
                           <button 
-                            onClick={() => { transferHost(m.userId); setOpenMenu(null); }}
+                            onClick={() => handleTransferHost(m.userId, m.nickname)}
                             className="w-full text-left px-3.5 py-2 font-label-md text-primary hover:bg-primary-container/20 transition-colors flex items-center gap-2.5"
                           >
                             <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span> Make Host
                           </button>
                           <button 
-                            onClick={() => { kickUser(m.userId); setOpenMenu(null); }}
+                            onClick={() => handleKickUser(m.userId, m.nickname)}
                             className="w-full text-left px-3.5 py-2 font-label-md text-error hover:bg-error/10 transition-colors flex items-center gap-2.5"
                           >
                             <span className="material-symbols-outlined text-[18px]">person_remove</span> Kick from Room
