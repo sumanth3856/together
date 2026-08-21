@@ -76,10 +76,11 @@ export const PlaybackControls = memo(function PlaybackControls({
   };
 
   return (
-    <div className="p-3 sm:p-4 bg-surface-container rounded-2xl border border-outline-variant w-full flex flex-col gap-3 shadow-sm ambient-shadow">
+    <div className="p-3 sm:p-4 bg-surface-container rounded-2xl border border-outline-variant w-full flex flex-col gap-2.5 sm:gap-3 shadow-sm ambient-shadow">
       
-      {/* ── 1. Full-Width Progress Scrubber Track ── */}
-      <div className="flex items-center gap-2 w-full pt-1">
+      {/* ── 1. Progress Scrubber Track + Timestamp Pill at End ── */}
+      <div className="flex items-center gap-2.5 sm:gap-3.5 w-full pt-1">
+        {/* Scrubber Track */}
         <div className="relative flex-1 h-2 bg-outline-variant/60 hover:h-2.5 rounded-full cursor-pointer flex items-center group transition-all">
           <div 
             className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-75 ease-linear pointer-events-none" 
@@ -116,6 +117,17 @@ export const PlaybackControls = memo(function PlaybackControls({
             aria-label="Seek time scrubber"
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
           />
+        </div>
+
+        {/* Timestamp Pill at the ending of progress track */}
+        <div className="flex items-center justify-center px-2.5 py-0.5 bg-surface-container-lowest rounded-full border border-outline-variant/60 text-xs font-label-sm shrink-0 select-none shadow-2xs">
+          <span className="text-on-surface font-medium tabular-nums">
+            {formatTime(displayTime)}
+          </span>
+          <span className="mx-1 text-on-surface-variant/40">/</span>
+          <span className="text-on-surface-variant/80 tabular-nums">
+            {formatTime(effectiveDuration)}
+          </span>
         </div>
       </div>
 
@@ -185,17 +197,6 @@ export const PlaybackControls = memo(function PlaybackControls({
               className="w-14 sm:w-20 h-1.5 bg-outline-variant rounded-full appearance-none outline-none cursor-pointer accent-primary"
             />
           </div>
-        </div>
-
-        {/* Center: Timestamp Badge */}
-        <div className="flex items-center justify-center px-2.5 py-1 bg-surface-container-lowest rounded-full border border-outline-variant/60 text-xs font-label-sm min-w-0">
-          <span className="text-on-surface font-medium tabular-nums">
-            {formatTime(displayTime)}
-          </span>
-          <span className="mx-1 text-on-surface-variant/40">/</span>
-          <span className="text-on-surface-variant/80 tabular-nums">
-            {formatTime(effectiveDuration)}
-          </span>
         </div>
 
         {/* Right Action Cluster: Fullscreen & Lock Badge */}
