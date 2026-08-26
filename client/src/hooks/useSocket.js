@@ -79,6 +79,10 @@ const attemptRejoin = (socket, roomId, userId, nickname, avatar, retriesLeft = 4
       activeSessionObj = null;
       useRoomStore.getState().setIsReconnecting(false);
       useRoomStore.getState().setRoomState(null);
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+      useUIStore.getState().setToastNotification({ type: 'error', message: 'Room not found or no longer available.' });
     });
 };
 
@@ -164,17 +168,24 @@ export function useSocket() {
       socket.on('session_ended', () => {
         clearSession();
         activeSessionObj = null;
-        useRoomStore.getState().setSessionEnded(true);
+        useRoomStore.getState().setSessionEnded(false);
         useRoomStore.getState().setRoomState(null);
         useRoomStore.getState().setIsReconnecting(false);
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+        useUIStore.getState().setToastNotification({ type: 'info', message: 'Room ended.' });
       });
 
       socket.on('kicked_from_room', () => {
         clearSession();
         activeSessionObj = null;
         useRoomStore.getState().setRoomState(null);
-        useUIStore.getState().setToastNotification({ type: 'error', message: 'You have been removed from the room.' });
-        window.location.href = '/';
+        useRoomStore.getState().setIsReconnecting(false);
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+        useUIStore.getState().setToastNotification({ type: 'error', message: 'You were removed from the room.' });
       });
 
       socket.on('chat_received', (message) => {

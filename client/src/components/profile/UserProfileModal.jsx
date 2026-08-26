@@ -10,6 +10,8 @@ export function UserProfileModal({ isOpen, onClose, user }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   const setToastNotification = useUIStore(state => state.setToastNotification);
+  const theme = useUIStore(state => state.theme);
+  const setTheme = useUIStore(state => state.setTheme);
 
   useLockBodyScroll(isOpen);
 
@@ -52,35 +54,54 @@ export function UserProfileModal({ isOpen, onClose, user }) {
     }
   };
 
-  // Mock initial for avatar if not using boring-avatars right now
+  const userAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || user?.user_metadata?.image || null;
   const initial = displayName ? displayName.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || 'U');
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="profile-title" className="fixed inset-0 z-[100] flex items-center justify-center font-body-md p-4">
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-surface/90 backdrop-blur-md" onClick={onClose}></div>
+        <div className="absolute inset-0 modal-backdrop" onClick={onClose} aria-hidden="true"></div>
         
         {/* Modal Container */}
-        <div className="relative z-10 w-full max-w-[800px] bg-surface-container-lowest rounded-3xl shadow-2xl overflow-hidden border border-outline-variant animate-fade-in-up flex flex-col md:flex-row">
+        <div className="relative z-10 w-full max-w-[800px] bg-surface-container/98 backdrop-blur-2xl rounded-3xl shadow-cinema overflow-hidden border border-outline-variant text-on-surface animate-fade-in-up flex flex-col md:flex-row">
             
             {/* Left Sidebar: Profile Summary */}
-            <div className="w-full md:w-1/3 bg-surface-container p-8 flex flex-col items-center text-center border-r border-outline-variant/50">
-                <div className="w-32 h-32 rounded-full bg-error-container text-primary flex items-center justify-center text-5xl font-display-lg mb-6 border-4 border-surface-container-lowest shadow-lg ambient-shadow">
-                    {initial}
+            <div className="w-full md:w-1/3 bg-surface-container-lowest/80 p-8 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-outline-variant/50">
+                <div className="shrink-0 relative mb-4">
+                    {userAvatar ? (
+                      <img
+                        src={userAvatar}
+                        alt={displayName || 'User Avatar'}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.parentElement?.querySelector('.profile-avatar-fallback');
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                        className="w-28 h-28 rounded-full border-2 border-outline-variant object-cover shadow-soft"
+                      />
+                    ) : null}
+                    <div
+                      style={{ display: userAvatar ? 'none' : 'flex' }}
+                      className="profile-avatar-fallback w-28 h-28 rounded-full bg-surface-container-highest text-primary items-center justify-center text-4xl font-display-lg border-2 border-outline-variant shadow-soft"
+                    >
+                      {initial}
+                    </div>
                 </div>
-                <h2 id="profile-title" className="font-headline-md text-2xl mb-1 text-on-background">{displayName || 'User'}</h2>
-                <p className="font-label-sm text-on-surface-variant break-all">{user?.email}</p>
-                <div className="mt-auto pt-8 w-full">
+                <h2 id="profile-title" className="font-display-lg text-xl font-bold mb-1 text-on-background">{displayName || 'User'}</h2>
+                <p className="text-xs text-on-surface-muted break-all">{user?.email}</p>
+                <div className="mt-auto pt-6 w-full">
                     <button 
                         onClick={() => setShowSignoutConfirm(true)}
                         disabled={isLoggingOut}
-                        className="btn w-full py-3 text-error hover:bg-error/10 border border-transparent hover:border-error/20"
+                        title="Sign out of your account"
+                        aria-label="Sign out"
+                        className="btn w-full py-2.5 text-error hover:bg-error-container/50 border border-error/20 rounded-xl text-xs sm:text-sm font-semibold transition-all"
                     >
                         {isLoggingOut ? (
-                            <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                            <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                         ) : (
                             <>
-                                <span className="material-symbols-outlined">logout</span>
+                                <span className="material-symbols-outlined text-[16px]">logout</span>
                                 Sign Out
                             </>
                         )}
@@ -89,17 +110,22 @@ export function UserProfileModal({ isOpen, onClose, user }) {
             </div>
 
             {/* Right Content: Settings Form */}
-            <div className="w-full md:w-2/3 p-8">
-                <div className="flex justify-between items-center mb-8">
-                    <h3 className="font-headline-lg text-3xl text-on-background">Account Settings</h3>
-                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors" aria-label="Close">
+            <div className="w-full md:w-2/3 p-6 sm:p-8">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-display-lg text-2xl sm:text-3xl font-bold text-on-background">Account Settings</h3>
+                    <button 
+                      onClick={onClose} 
+                      title="Close dialog" 
+                      aria-label="Close dialog"
+                      className="w-10 h-10 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-on-surface transition-colors"
+                    >
                         <span className="material-symbols-outlined">close</span>
                     </button>
                 </div>
 
-                <form onSubmit={handleSave} className="space-y-6">
+                <form onSubmit={handleSave} className="space-y-5">
                     <div className="space-y-2">
-                        <label className="block font-label-lg text-on-surface">Display Name</label>
+                        <label className="block text-sm font-semibold text-on-surface">Display Name</label>
                         <input 
                             type="text" 
                             className="input"
@@ -107,30 +133,49 @@ export function UserProfileModal({ isOpen, onClose, user }) {
                             onChange={(e) => setDisplayName(e.target.value)}
                             disabled={isSaving}
                         />
-                        <p className="font-label-sm text-on-surface-variant opacity-70">This is how you will appear to others in the room.</p>
+                        <p className="text-xs text-on-surface-muted">This is how you will appear to others in the room</p>
                     </div>
 
                     <div className="space-y-2">
-                        <label className="block font-label-lg text-on-surface">Email Address</label>
+                        <label className="block text-sm font-semibold text-on-surface">Email Address</label>
                         <input 
                             type="email" 
-                            className="input bg-surface-container/50 border-outline-variant/50 text-on-surface-variant cursor-not-allowed"
+                            className="input bg-surface-container-highest/40 border-outline-variant/50 text-on-surface-muted cursor-not-allowed"
                             value={user?.email || ''}
                             disabled
                         />
                     </div>
 
-                    <div className="pt-6 border-t border-outline-variant/50 flex justify-between items-center">
-                        <button type="button" className="text-error font-label-sm hover:underline">
-                            Deactivate Account
-                        </button>
+                    <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-on-surface">Appearance</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setTheme('dark')}
+                                className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-semibold text-xs sm:text-sm transition-all ${theme === 'dark' ? 'border-primary bg-primary/10 text-primary shadow-soft' : 'border-outline-variant bg-surface-container-highest text-on-surface-variant hover:text-on-surface'}`}
+                            >
+                                <span className="material-symbols-outlined text-[18px]">dark_mode</span>
+                                Dark
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTheme('light')}
+                                className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-semibold text-xs sm:text-sm transition-all ${theme === 'light' ? 'border-primary bg-primary/10 text-primary shadow-soft' : 'border-outline-variant bg-surface-container-highest text-on-surface-variant hover:text-on-surface'}`}
+                            >
+                                <span className="material-symbols-outlined text-[18px]">light_mode</span>
+                                Light
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-outline-variant/50 flex justify-end items-center">
                         <button 
                             type="submit" 
                             disabled={isSaving || !displayName.trim()}
-                            className="btn btn-primary px-8 py-3"
+                            className="btn btn-primary px-8 py-3 shadow-glow"
                         >
                             {isSaving ? (
-                                <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                                <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                             ) : 'Save Changes'}
                         </button>
                     </div>

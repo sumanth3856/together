@@ -6,30 +6,30 @@ import { useUIStore } from '../../store/useUIStore';
 const TOAST_VARIANTS = {
   success: {
     icon: 'check_circle',
-    chipBg: 'bg-green-100',
-    chipText: 'text-green-700',
-    ring: 'ring-green-200',
-    bar: 'bg-green-600',
+    chipBg: 'bg-success-container',
+    chipText: 'text-success',
+    ring: 'ring-success/30 border border-success/20',
+    bar: 'bg-success',
   },
   error: {
     icon: 'error',
-    chipBg: 'bg-red-100',
-    chipText: 'text-red-700',
-    ring: 'ring-red-200',
-    bar: 'bg-red-600',
+    chipBg: 'bg-error-container',
+    chipText: 'text-error',
+    ring: 'ring-error/30 border border-error/20',
+    bar: 'bg-error',
   },
   warning: {
     icon: 'warning',
-    chipBg: 'bg-amber-100',
-    chipText: 'text-amber-700',
-    ring: 'ring-amber-200',
+    chipBg: 'bg-amber-500/15',
+    chipText: 'text-amber-400',
+    ring: 'ring-amber-500/30 border border-amber-500/20',
     bar: 'bg-amber-500',
   },
   info: {
     icon: 'info',
-    chipBg: 'bg-[#f3ede8]',
-    chipText: 'text-[#5e3f3a]',
-    ring: 'ring-[#e8bdb6]',
+    chipBg: 'bg-primary-container',
+    chipText: 'text-primary',
+    ring: 'ring-primary/30 border border-primary/20',
     bar: 'bg-primary',
   },
 };
@@ -52,7 +52,7 @@ export function ToastStack({ top = '16px' }) {
             key={toast.id}
             role={toast.type === 'error' ? 'alert' : 'status'}
             aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
-            className={`pointer-events-auto relative flex w-full items-center gap-3 overflow-hidden rounded-xl bg-surface-container-lowest p-3 pr-2 shadow-lg ring-1 sm:w-auto sm:max-w-sm ${variant.ring} ${toast.leaving ? 'toast-out' : 'toast-in'}`}
+            className={`pointer-events-auto relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-surface-container-highest/95 backdrop-blur-xl p-3 pr-2 shadow-lift ring-1 sm:w-auto sm:max-w-sm ${variant.ring} ${toast.leaving ? 'toast-out' : 'toast-in'}`}
           >
             <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${variant.chipBg}`}>
               <span className={`material-symbols-outlined text-[16px] ${variant.chipText}`}>{variant.icon}</span>

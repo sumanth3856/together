@@ -104,60 +104,56 @@ export const ChatPanel = memo(function ChatPanel() {
 
   return (
     <div
-      className="flex flex-col h-full md:max-h-full relative overflow-hidden bg-surface-container rounded-3xl border border-outline-variant shadow-md"
-      style={{
-        '--chat-form-bottom': `${formBottom}px`,
-        '--chat-scroll-padding': `${scrollPaddingBottom}px`,
-      }}
+      className="flex flex-col h-full max-h-full relative overflow-hidden bg-surface-container/90 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-outline-variant/60 shadow-card"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-outline-variant/50 bg-surface-container-lowest shrink-0 shadow-2xs">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/50 bg-surface-container-lowest/80 shrink-0 shadow-2xs">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-[18px] fill-1">chat_bubble</span>
           </div>
-          <h2 className="font-headline-md text-base sm:text-lg text-on-background">Moments</h2>
+          <h2 className="font-display-lg text-base sm:text-lg font-bold text-on-background">Moments</h2>
           {nonSystemMessageCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[11px] font-label-sm font-semibold tabular-nums">
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant border border-outline-variant/60 tabular-nums">
               {nonSystemMessageCount}
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 border border-success/20 text-success text-[11px] font-label-sm">
+        {/* Live sync pill badge */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success-container/80 text-success text-[11px] font-bold border border-success/30 shadow-2xs">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
           Live
         </div>
       </div>
 
-      {/* Floating Emoji Reactions Bar */}
-      <EmojiReactions incomingReaction={incomingReaction} onSendReaction={onSendReaction} />
+      {/* Emoji Reactions Bar */}
+      <EmojiReactions
+        onReactionSelect={(emoji) => onSendReaction(emoji)}
+        incomingReaction={incomingReaction}
+      />
 
-      {/* Messages Stream */}
-      <div 
+      {/* Message Stream */}
+      <div
         ref={chatContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-3.5 sm:px-4 pt-3.5 relative flex flex-col gap-3"
-        style={{ paddingBottom: isMobile ? 'var(--chat-scroll-padding)' : '1rem' }}
+        className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-3 space-y-3 overscroll-contain"
+        aria-live="polite"
+        aria-label="Chat message history"
       >
         {chatHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-on-surface-variant opacity-75 my-auto py-8">
-            <div className="w-14 h-14 rounded-2xl bg-surface-container-lowest border border-outline-variant/60 flex items-center justify-center text-primary mb-3 shadow-sm">
-              <span className="material-symbols-outlined text-3xl">forum</span>
+          <div className="h-full flex flex-col items-center justify-center text-center p-6 select-none opacity-60">
+            <div className="w-12 h-12 rounded-2xl bg-surface-container-highest flex items-center justify-center mb-3 text-on-surface-muted shadow-2xs">
+              <span className="material-symbols-outlined text-[24px]">chat_bubble_outline</span>
             </div>
-            <span className="font-headline-md text-sm sm:text-base text-on-background">No moments yet.</span>
-            <span className="font-body-md text-xs text-on-surface-variant mt-1 text-center max-w-[200px]">
-              Share your thoughts or react with an emoji above!
-            </span>
+            <p className="text-xs sm:text-sm font-semibold text-on-surface-variant">No moments yet.</p>
+            <p className="text-[11px] text-on-surface-muted mt-0.5 max-w-[200px]">Send a reaction or share your thoughts as the video plays!</p>
           </div>
         ) : (
           chatHistory.map((msg, index) => {
             if (msg.isSystem) {
               return (
-                <div
-                  key={msg.id || index}
-                  className="w-full flex justify-center py-0.5 animate-fade-in"
-                >
-                  <span className="bg-surface-container-highest/70 backdrop-blur-xs text-on-surface-variant px-3 py-1 rounded-full font-label-sm text-[11px] sm:text-xs tracking-wide border border-outline-variant/30 shadow-2xs text-center max-w-[85%] break-words leading-tight">
+                <div key={msg.id || index} className="w-full flex justify-center py-1 animate-fade-in">
+                  <span className="bg-surface-container-highest/60 backdrop-blur-xs text-on-surface-variant px-3 py-1 rounded-full text-[11px] sm:text-xs border border-outline-variant/40 shadow-2xs text-center max-w-[85%] break-words leading-tight">
                     {msg.text}
                   </span>
                 </div>
@@ -172,20 +168,32 @@ export const ChatPanel = memo(function ChatPanel() {
                 className={`w-full flex gap-2.5 py-1 animate-fade-in ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
               >
                 {/* Avatar */}
-                <div className="shrink-0 pt-0.5">
+                <div className="shrink-0 pt-0.5 relative">
                   {msg.avatar ? (
-                    <img src={msg.avatar} alt="Avatar" loading="lazy" className="w-8 h-8 rounded-full border border-outline-variant object-cover shadow-2xs" />
-                  ) : (
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-label-sm shadow-2xs ${isMe ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant border border-outline-variant'}`}>
-                      {msg.sender?.charAt(0).toUpperCase() || '?'}
-                    </div>
-                  )}
+                    <img 
+                      src={msg.avatar} 
+                      alt={msg.sender || 'Avatar'} 
+                      loading="lazy" 
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                      className="w-8 h-8 rounded-full border border-outline-variant/60 object-cover shadow-2xs" 
+                    />
+                  ) : null}
+                  <div 
+                    style={{ display: msg.avatar ? 'none' : 'flex' }}
+                    className={`avatar-fallback w-8 h-8 rounded-full items-center justify-center text-xs sm:text-sm font-bold shadow-2xs ${isMe ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface border border-outline-variant/60'}`}
+                  >
+                    {msg.sender?.charAt(0).toUpperCase() || '?'}
+                  </div>
                 </div>
 
                 {/* Content Bubble */}
                 <div className={`flex flex-col min-w-0 max-w-[78%] sm:max-w-[72%] ${isMe ? 'items-end' : 'items-start'}`}>
                   <div className={`flex items-center gap-1.5 mb-1 px-1 flex-wrap ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <span className="font-label-sm text-xs sm:text-sm text-on-surface font-semibold truncate max-w-[130px]">
+                    <span className="text-xs sm:text-sm text-on-surface font-semibold truncate max-w-[130px]">
                       {isMe ? 'You' : msg.sender}
                     </span>
                     {msg.isHost && (
@@ -193,13 +201,13 @@ export const ChatPanel = memo(function ChatPanel() {
                         star
                       </span>
                     )}
-                    <span className="text-[11px] sm:text-xs text-on-surface-variant/80 font-label-sm" title={new Date(msg.timestamp).toLocaleTimeString()}>
+                    <span className="text-[11px] text-on-surface-muted font-medium" title={new Date(msg.timestamp).toLocaleTimeString()}>
                       {formatRelativeTime(msg.timestamp)}
                     </span>
                   </div>
                   
                   <div 
-                    className={`inline-block w-fit px-3.5 py-2 text-sm font-body-md shadow-xs break-all [overflow-wrap:anywhere] leading-relaxed ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-xs' : 'bg-surface-container-lowest text-on-background rounded-2xl rounded-tl-xs border border-outline-variant/60'}`}
+                    className={`inline-block w-fit px-3.5 py-2 text-sm shadow-soft break-all [overflow-wrap:anywhere] leading-relaxed ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-xs' : 'bg-surface-container-highest text-on-surface rounded-2xl rounded-tl-xs border border-outline-variant/60'}`}
                   >
                     {msg.text}
                   </div>
@@ -211,19 +219,19 @@ export const ChatPanel = memo(function ChatPanel() {
         <div ref={chatBottomRef} />
       </div>
 
-      {/* Input Form — fixed on mobile to stay above tab bar, docked shrink-0 on desktop */}
+      {/* Input Form — docked flush at bottom of chat panel */}
       <form
         onSubmit={handleSend}
-        className="fixed md:relative bottom-0 left-0 right-0 p-2.5 sm:p-3 bg-surface-container-lowest border-t border-outline-variant/60 flex items-center gap-2 shrink-0 z-40 md:z-20 shadow-sm"
+        className="relative p-2.5 sm:p-3 bg-surface-container-lowest/90 backdrop-blur-md border-t border-outline-variant/60 flex items-center gap-2 shrink-0 z-20 shadow-soft"
         style={{
-          paddingBottom: isMobile ? `calc(${formBottom}px + env(safe-area-inset-bottom) + 0.5rem)` : '0.75rem'
+          paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : undefined
         }}
       >
         <div className="relative flex-1 flex items-center">
           <input
             ref={inputRef}
             type="text"
-            className="input w-full rounded-full pl-4 pr-10 py-2 text-sm sm:text-base bg-surface-container border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-on-surface-variant/60"
+            className="input w-full rounded-full pl-4 pr-10 py-2 text-sm sm:text-base bg-surface-container-highest border-outline-variant focus:border-primary placeholder:text-on-surface-muted"
             placeholder="Share a moment…"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
@@ -234,8 +242,9 @@ export const ChatPanel = memo(function ChatPanel() {
         <button
           type="submit"
           disabled={!inputText.trim()}
-          className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-surface-tint active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 shrink-0 shadow-md hover:shadow-lg"
+          title="Send message"
           aria-label="Send message"
+          className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-hover active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 shrink-0 shadow-soft"
         >
           <span className="material-symbols-outlined text-[18px]">send</span>
         </button>

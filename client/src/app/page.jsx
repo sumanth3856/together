@@ -62,6 +62,7 @@ export default function Page() {
 
   const setToastNotification = useUIStore(state => state.setToastNotification);
   const incomingReaction = useUIStore(state => state.incomingReaction);
+  const initTheme = useUIStore(state => state.initTheme);
 
   const [initialRoomId, setInitialRoomId] = useState('');
   const [desktopTab, setDesktopTab] = useState('search_queue');
@@ -69,6 +70,11 @@ export default function Page() {
   const [isMobileScreen, setIsMobileScreen] = useState(false);
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
   const [user, setUser] = useState(null);
+
+  // Initialize theme on client mount
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
 
   // Check Supabase Auth & Purge Sensitive URL tokens
   useEffect(() => {
@@ -176,8 +182,10 @@ export default function Page() {
     try {
       await actions.leaveRoom();
     } catch (_) {}
-    window.history.replaceState({ path: window.location.pathname }, '', window.location.pathname);
-  }, [actions]);
+    setInitialRoomId('');
+    window.history.replaceState({}, '', window.location.pathname);
+    setToastNotification({ type: 'info', message: 'You left the room.' });
+  }, [actions, setToastNotification]);
 
   // ---------- Derived State ----------
   const currentMember = members.find((m) => m.socketIds?.includes(socketId));
@@ -197,21 +205,15 @@ export default function Page() {
 
   // ---------- Render ----------
   return (
-    <div style={{ minHeight: '100dvh', position: 'relative', background: '#efede6' }}>
+    <div className="min-h-[100dvh] relative bg-background text-on-background">
 
       {/* ── Reconnecting Banner ── */}
       {isReconnecting && !roomId && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20000,
-          background: 'rgba(245,158,11,0.12)', borderBottom: '1px solid rgba(245,158,11,0.25)',
-          padding: '10px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-          backdropFilter: 'blur(8px)',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
+        <div className="fixed top-0 left-0 right-0 z-[20000] bg-amber-500/10 border-b border-amber-500/20 py-2.5 px-4 flex items-center justify-center gap-2.5 backdrop-blur-md">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" className="animate-spin shrink-0">
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>
-          <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: '600' }}>
+          <span className="text-xs font-semibold text-amber-500">
             Reconnecting to your session…
           </span>
         </div>
@@ -219,14 +221,9 @@ export default function Page() {
 
       {/* ── Reconnecting Banner (in-room disconnect) ── */}
       {isReconnecting && roomId && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20000,
-          background: 'rgba(245,158,11,0.10)', borderBottom: '1px solid rgba(245,158,11,0.2)',
-          padding: '6px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-        }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#f59e0b' }}>wifi_off</span>
-          <span style={{ fontSize: '0.78rem', color: '#fbbf24', fontWeight: '600' }}>
+        <div className="fixed top-0 left-0 right-0 z-[20000] bg-amber-500/10 border-b border-amber-500/20 py-1.5 px-4 flex items-center justify-center gap-2 backdrop-blur-md">
+          <span className="material-symbols-outlined text-[13px] text-amber-500">wifi_off</span>
+          <span className="text-xs font-semibold text-amber-500">
             Connection lost — reconnecting…
           </span>
         </div>
@@ -235,28 +232,18 @@ export default function Page() {
       {/* ── Toast Notifications Stack ── */}
       <ToastStack top={isReconnecting ? '48px' : '16px'} />
 
-      {/* ── Reconnecting full-screen overlay (no room, no session ended) ── */}
-      {isReconnecting && !roomId && !sessionEnded && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: '#efede6',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px',
-          animation: 'fadeIn 0.3s ease',
-        }}>
-          <div style={{
-            width: '64px', height: '64px', borderRadius: '50%',
-            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#cd0000" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+      {/* ── Reconnecting full-screen overlay (no room) ── */}
+      {isReconnecting && !roomId && (
+        <div className="fixed inset-0 z-[9999] bg-background/95 backdrop-blur-xl flex flex-col items-center justify-center gap-4 animate-fade-in">
+          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-primary animate-spin">
               <path d="M21 12a9 9 0 1 1-6.219-8.56" />
             </svg>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '6px' }}>Rejoining your room…</h2>
-            <p style={{ color: '#5e3f3a', fontSize: '0.875rem' }}>Restoring your session, please wait.</p>
+          <div className="text-center">
+            <h2 className="text-xl font-bold mb-1 text-on-background">Rejoining your room…</h2>
+            <p className="text-on-surface-variant text-sm">Restoring your session, please wait.</p>
           </div>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
         </div>
       )}
 
@@ -271,35 +258,7 @@ export default function Page() {
           </div>
         </div>
       ) : !roomId ? (
-        sessionEnded ? (
-          /* Session Ended Screen */
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            minHeight: '100dvh', padding: '24px', textAlign: 'center',
-          }}>
-            <div style={{
-              width: '80px', height: '80px', borderRadius: '50%',
-              background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginBottom: '20px', boxShadow: '0 0 40px rgba(244,63,94,0.12)',
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 36, color: '#ba1a1a' }}>error</span>
-            </div>
-            <h2 className="font-display-lg text-3xl md:text-4xl font-extrabold mb-3 text-on-background">
-              Session Ended
-            </h2>
-            <p style={{ color: '#5e3f3a', marginBottom: '28px', maxWidth: '300px', lineHeight: 1.6, fontSize: '0.9rem' }}>
-              The host left the room and ended the session. Thanks for watching together!
-            </p>
-            <button
-              className="bg-primary text-on-primary hover:bg-surface-tint transition-colors shadow-md"
-              onClick={() => window.location.href = '/'}
-              style={{ padding: '12px 32px', borderRadius: '9999px', fontSize: '0.95rem' }}
-            >
-              Return Home
-            </button>
-          </div>
-        ) : !isReconnecting ? (
+        !isReconnecting ? (
           /* Landing Page — only show if NOT reconnecting */
           <LandingPage
             initialRoomId={initialRoomId}
@@ -330,25 +289,27 @@ export default function Page() {
                   />
                   
                   {/* Segmented Workspace Tabs below player */}
-                  <div className="mt-3 flex flex-col flex-1 min-h-0">
-                    <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2 mb-3 shrink-0">
-                      <button
-                        onClick={() => setDesktopTab('search_queue')}
-                        className={`px-4 py-1.5 rounded-xl text-xs sm:text-sm font-label-md transition-all flex items-center gap-2 ${desktopTab === 'search_queue' ? 'bg-surface-container-high text-primary font-semibold shadow-sm' : 'text-on-surface-variant hover:text-on-background'}`}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">video_library</span>
-                        Search & Queue
-                        {videoQueueLength > 0 && (
-                          <span className="badge badge-primary px-1.5 py-0.2 text-[10px]">{videoQueueLength}</span>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setDesktopTab('room_members')}
-                        className={`px-4 py-1.5 rounded-xl text-xs sm:text-sm font-label-md transition-all flex items-center gap-2 ${desktopTab === 'room_members' ? 'bg-surface-container-high text-primary font-semibold shadow-sm' : 'text-on-surface-variant hover:text-on-background'}`}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">group</span>
-                        Room & Members ({members.length})
-                      </button>
+                  <div className="mt-4 flex flex-col flex-1 min-h-0">
+                    <div className="flex items-center gap-2 border-b border-outline-variant/40 pb-3 mb-4 shrink-0">
+                      <div className="flex items-center p-1 bg-surface-container-lowest rounded-2xl border border-outline-variant/60">
+                        <button
+                          onClick={() => setDesktopTab('search_queue')}
+                          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${desktopTab === 'search_queue' ? 'bg-surface-container-highest text-primary shadow-soft' : 'text-on-surface-variant hover:text-on-surface'}`}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">video_library</span>
+                          Search & Queue
+                          {videoQueueLength > 0 && (
+                            <span className="bg-primary/20 text-primary px-1.5 py-0.2 rounded-full text-[10px] font-bold">{videoQueueLength}</span>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setDesktopTab('room_members')}
+                          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${desktopTab === 'room_members' ? 'bg-surface-container-highest text-primary shadow-soft' : 'text-on-surface-variant hover:text-on-surface'}`}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">group</span>
+                          Room & Members ({members.length})
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex-1 min-h-0 pb-6">

@@ -30,7 +30,7 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
     if (!user) return;
     
     const nickname = user.user_metadata.full_name || 'Host';
-    const avatar = user.user_metadata.avatar_url || null;
+    const avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || user.user_metadata?.image || null;
 
     setLoading(true);
     setErrorMsg('');
@@ -46,18 +46,23 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="create-room-title" className="fixed inset-0 z-[100] flex items-center justify-center font-body-md p-4 overflow-y-auto">
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-surface/90 backdrop-blur-md" onClick={onClose}></div>
+        <div className="absolute inset-0 modal-backdrop" onClick={onClose} aria-hidden="true"></div>
         
         {/* Modal Container */}
-        <div className="relative z-10 my-auto w-full max-w-[540px] bg-surface-container-lowest rounded-3xl shadow-2xl overflow-hidden border border-outline-variant animate-fade-in-up">
+        <div className="relative z-10 my-auto w-full max-w-[540px] bg-surface-container/98 backdrop-blur-2xl rounded-3xl shadow-cinema overflow-hidden border border-outline-variant text-on-surface animate-fade-in-up">
             
             {/* Header */}
             <div className="p-6 pb-4 flex justify-between items-start border-b border-outline-variant/50">
                 <div>
-                    <h2 id="create-room-title" className="font-headline-lg text-3xl mb-1 text-on-background">Create Room</h2>
-                    <p className="font-body-md text-on-surface-variant">Set up your shared watching space.</p>
+                    <h2 id="create-room-title" className="font-display-lg text-2xl sm:text-3xl font-bold mb-1 text-on-background">Create Room</h2>
+                    <p className="text-sm text-on-surface-variant">Set up your shared watching space</p>
                 </div>
-                <button onClick={onClose} className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors" aria-label="Close">
+                <button 
+                  onClick={onClose} 
+                  title="Close dialog" 
+                  aria-label="Close dialog"
+                  className="w-10 h-10 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-on-surface transition-colors"
+                >
                     <span className="material-symbols-outlined">close</span>
                 </button>
             </div>
@@ -66,12 +71,12 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
             <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
                 {!user ? (
                    <div className="text-center py-6">
-                     <div className="w-16 h-16 rounded-full bg-error-container text-primary flex items-center justify-center mx-auto mb-4 shadow-soft">
+                     <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4 shadow-soft">
                        <span className="material-symbols-outlined text-[32px]">account_circle</span>
                      </div>
-                     <h3 className="font-headline-md text-xl mb-2 text-on-background">Sign in to host</h3>
-                     <p className="font-body-md text-on-surface-variant mb-6">You need an account to create a room.</p>
-                     <button onClick={handleGoogleSignIn} className="btn btn-secondary w-full py-4 text-base gap-3">
+                     <h3 className="font-display-lg text-xl font-bold mb-2 text-on-background">Sign in to host</h3>
+                     <p className="text-sm text-on-surface-variant mb-6">You need an account to create a room.</p>
+                     <button onClick={handleGoogleSignIn} className="btn btn-secondary w-full py-3.5 text-base gap-3 shadow-soft">
                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
                             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.7 17.74 9.5 24 9.5z"/>
                             <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -82,10 +87,10 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
                      </button>
                    </div>
                 ) : (
-                  <form id="create-room-form" onSubmit={handleSubmit} className="space-y-8">
+                  <form id="create-room-form" onSubmit={handleSubmit} className="space-y-6">
                       {/* Room Details */}
-                      <div className="space-y-4">
-                          <label className="block font-label-lg text-on-surface">Room Name (Optional)</label>
+                      <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-on-surface">Room Name (Optional)</label>
                           <input 
                               type="text" 
                               className="input"
@@ -97,36 +102,36 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
                       </div>
 
                       {/* Theater Moods */}
-                      <div className="space-y-4">
-                          <label className="block font-label-lg text-on-surface">Theater Mood</label>
+                      <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-on-surface">Theater Mood</label>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                               {/* Mood: Cosy */}
                               <label className="cursor-pointer group">
                                   <input type="radio" name="mood" className="hidden mood-card-input" value="cosy" checked={mood === 'cosy'} onChange={() => setMood('cosy')} disabled={loading}/>
-                                  <div className="border border-outline-variant rounded-xl p-4 text-center hover:bg-surface-container transition-all h-full">
-                                      <span className="material-symbols-outlined text-[32px] text-on-surface-variant mb-2 group-hover:text-primary transition-colors mood-icon">fireplace</span>
-                                      <h4 className="font-label-sm mb-1 text-on-background">Cosy Cabin</h4>
-                                      <p className="text-[11px] text-on-surface-variant leading-tight">Warm & intimate</p>
+                                  <div className="border border-outline-variant bg-surface-container-highest/50 rounded-2xl p-4 text-center hover:bg-surface-container-highest transition-all h-full">
+                                      <span className="material-symbols-outlined text-[28px] text-on-surface-variant mb-2 group-hover:text-primary transition-colors mood-icon">fireplace</span>
+                                      <h4 className="text-xs font-bold mb-0.5 text-on-background">Cosy Cabin</h4>
+                                      <p className="text-[11px] text-on-surface-muted leading-tight">Warm & intimate</p>
                                   </div>
                               </label>
 
                               {/* Mood: Starlit */}
                               <label className="cursor-pointer group">
                                   <input type="radio" name="mood" className="hidden mood-card-input" value="starlit" checked={mood === 'starlit'} onChange={() => setMood('starlit')} disabled={loading}/>
-                                  <div className="border border-outline-variant rounded-xl p-4 text-center hover:bg-surface-container transition-all h-full">
-                                      <span className="material-symbols-outlined text-[32px] text-on-surface-variant mb-2 group-hover:text-primary transition-colors mood-icon">clear_night</span>
-                                      <h4 className="font-label-sm mb-1 text-on-background">Starlit</h4>
-                                      <p className="text-[11px] text-on-surface-variant leading-tight">Dark & ambient</p>
+                                  <div className="border border-outline-variant bg-surface-container-highest/50 rounded-2xl p-4 text-center hover:bg-surface-container-highest transition-all h-full">
+                                      <span className="material-symbols-outlined text-[28px] text-on-surface-variant mb-2 group-hover:text-primary transition-colors mood-icon">clear_night</span>
+                                      <h4 className="text-xs font-bold mb-0.5 text-on-background">Starlit</h4>
+                                      <p className="text-[11px] text-on-surface-muted leading-tight">Dark & ambient</p>
                                   </div>
                               </label>
 
                               {/* Mood: Cinema */}
                               <label className="cursor-pointer group">
                                   <input type="radio" name="mood" className="hidden mood-card-input" value="cinema" checked={mood === 'cinema'} onChange={() => setMood('cinema')} disabled={loading}/>
-                                  <div className="border border-outline-variant rounded-xl p-4 text-center hover:bg-surface-container transition-all h-full">
-                                      <span className="material-symbols-outlined text-[32px] text-on-surface-variant mb-2 group-hover:text-primary transition-colors mood-icon">theaters</span>
-                                      <h4 className="font-label-sm mb-1 text-on-background">Classic</h4>
-                                      <p className="text-[11px] text-on-surface-variant leading-tight">Pure focus</p>
+                                  <div className="border border-outline-variant bg-surface-container-highest/50 rounded-2xl p-4 text-center hover:bg-surface-container-highest transition-all h-full">
+                                      <span className="material-symbols-outlined text-[28px] text-on-surface-variant mb-2 group-hover:text-primary transition-colors mood-icon">theaters</span>
+                                      <h4 className="text-xs font-bold mb-0.5 text-on-background">Classic</h4>
+                                      <p className="text-[11px] text-on-surface-muted leading-tight">Pure focus</p>
                                   </div>
                               </label>
                           </div>
@@ -137,20 +142,20 @@ export function CreateRoomModal({ isOpen, onClose, onCreateRoom, user }) {
 
             {/* Footer / CTA */}
             {user && (
-              <div className="p-6 bg-surface-container border-t border-outline-variant flex flex-col gap-3">
+              <div className="p-6 bg-surface-container-lowest/80 border-t border-outline-variant flex flex-col gap-3">
                   {errorMsg && (
-                    <p className="text-error text-sm font-label-md flex items-center gap-2">
+                    <p className="text-error text-sm font-semibold flex items-center gap-2">
                       <span className="material-symbols-outlined text-[16px]">error</span>
                       {errorMsg}
                     </p>
                   )}
                   <div className="flex items-center justify-between">
-                    <p className="font-body-sm text-on-surface-variant max-w-[200px]">You'll get an invite code on the next screen.</p>
+                    <p className="text-xs text-on-surface-muted max-w-[200px]">You'll get an invite code on the next screen.</p>
                     <button 
                         form="create-room-form"
                         type="submit" 
                         disabled={loading}
-                        className="btn btn-primary px-8 py-3"
+                        className="btn btn-primary px-8 py-3.5 shadow-glow"
                     >
                         {loading ? (
                             <span className="material-symbols-outlined animate-spin">progress_activity</span>

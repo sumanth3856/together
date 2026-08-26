@@ -53,12 +53,12 @@ export function EmojiReactions({ incomingReaction, onSendReaction }) {
       </div>
 
       {/* Reaction Buttons Bar */}
-      <div className="flex items-center justify-between gap-1 px-2.5 sm:px-3 py-1.5 bg-surface-container-lowest/80 border-b border-outline-variant/40 shrink-0">
+      <div className="flex items-center justify-between gap-1 px-2.5 sm:px-3 py-1.5 bg-surface-container-lowest/60 backdrop-blur-md border-b border-outline-variant/40 shrink-0">
         {REACTION_EMOJIS.map((emoji) => (
           <button
             key={emoji}
             onClick={() => handleEmojiClick(emoji)}
-            className="flex-1 max-w-[38px] h-8 min-w-0 flex items-center justify-center rounded-xl text-base transition-all duration-150 hover:bg-surface-container-high hover:scale-125 active:scale-90"
+            className="flex-1 max-w-[38px] h-8 min-w-0 flex items-center justify-center rounded-xl text-base transition-all duration-150 hover:bg-surface-container-highest hover:scale-125 active:scale-90"
             title={`React ${emoji}`}
             aria-label={`React ${emoji}`}
           >

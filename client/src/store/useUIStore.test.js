@@ -54,4 +54,52 @@ describe('useUIStore', () => {
     const state = useUIStore.getState();
     expect(state.incomingReaction).toEqual({ emoji: '🔥', userId: 'user1' });
   });
+
+  describe('Theme State & Actions', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      document.documentElement.removeAttribute('data-theme');
+      document.documentElement.className = '';
+    });
+
+    it('should default to dark theme when no storage or matchMedia exists', () => {
+      const theme = useUIStore.getState().initTheme();
+      expect(theme).toBe('dark');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+    });
+
+    it('should restore saved light theme from localStorage', () => {
+      localStorage.setItem('beingus-theme', 'light');
+      const theme = useUIStore.getState().initTheme();
+      expect(theme).toBe('light');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+      expect(document.documentElement.classList.contains('light')).toBe(true);
+    });
+
+    it('should set theme and persist to localStorage and DOM', () => {
+      useUIStore.getState().setTheme('light');
+      expect(useUIStore.getState().theme).toBe('light');
+      expect(localStorage.getItem('beingus-theme')).toBe('light');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+      expect(document.documentElement.classList.contains('light')).toBe(true);
+
+      useUIStore.getState().setTheme('dark');
+      expect(useUIStore.getState().theme).toBe('dark');
+      expect(localStorage.getItem('beingus-theme')).toBe('dark');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+    });
+
+    it('should toggle theme back and forth correctly', () => {
+      useUIStore.getState().setTheme('dark');
+      useUIStore.getState().toggleTheme();
+      expect(useUIStore.getState().theme).toBe('light');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+
+      useUIStore.getState().toggleTheme();
+      expect(useUIStore.getState().theme).toBe('dark');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
+  });
 });
