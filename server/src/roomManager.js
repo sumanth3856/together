@@ -51,25 +51,92 @@ function deserializeRoom(data) {
 }
 
 // ─── Redis Persistence ────────────────────────────────────────────────────────
+// Per-room write state: roomId -> { inFlight: Promise | null, isDirty: boolean, debounceTimer: Timeout | null }
+export const persistenceState = new Map();
 
 /**
- * Persist a room to Redis (fire-and-forget, non-blocking).
+ * Execute actual Redis set command.
  */
-async function saveRoom(room) {
+async function executeSave(room) {
   if (!redis || !room) return;
   try {
     const serialized = JSON.stringify(serializeRoom(room));
     await redis.set(ROOM_KEY(room.roomId), serialized, { ex: ROOM_TTL_SECONDS });
   } catch (err) {
-    console.error(`[Redis] Failed to save room ${room.roomId}:`, err.message);
+    console.error(`[Redis] Failed to save room ${room?.roomId}:`, err.message);
   }
 }
 
 /**
- * Fire-and-forget wrapper so save calls don't need to be awaited.
+ * Flush the latest authoritative in-memory room state to Redis.
+ * Ensures only ONE write is in-flight at a time per room.
+ * If mutations arrive while a write is in-flight, 'isDirty' is flagged and flushes upon completion.
  */
-function persistRoom(room) {
-  saveRoom(room).catch(() => {}); // Errors already logged inside saveRoom
+function flushPersistence(roomId) {
+  const room = rooms.get(roomId);
+  if (!redis || !room) {
+    persistenceState.delete(roomId);
+    return;
+  }
+
+  let state = persistenceState.get(roomId);
+  if (!state) {
+    state = { inFlight: null, isDirty: false, debounceTimer: null };
+    persistenceState.set(roomId, state);
+  }
+
+  if (state.inFlight) {
+    state.isDirty = true;
+    return;
+  }
+
+  state.isDirty = false;
+  state.inFlight = executeSave(room).finally(() => {
+    state.inFlight = null;
+    if (state.isDirty) {
+      state.isDirty = false;
+      const latestRoom = rooms.get(roomId);
+      if (latestRoom) {
+        flushPersistence(roomId);
+      } else {
+        persistenceState.delete(roomId);
+      }
+    } else {
+      persistenceState.delete(roomId);
+    }
+  });
+}
+
+/**
+ * Persist room state to Redis with per-room write serialization.
+ * @param {Object} room - The live room object.
+ * @param {Object} [options] - Options.
+ * @param {number} [options.debounceMs=0] - If > 0, debounces rapid successive writes (e.g. continuous playback scrubbing).
+ */
+export function persistRoom(room, { debounceMs = 0 } = {}) {
+  if (!room || !room.roomId) return;
+  const roomId = room.roomId;
+
+  let state = persistenceState.get(roomId);
+  if (!state) {
+    state = { inFlight: null, isDirty: false, debounceTimer: null };
+    persistenceState.set(roomId, state);
+  }
+
+  if (debounceMs > 0) {
+    if (state.debounceTimer) clearTimeout(state.debounceTimer);
+    state.debounceTimer = setTimeout(() => {
+      state.debounceTimer = null;
+      flushPersistence(roomId);
+    }, debounceMs);
+    if (state.debounceTimer.unref) state.debounceTimer.unref();
+  } else {
+    if (state.debounceTimer) {
+      clearTimeout(state.debounceTimer);
+      state.debounceTimer = null;
+    }
+    flushPersistence(roomId);
+  }
 }
 
 /**
@@ -94,7 +161,12 @@ async function loadRoomFromRedis(roomId) {
 /**
  * Delete a room from both memory and Redis.
  */
-async function deleteRoom(roomId) {
+export async function deleteRoom(roomId) {
+  const state = persistenceState.get(roomId);
+  if (state && state.debounceTimer) {
+    clearTimeout(state.debounceTimer);
+  }
+  persistenceState.delete(roomId);
   rooms.delete(roomId);
   if (redis) {
     try {
@@ -235,7 +307,8 @@ export const RoomManager = {
       return { room, member, wasReconnect: true };
     }
 
-    if (pendingReconnects.has(actualUserId)) {
+    const isReconnecting = pendingReconnects.has(actualUserId);
+    if (isReconnecting) {
       clearTimeout(pendingReconnects.get(actualUserId).timer);
       pendingReconnects.delete(actualUserId);
     }
@@ -251,126 +324,132 @@ export const RoomManager = {
     pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
-      text: `${member.nickname} joined the room.`,
+      text: `${member.nickname} ${isReconnecting ? 'reconnected.' : 'joined the room.'}`,
       isSystem: true,
       timestamp: Date.now()
     });
 
     room.members.set(actualUserId, member);
     persistRoom(room);
-    return { room, member, wasReconnect: false };
+    return { room, member, wasReconnect: isReconnecting };
   },
 
-  leaveRoom(socketId) {
-    for (const [roomId, room] of rooms.entries()) {
-      const member = this.getMemberBySocketId(room, socketId);
-      if (member) {
-        member.socketIds = member.socketIds.filter(id => id !== socketId);
+  leaveRoom(socketId, preferredRoomId = null) {
+    const processLeave = (roomId, room, member) => {
+      member.socketIds = member.socketIds.filter(id => id !== socketId);
 
-        if (member.socketIds.length > 0) {
-          return { roomId, room, member, sessionEnded: false };
-        }
-
-        room.members.delete(member.userId);
-
-        pushChatMessage(room, {
-          id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          sender: 'System',
-          text: `${member.nickname} disconnected.`,
-          isSystem: true,
-          timestamp: Date.now()
-        });
-
-        // Persist the room state (even with 0 members) so it survives restarts
-        persistRoom(room);
-
-        // If room is now empty, schedule a grace period for reconnect.
-        // After grace, just evict from memory (NOT from Redis) to save RAM.
-        const timer = setTimeout(() => {
-          pendingReconnects.delete(member.userId);
-          const currentRoom = rooms.get(roomId);
-          if (!currentRoom) return;
-
-          if (currentRoom.members.size === 0) {
-            // Evict from memory only — Redis copy stays for future rejoin
-            rooms.delete(roomId);
-            return;
-          }
-
-          if (currentRoom.hostId === member.userId) {
-            const nextHost = Array.from(currentRoom.members.values())
-              .sort((a, b) => a.joinedAt - b.joinedAt)[0];
-            if (nextHost) {
-              currentRoom.hostId = nextHost.userId;
-              pushChatMessage(currentRoom, {
-                id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                sender: 'System',
-                text: `${nextHost.nickname} is the new host.`,
-                isSystem: true,
-                timestamp: Date.now()
-              });
-              if (currentRoom._io) {
-                currentRoom._io.to(roomId).emit('room_state_updated', RoomManager.getRoomStateDTO(currentRoom));
-              }
-              persistRoom(currentRoom);
-            }
-          }
-        }, RECONNECT_GRACE_MS);
-
-        pendingReconnects.set(member.userId, { roomId, timer });
+      if (member.socketIds.length > 0) {
         return { roomId, room, member, sessionEnded: false };
       }
+
+      room.members.delete(member.userId);
+
+      pushChatMessage(room, {
+        id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        sender: 'System',
+        text: `${member.nickname} disconnected.`,
+        isSystem: true,
+        timestamp: Date.now()
+      });
+
+      // Persist the room state (even with 0 members) so it survives restarts
+      persistRoom(room);
+
+      // If room is now empty, schedule a grace period for reconnect.
+      // After grace, just evict from memory (NOT from Redis) to save RAM.
+      const timer = setTimeout(() => {
+        const pendingEntry = pendingReconnects.get(member.userId);
+        if (!pendingEntry || pendingEntry.timer !== timer) return;
+
+        pendingReconnects.delete(member.userId);
+        const currentRoom = rooms.get(roomId);
+        if (!currentRoom) return;
+
+        if (currentRoom.members.size === 0) {
+          // Evict from memory only — Redis copy stays for future rejoin
+          rooms.delete(roomId);
+          return;
+        }
+
+        if (currentRoom.hostId === member.userId) {
+          const nextHost = Array.from(currentRoom.members.values())
+            .sort((a, b) => a.joinedAt - b.joinedAt)[0];
+          if (nextHost) {
+            currentRoom.hostId = nextHost.userId;
+            pushChatMessage(currentRoom, {
+              id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              sender: 'System',
+              text: `${nextHost.nickname} is the new host.`,
+              isSystem: true,
+              timestamp: Date.now()
+            });
+            if (currentRoom._io) {
+              currentRoom._io.to(roomId).emit('room_state_updated', RoomManager.getRoomStateDTO(currentRoom));
+            }
+            persistRoom(currentRoom);
+          }
+        }
+      }, RECONNECT_GRACE_MS);
+
+      pendingReconnects.set(member.userId, { roomId, timer });
+      return { roomId, room, member, sessionEnded: false };
+    };
+
+    if (preferredRoomId) {
+      const room = this.getRoom(preferredRoomId);
+      if (room) {
+        const member = this.getMemberBySocketId(room, socketId);
+        if (member) return processLeave(room.roomId, room, member);
+      }
+    }
+
+    for (const [roomId, room] of rooms.entries()) {
+      const member = this.getMemberBySocketId(room, socketId);
+      if (member) return processLeave(roomId, room, member);
     }
     return null;
   },
 
-  intentionalLeave(socketId) {
+  intentionalLeave(socketId, preferredRoomId = null) {
+    const processIntentionalLeave = (roomId, room, member) => {
+      member.socketIds = member.socketIds.filter(id => id !== socketId);
+      let sessionEnded = false;
+
+      if (pendingReconnects.has(member.userId)) {
+        clearTimeout(pendingReconnects.get(member.userId).timer);
+        pendingReconnects.delete(member.userId);
+      }
+
+      if (room.hostId === member.userId) {
+        // Host intentionally left — disband room
+        sessionEnded = true;
+        deleteRoom(roomId);
+      } else {
+        room.members.delete(member.userId);
+        pushChatMessage(room, {
+          id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          sender: 'System',
+          text: `${member.nickname} left the room.`,
+          isSystem: true,
+          timestamp: Date.now()
+        });
+        persistRoom(room);
+      }
+
+      return { roomId, room, member, sessionEnded };
+    };
+
+    if (preferredRoomId) {
+      const room = this.getRoom(preferredRoomId);
+      if (room) {
+        const member = this.getMemberBySocketId(room, socketId);
+        if (member) return processIntentionalLeave(room.roomId, room, member);
+      }
+    }
+
     for (const [roomId, room] of rooms.entries()) {
       const member = this.getMemberBySocketId(room, socketId);
-      if (member) {
-        room.members.delete(member.userId);
-
-        if (pendingReconnects.has(member.userId)) {
-          clearTimeout(pendingReconnects.get(member.userId).timer);
-          pendingReconnects.delete(member.userId);
-        }
-
-        let sessionEnded = false;
-
-        if (room.members.size === 0) {
-          // Evict from memory — Redis copy stays so host/guests can rejoin later
-          rooms.delete(roomId);
-          persistRoom({ ...room }); // final save with 0 members before evicting
-          sessionEnded = true;
-        } else {
-          if (room.hostId === member.userId) {
-            const nextHost = Array.from(room.members.values())
-              .sort((a, b) => a.joinedAt - b.joinedAt)[0];
-            if (nextHost) {
-              room.hostId = nextHost.userId;
-              pushChatMessage(room, {
-                id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                sender: 'System',
-                text: `${nextHost.nickname} is the new host.`,
-                isSystem: true,
-                timestamp: Date.now()
-              });
-            }
-          }
-
-          pushChatMessage(room, {
-            id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            sender: 'System',
-            text: `${member.nickname} left the room.`,
-            isSystem: true,
-            timestamp: Date.now()
-          });
-
-          persistRoom(room);
-        }
-
-        return { roomId, room, member, sessionEnded };
-      }
+      if (member) return processIntentionalLeave(roomId, room, member);
     }
     return null;
   },
@@ -380,7 +459,7 @@ export const RoomManager = {
     if (!room) return null;
 
     const member = this.getMemberBySocketId(room, socketId);
-    if (!member) return { error: 'User not found in room.' };
+    if (!member) return null;
 
     if (!room.settings.allowMemberControls && room.hostId !== member.userId) {
       return { error: 'Only the host can control playback.' };
@@ -402,6 +481,9 @@ export const RoomManager = {
       });
     }
 
+    const prevPlaying = room.playback.isPlaying;
+    const isNewVideo = Boolean(nextId && (nextId !== room.currentVideo.youtubeId && nextId !== room.currentVideo.videoUrl));
+
     room.playback = {
       isPlaying: typeof isPlaying === 'boolean' ? isPlaying : room.playback.isPlaying,
       currentTime: typeof currentTime === 'number' ? Math.max(0, currentTime) : room.playback.currentTime,
@@ -409,7 +491,8 @@ export const RoomManager = {
       updatedAt: Date.now()
     };
 
-    persistRoom(room);
+    const isStateChange = isNewVideo || (typeof isPlaying === 'boolean' && isPlaying !== prevPlaying) || hasEnded;
+    persistRoom(room, { debounceMs: isStateChange ? 0 : 500 });
     return { room };
   },
 
@@ -449,11 +532,15 @@ export const RoomManager = {
       return { error: 'Queue is full (maximum 50 videos).' };
     }
 
-    room.videoQueue.push({
-      ...video,
+    const queueItem = {
       id: `queue-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      addedBy: member.nickname
-    });
+      youtubeId: video.youtubeId,
+      title: video.title || 'YouTube Video',
+      addedBy: member.nickname,
+      addedAt: Date.now()
+    };
+
+    room.videoQueue.push(queueItem);
 
     pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -510,7 +597,7 @@ export const RoomManager = {
     pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
-      text: `Playing next: ${nextVideo.title}`,
+      text: `Now playing "${nextVideo.title}".`,
       isSystem: true,
       timestamp: Date.now()
     });
@@ -575,6 +662,10 @@ export const RoomManager = {
   transferHost(roomId, socketId, targetUserId) {
     const room = this.getRoom(roomId);
     if (!room) return null;
+
+    if (!targetUserId || typeof targetUserId !== 'string') {
+      return { error: 'Invalid target user ID for host transfer.' };
+    }
 
     const member = this.getMemberBySocketId(room, socketId);
     if (!member || room.hostId !== member.userId) {
@@ -671,3 +762,4 @@ export const cleanupInterval = setInterval(() => {
     }
   }
 }, 600000); // every 10 minutes
+if (cleanupInterval.unref) cleanupInterval.unref();

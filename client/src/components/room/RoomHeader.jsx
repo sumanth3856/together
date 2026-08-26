@@ -9,9 +9,9 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const setToastNotification = useUIStore(state => state.setToastNotification);
-  const roomState = useRoomStore(state => state.roomState);
+  const hostId = useRoomStore(state => state.roomState?.hostId);
 
-  const isHost = roomState?.hostId === user?.id;
+  const isHost = hostId === user?.id;
 
   const handleCopyCode = () => {
     if (!roomId) return;

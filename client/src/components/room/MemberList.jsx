@@ -4,9 +4,8 @@ import { useUIStore } from '../../store/useUIStore';
 import { useSocket } from '../../hooks/useSocket';
 
 export const MemberList = memo(function MemberList({ members = [], currentSocketId }) {
-  const roomState = useRoomStore((s) => s.roomState);
+  const hostId = useRoomStore((s) => s.roomState?.hostId);
   const { kickUser, transferHost, sendReaction } = useSocket();
-  const hostId = roomState?.hostId;
   
   const [openMenu, setOpenMenu] = useState(null); // { userId, placement: 'bottom' | 'top' }
 
@@ -103,6 +102,7 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
           return (
             <div
               key={m.userId}
+              style={{ zIndex: isMenuOpen ? 50 : 1 }}
               className={`flex items-center gap-3.5 p-3 rounded-2xl relative transition-all duration-200 ${isYou ? 'bg-surface-container-lowest border border-outline-variant/80 ring-1 ring-primary/20 shadow-xs' : 'bg-surface-container-lowest/50 hover:bg-surface-container-high border border-outline-variant/40 hover:-translate-y-px'} `}
             >
               {/* Avatar */}

@@ -23,6 +23,8 @@ const SearchAndQueuePanel = dynamic(() => import('../components/player/SearchAnd
 const MobileTabBar = dynamic(() => import('../components/room/MobileTabBar').then((mod) => mod.MobileTabBar), { ssr: false });
 const ToastStack = dynamic(() => import('../components/common/ToastStack').then((mod) => mod.ToastStack), { ssr: false });
 
+const EMPTY_MEMBERS_ARRAY = [];
+
 export default function Page() {
   const {
     createRoom,
@@ -47,11 +49,10 @@ export default function Page() {
     removeFromQueue
   }), [createRoom, joinRoom, leaveRoom, syncPlayback, sendChatMessage, sendReaction, addToQueue, removeFromQueue]);
 
-  const EMPTY_ARRAY = useMemo(() => [], []);
   const roomId = useRoomStore(state => state.roomState?.roomId);
   const hostId = useRoomStore(state => state.roomState?.hostId);
   const currentVideo = useRoomStore(state => state.roomState?.currentVideo);
-  const members = useRoomStore(useShallow(state => state.roomState?.members || EMPTY_ARRAY));
+  const members = useRoomStore(useShallow(state => state.roomState?.members || EMPTY_MEMBERS_ARRAY));
   const videoQueueLength = useRoomStore(state => state.roomState?.videoQueue?.length || 0);
   const chatHistoryLength = useRoomStore(state => state.roomState?.chatHistory?.length || 0);
   const isConnected = useRoomStore(state => state.isConnected);
@@ -130,7 +131,10 @@ export default function Page() {
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
     if (roomParam) {
-      setInitialRoomId(roomParam.toUpperCase());
+      const cleanRoom = roomParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+      if (cleanRoom.length >= 3) {
+        setInitialRoomId(cleanRoom);
+      }
     }
   }, []);
 
@@ -383,43 +387,40 @@ export default function Page() {
             ) : (
               /* ── Mobile View (Clean Tabbed Experience) ── */
               <div className="flex flex-col h-full min-h-0 w-full overflow-hidden pb-16">
-                {mobileActiveTab === 'video' && (
-                  <div className="flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1">
-                    <VideoPlayer
-                      videoUrl={currentVideo?.videoUrl || currentVideo?.youtubeId}
-                      onPlaybackChange={(pData) => actions.syncPlayback(pData)}
-                      onVideoEnded={handleVideoEnded}
+                {/* Video Tab Panel (Kept permanently mounted to preserve playback & audio) */}
+                <div className={`flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1 ${mobileActiveTab === 'video' ? 'flex' : 'hidden'}`}>
+                  <VideoPlayer
+                    videoUrl={currentVideo?.videoUrl || currentVideo?.youtubeId}
+                    onPlaybackChange={(pData) => actions.syncPlayback(pData)}
+                    onVideoEnded={handleVideoEnded}
+                  />
+                  <div className="flex-1 min-h-[360px] flex flex-col">
+                    <SearchAndQueuePanel
+                      onAddVideo={(video) => actions.addToQueue(video)}
+                      onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
+                      onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
                     />
-                    <div className="flex-1 min-h-[360px] flex flex-col">
-                      <SearchAndQueuePanel
-                        onAddVideo={(video) => actions.addToQueue(video)}
-                        onPlayVideo={(video) => actions.syncPlayback({ youtubeId: video.youtubeId, title: video.title, isPlaying: true, currentTime: 0 })}
-                        onRemoveVideo={(queueId) => actions.removeFromQueue(queueId)}
-                      />
-                    </div>
                   </div>
-                )}
+                </div>
 
-                {mobileActiveTab === 'chat' && (
-                  <div className="flex-1 min-h-0 h-full flex flex-col p-1">
-                    <ChatPanel />
-                  </div>
-                )}
+                {/* Chat Tab Panel */}
+                <div className={`flex-1 min-h-0 h-full flex flex-col p-1 ${mobileActiveTab === 'chat' ? 'flex' : 'hidden'}`}>
+                  <ChatPanel />
+                </div>
 
-                {mobileActiveTab === 'members' && (
-                  <div className="flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1 pb-20">
-                    <VideoDetailsCard
-                      currentVideo={currentVideo}
-                      roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
-                      currentSocketId={socketId}
-                      onLoadVideo={(vData) => actions.syncPlayback(vData)}
-                    />
-                    <MemberList
-                      members={members}
-                      currentSocketId={socketId}
-                    />
-                  </div>
-                )}
+                {/* Members Tab Panel */}
+                <div className={`flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1 pb-20 ${mobileActiveTab === 'members' ? 'flex' : 'hidden'}`}>
+                  <VideoDetailsCard
+                    currentVideo={currentVideo}
+                    roomState={{ roomId, hostId, currentVideo, members, videoQueue: Array(videoQueueLength).fill({}) }}
+                    currentSocketId={socketId}
+                    onLoadVideo={(vData) => actions.syncPlayback(vData)}
+                  />
+                  <MemberList
+                    members={members}
+                    currentSocketId={socketId}
+                  />
+                </div>
 
                 <MobileTabBar
                   activeTab={mobileActiveTab}

@@ -15,6 +15,8 @@ const getApiUrl = () => {
   return '';
 };
 const API_BASE_URL = getApiUrl();
+const EMPTY_QUEUE = [];
+const EMPTY_MEMBERS = [];
 
 export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) {
   const [activeTab, setActiveTab] = useState('search');
@@ -26,14 +28,15 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
   const [error, setError] = useState(null);
   const lastResultsRef = useRef([]);
 
-  const roomState = useRoomStore((s) => s.roomState);
+  const hostId = useRoomStore((s) => s.roomState?.hostId);
+  const allowMemberControls = useRoomStore((s) => s.roomState?.settings?.allowMemberControls ?? true);
+  const queue = useRoomStore((s) => s.roomState?.videoQueue || EMPTY_QUEUE);
+  const members = useRoomStore((s) => s.roomState?.members || EMPTY_MEMBERS);
   const socketId = useRoomStore((s) => s.socketId);
 
-  const currentMember = roomState?.members?.find((m) => m.socketIds?.includes(socketId));
-  const isHost = roomState?.hostId === currentMember?.userId;
-  const allowMemberControls = roomState?.settings?.allowMemberControls ?? true;
+  const currentMember = members.find((m) => m.socketIds?.includes(socketId));
+  const isHost = hostId === currentMember?.userId;
   const canControl = isHost || allowMemberControls;
-  const queue = roomState?.videoQueue || [];
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -43,14 +46,21 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
     setError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/youtube/search?q=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error('Search failed');
+      if (!res.ok) {
+        setResults([]);
+        setError(`Search failed (${res.status}). Please try again.`);
+        return;
+      }
       const data = await res.json();
-      const videos = data.results || [];
+      const videos = Array.isArray(data?.results) ? data.results : [];
       setResults(videos);
       lastResultsRef.current = videos;
+      if (videos.length === 0) {
+        setError('No videos found.');
+      }
     } catch (err) {
-      setError('Failed to load search results.');
-      if (lastResultsRef.current.length > 0) setResults(lastResultsRef.current);
+      setResults([]);
+      setError('Failed to load search results. Check network or try again.');
     } finally {
       setLoading(false);
     }

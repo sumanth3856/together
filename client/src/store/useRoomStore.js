@@ -21,10 +21,11 @@ export const useRoomStore = create((set) => ({
 
   updateChatHistory: (message) => set((state) => {
     if (!state.roomState) return state;
-    const alreadyExists = state.roomState.chatHistory.some(m => m.id === message.id);
+    const history = Array.isArray(state.roomState.chatHistory) ? state.roomState.chatHistory : [];
+    const alreadyExists = history.some(m => m?.id === message?.id);
     if (alreadyExists) return state;
     
-    const newHistory = [...state.roomState.chatHistory, message];
+    const newHistory = [...history, message];
     if (newHistory.length > 100) {
       newHistory.shift();
     }

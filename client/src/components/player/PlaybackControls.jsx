@@ -40,15 +40,18 @@ export const PlaybackControls = memo(function PlaybackControls({
     const val = parseFloat(e.target.value);
     if (!isNaN(val)) {
       setDragValue(val);
-      if (onSeekChange) onSeekChange(val);
+      if (!isDragging && onSeekChange) {
+        onSeekChange(val);
+      }
     }
   };
 
   const handleSliderCommit = (e) => {
     setIsDragging(false);
-    const val = parseFloat(e.target.value);
-    if (!isNaN(val) && onSeekChange) {
-      onSeekChange(val);
+    const targetVal = e?.target?.value !== undefined ? parseFloat(e.target.value) : dragValue;
+    const finalVal = !isNaN(targetVal) ? targetVal : dragValue;
+    if (!isNaN(finalVal) && onSeekChange) {
+      onSeekChange(finalVal);
     }
   };
 

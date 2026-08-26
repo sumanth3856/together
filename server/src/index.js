@@ -87,9 +87,13 @@ app.get('/api/health', async (req, res) => {
   }
 
   const redisStatus = await pingRedis();
+  const isProd = process.env.NODE_ENV === 'production';
+  const isHealthy = redisStatus === 'ok' || (!isProd && (redisStatus === 'unavailable' || redisStatus === 'missing_config'));
 
-  res.json({ 
-    status: 'ok', 
+  const statusCode = isHealthy ? 200 : (isProd ? 503 : 200);
+
+  res.status(statusCode).json({ 
+    status: isHealthy ? 'ok' : 'degraded', 
     service: 'Together-Server', 
     supabase: supabaseStatus,
     redis: redisStatus,

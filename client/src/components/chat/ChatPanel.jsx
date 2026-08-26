@@ -4,10 +4,13 @@ import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useSocket } from '../../hooks/useSocket';
 
+const EMPTY_CHAT = [];
+
 export const ChatPanel = memo(function ChatPanel() {
-  const chatHistory = useRoomStore(state => state.roomState?.chatHistory || []);
+  const chatHistory = useRoomStore(state => state.roomState?.chatHistory || EMPTY_CHAT);
   const socketId = useRoomStore(state => state.socketId);
-  const currentMember = useRoomStore(state => state.roomState?.members?.find(m => m.socketIds?.includes(state.socketId)));
+  const members = useRoomStore(state => state.roomState?.members);
+  const currentMember = members?.find(m => m.socketIds?.includes(socketId));
   const myUserId = currentMember?.userId;
   const incomingReaction = useUIStore(state => state.incomingReaction);
   const { sendChatMessage: onSendMessage, sendReaction: onSendReaction } = useSocket();

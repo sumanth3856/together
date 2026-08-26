@@ -6,6 +6,17 @@ const rateLimits = new Map();
 // socketId -> { roomId, data, timer } — newest sync payload awaiting a retry
 const pendingSyncs = new Map();
 
+// Prune rate limit entries older than 60 seconds every 5 minutes to prevent memory growth
+const rateLimitPruneInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of rateLimits.entries()) {
+    if (now - timestamp > 60000) {
+      rateLimits.delete(key);
+    }
+  }
+}, 300000);
+if (rateLimitPruneInterval.unref) rateLimitPruneInterval.unref();
+
 const checkRateLimit = (socketId, action, limitMs) => {
   const key = `${socketId}:${action}`;
   const now = Date.now();
@@ -118,8 +129,9 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      // If a real user token is present, strictly enforce that they use their real userId
-      const finalUserId = socket.user?.sub ? socket.user.sub : userId;
+      // If a real authenticated user token is present, strictly enforce socket.user.sub
+      // For unauthenticated guest sockets, fall back to guest ID tied to socket.id or safe guest ID
+      const finalUserId = socket.user?.sub ? socket.user.sub : (userId || `guest-${socket.id}`);
 
       const room = RoomManager.createRoom(finalUserId, socket.id, cleanName, avatar, roomName, mood);
       room._io = io; // Store io ref so async grace-period timer can emit events
@@ -149,17 +161,36 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      // If authenticated, enforce real userId
-      const finalUserId = socket.user?.sub ? socket.user.sub : userId;
-
       // Try memory first; if not found, attempt to load from Redis
-      const roomExists = RoomManager.getRoom(cleanRoomId);
-      if (!roomExists) {
-        const loaded = await RoomManager.ensureRoom(cleanRoomId);
-        if (!loaded) {
+      let existingRoom = RoomManager.getRoom(cleanRoomId);
+      if (!existingRoom) {
+        existingRoom = await RoomManager.ensureRoom(cleanRoomId);
+        if (!existingRoom) {
           if (typeof callback === 'function') callback({ success: false, error: 'Room not found. It may have expired.' });
           return;
         }
+      }
+
+      const currentRoom = existingRoom;
+
+      // Identity Anti-Spoofing Guard:
+      // If socket is authenticated, force sub.
+      // If guest socket, prevent claiming an existing active user's identity or host identity.
+      let finalUserId;
+      if (socket.user?.sub) {
+        finalUserId = socket.user.sub;
+      } else if (userId && currentRoom && currentRoom.members.has(userId)) {
+        const targetMember = currentRoom.members.get(userId);
+        const isHostOrActive = (currentRoom.hostId === userId) || (targetMember.socketIds && targetMember.socketIds.length > 0);
+        if (isHostOrActive) {
+          // Prevent malicious guest from claiming host/active member identity
+          finalUserId = `guest-${socket.id}`;
+        } else {
+          // Disconnected guest reconnecting within grace period
+          finalUserId = userId;
+        }
+      } else {
+        finalUserId = userId || `guest-${socket.id}`;
       }
 
       const result = RoomManager.joinRoom(cleanRoomId, finalUserId, socket.id, cleanName, avatar);
@@ -188,7 +219,7 @@ export function setupSocketHandlers(io) {
         return;
       }
 
-      const result = RoomManager.intentionalLeave(socket.id);
+      const result = RoomManager.intentionalLeave(socket.id, currentRoomId);
       socket.leave(currentRoomId);
       const roomIdSnapshot = currentRoomId;
       currentRoomId = null;
@@ -278,7 +309,22 @@ export function setupSocketHandlers(io) {
       }
     });
 
-    socket.on('transfer_host', handleAction(null, 0, RoomManager.transferHost.bind(RoomManager), d => [d?.newHostId || d?.targetUserId]));
+    socket.on('transfer_host', ({ targetUserId, newHostId }) => {
+      if (!currentRoomId) return;
+      const targetId = sanitizeStr(targetUserId || newHostId, 50);
+      if (!targetId) {
+        socket.emit('error_message', { message: 'Invalid target user ID for host transfer.' });
+        return;
+      }
+      const result = RoomManager.transferHost(currentRoomId, socket.id, targetId);
+      if (result && result.error) {
+        socket.emit('error_message', { message: result.error });
+        return;
+      }
+      if (result && result.room) {
+        broadcastRoomState(currentRoomId);
+      }
+    });
 
     // 8. Floating Emoji Reaction Bursts
     socket.on('send_reaction', ({ emoji }) => {
@@ -292,7 +338,7 @@ export function setupSocketHandlers(io) {
 
       io.to(currentRoomId).emit('reaction_triggered', {
         id: `react-${Date.now()}-${Math.random()}`,
-        emoji,
+        emoji: cleanEmoji,
         senderName: member?.nickname || 'Guest',
         senderColor: '#FF5733',
         xPos: Math.floor(15 + Math.random() * 70)
@@ -315,7 +361,7 @@ export function setupSocketHandlers(io) {
 
       if (currentRoomId) {
         // Use grace-period leaveRoom (does NOT immediately disband)
-        const result = RoomManager.leaveRoom(socket.id);
+        const result = RoomManager.leaveRoom(socket.id, currentRoomId);
         if (result && result.room) {
           // Only broadcast updated state to remaining members
           // (do NOT send session_ended — they may reconnect)

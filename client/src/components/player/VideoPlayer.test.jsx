@@ -16,6 +16,7 @@ vi.mock('react-player', () => ({
       <div data-testid="mock-react-player" data-url={props.url} data-playing={props.playing}>
         <button onClick={() => props.onPlay?.()} data-testid="mock-play">Play</button>
         <button onClick={() => props.onPause?.()} data-testid="mock-pause">Pause</button>
+        <button onClick={() => props.onSeek?.(45)} data-testid="mock-seek">Seek</button>
         <button onClick={() => props.onProgress?.({ playedSeconds: 25 })} data-testid="mock-progress">Progress</button>
         <button onClick={() => props.onEnded?.()} data-testid="mock-ended">End</button>
         <button onClick={() => props.onError?.(new Error('play() failed'))} data-testid="mock-error">Error</button>
@@ -84,5 +85,18 @@ describe('VideoPlayer Component', () => {
     fireEvent.click(screen.getByTestId('mock-error'));
     // Error state should NOT show for play() failed
     expect(screen.queryByTestId('video-error-state')).not.toBeInTheDocument();
+  });
+
+  it('detects and dispatches native seek events from player', () => {
+    const onPlaybackChange = vi.fn();
+    render(
+      <VideoPlayer 
+        videoUrl="https://example.com/video.mp4" 
+        onPlaybackChange={onPlaybackChange} 
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('mock-seek'));
+    expect(onPlaybackChange).toHaveBeenCalledWith(expect.objectContaining({ currentTime: 45, action: 'seek' }));
   });
 });

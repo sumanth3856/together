@@ -21,15 +21,21 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
   });
   console.log('✅ Redis: Connected via Upstash REST API');
 } else {
-  console.warn('⚠️  Redis: No UPSTASH_REDIS_REST_URL/TOKEN found. Running in memory-only mode (rooms will not persist across restarts).');
+  if (process.env.NODE_ENV === 'production') {
+    console.error('🚨 [CRITICAL] Redis credentials missing in PRODUCTION environment! Active rooms will not persist across restarts.');
+  } else {
+    console.warn('⚠️  Redis: No UPSTASH_REDIS_REST_URL/TOKEN found. Running in memory-only mode (rooms will not persist across restarts).');
+  }
 }
 
 /**
  * Ping Redis to check connectivity. Used by the health endpoint.
- * @returns {Promise<string>} 'ok' | 'unavailable'
+ * @returns {Promise<string>} 'ok' | 'unavailable' | 'missing_config' | 'error'
  */
 export async function pingRedis() {
-  if (!redis) return 'unavailable';
+  if (!redis) {
+    return process.env.NODE_ENV === 'production' ? 'missing_config' : 'unavailable';
+  }
   try {
     await redis.ping();
     return 'ok';

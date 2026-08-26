@@ -68,14 +68,14 @@ export function VideoPlayer({
     onVideoEndedRef.current = onVideoEnded;
   }, [onVideoEnded]);
 
-  const roomState = useRoomStore((state) => state.roomState);
   const syncedPlaybackEvent = useRoomStore((state) => state.syncedPlaybackEvent);
   const socketId = useRoomStore((state) => state.socketId);
+  const playback = useRoomStore((state) => state.roomState?.playback);
+  const hostId = useRoomStore((state) => state.roomState?.hostId);
+  const allowMemberControls = useRoomStore((state) => state.roomState?.settings?.allowMemberControls ?? true);
+  const members = useRoomStore((state) => state.roomState?.members);
 
-  const playback = roomState?.playback;
-  const hostId = roomState?.hostId;
-  const allowMemberControls = roomState?.settings?.allowMemberControls ?? true;
-  const currentMember = roomState?.members?.find((m) => m.socketIds?.includes(socketId));
+  const currentMember = members?.find((m) => m.socketIds?.includes(socketId));
   const currentUserId = currentMember?.userId;
 
   // Unified dispatcher that triggers prop callback
@@ -183,10 +183,54 @@ export function VideoPlayer({
     }
   };
 
+  const lastVisibilityChangeRef = useRef(0);
+  useEffect(() => {
+    const handleVisChange = () => {
+      lastVisibilityChangeRef.current = Date.now();
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisChange);
+      return () => document.removeEventListener('visibilitychange', handleVisChange);
+    }
+  }, []);
+
+  const handleNativeSeek = (seconds) => {
+    if (!hasInteracted) setHasInteracted(true);
+    if (isRemoteSyncingRef.current || !canControl) return;
+    const cleanSeconds = typeof seconds === 'number' ? seconds : parseFloat(seconds);
+    if (isNaN(cleanSeconds) || cleanSeconds < 0) return;
+
+    isSelfSyncing.current = Date.now();
+    currentTimeRef.current = cleanSeconds;
+    setCurrentTime(cleanSeconds);
+
+    if (throttledSyncRef.current) {
+      throttledSyncRef.current(localPlaying, cleanSeconds, { action: 'seek' });
+    } else {
+      dispatchPlaybackChange(localPlaying, cleanSeconds, { action: 'seek' });
+    }
+  };
+
   const handleProgress = (state) => {
     if (state?.playedSeconds !== undefined) {
+      const prevTime = currentTimeRef.current;
       currentTimeRef.current = state.playedSeconds;
       setCurrentTime(state.playedSeconds);
+
+      // Dual Native YouTube Seek Detection via progress jump:
+      // When seeking via iframe scrubber without firing ReactPlayer onSeek,
+      // a delta > 2.0s between 500ms intervals indicates a user seek!
+      const timeSinceLocalSeek = Date.now() - isSelfSyncing.current;
+      const isVisible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+      const timeSinceVisChange = Date.now() - lastVisibilityChangeRef.current;
+
+      if (!isRemoteSyncingRef.current && timeSinceLocalSeek > 1200 && isPlayerReady && canControl && isVisible && timeSinceVisChange > 1000) {
+        const delta = Math.abs(state.playedSeconds - prevTime);
+        if (delta > 2.0) {
+          isSelfSyncing.current = Date.now();
+          dispatchPlaybackChange(localPlaying, state.playedSeconds, { action: 'seek' });
+        }
+      }
     }
     if (state?.loadedSeconds && (!duration || duration <= 0)) {
       const dur = playerRef.current && typeof playerRef.current.getDuration === 'function' ? playerRef.current.getDuration() : 0;
@@ -197,6 +241,11 @@ export function VideoPlayer({
   const handlePlay = () => {
     if (!hasInteracted) setHasInteracted(true);
     if (!localPlaying && !isRemoteSyncingRef.current) {
+      // If we just seeked, do not fire a separate play event that could clobber the seek
+      if (Date.now() - isSelfSyncing.current < 800) {
+        setLocalPlaying(true);
+        return;
+      }
       setLocalPlaying(true);
       const time = playerRef.current && typeof playerRef.current.getCurrentTime === 'function' ? playerRef.current.getCurrentTime() : currentTime;
       dispatchPlaybackChange(true, time, { action: 'play' });
@@ -205,6 +254,15 @@ export function VideoPlayer({
 
   const handlePause = () => {
     if (!hasInteracted) setHasInteracted(true);
+    // Ignore transient pauses during seek buffering
+    if (Date.now() - isSelfSyncing.current < 800) return;
+
+    // Ignore browser/OS backgrounding pauses to prevent broadcasting unintended room pause
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      setLocalPlaying(false);
+      return;
+    }
+
     if (localPlaying && !isRemoteSyncingRef.current) {
       setLocalPlaying(false);
       const time = playerRef.current && typeof playerRef.current.getCurrentTime === 'function' ? playerRef.current.getCurrentTime() : currentTime;
@@ -312,6 +370,7 @@ export function VideoPlayer({
               onReady={handleReady}
               onProgress={handleProgress}
               onDuration={handleDuration}
+              onSeek={handleNativeSeek}
               onPlay={handlePlay}
               onPause={handlePause}
               onEnded={handleEnded}
