@@ -269,14 +269,14 @@ export default function Page() {
         ) : null
       ) : (
         /* ── Main Co-Watching Room View ── */
-        <div className="h-screen max-h-screen overflow-hidden bg-background flex flex-col">
+        <div className="h-[100dvh] max-h-[100dvh] overflow-hidden bg-background flex flex-col">
           <RoomHeader
             onLeaveRoom={handleLeaveRoom}
             roomId={roomId}
             user={user}
           />
 
-          <div className="flex-1 min-h-0 pt-16 md:pt-20 px-3 sm:px-4 md:px-6 pb-2 sm:pb-3 max-w-[1700px] w-full mx-auto">
+          <div className="flex-1 min-h-0 pt-16 md:pt-20 px-2 sm:px-4 md:px-6 pb-0 md:pb-3 max-w-[1700px] w-full mx-auto flex flex-col">
             {!isMobileScreen ? (
               /* ── Desktop / Tablet Flex Grid (100% Viewport Locked) ── */
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 h-full min-h-0">
@@ -347,7 +347,10 @@ export default function Page() {
               </div>
             ) : (
               /* ── Mobile View (Clean Tabbed Experience) ── */
-              <div className="flex flex-col h-full min-h-0 w-full overflow-hidden pb-16">
+              <div 
+                className="flex flex-col flex-1 min-h-0 w-full overflow-hidden"
+                style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+              >
                 {/* Video Tab Panel (Kept permanently mounted to preserve playback & audio) */}
                 <div className={`flex flex-col h-full min-h-0 overflow-y-auto custom-scrollbar gap-3 p-1 ${mobileActiveTab === 'video' ? 'flex' : 'hidden'}`}>
                   <VideoPlayer
@@ -365,7 +368,7 @@ export default function Page() {
                 </div>
 
                 {/* Chat Tab Panel */}
-                <div className={`flex-1 min-h-0 h-full flex flex-col p-1 ${mobileActiveTab === 'chat' ? 'flex' : 'hidden'}`}>
+                <div className={`flex-1 min-h-0 flex flex-col p-1 ${mobileActiveTab === 'chat' ? 'flex' : 'hidden'}`}>
                   <ChatPanel />
                 </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
+﻿import React, { useState, useRef, useEffect, memo } from 'react';
 import { EmojiReactions } from './EmojiReactions';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -16,7 +16,6 @@ export const ChatPanel = memo(function ChatPanel() {
   const { sendChatMessage: onSendMessage, sendReaction: onSendReaction } = useSocket();
   const [inputText, setInputText] = useState('');
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
   const chatBottomRef = useRef(null);
@@ -56,13 +55,6 @@ export const ChatPanel = memo(function ChatPanel() {
     };
   }, []);
 
-  // Track isMobile with a resize listener
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (chatHistory.length > 0) {
@@ -86,10 +78,6 @@ export const ChatPanel = memo(function ChatPanel() {
     setInputText('');
   };
 
-  const INPUT_DOCK_HEIGHT = 64;
-  const formBottom = keyboardOffset > 0 ? keyboardOffset : (isMobile ? 70 : 0);
-  const scrollPaddingBottom = INPUT_DOCK_HEIGHT + formBottom + 8;
-
   // Format a timestamp as a relative string ("just now", "2 min ago", etc.)
   const formatRelativeTime = (ts) => {
     if (!ts) return 'just now';
@@ -104,7 +92,7 @@ export const ChatPanel = memo(function ChatPanel() {
 
   return (
     <div
-      className="flex flex-col h-full max-h-full relative overflow-hidden bg-surface-container/90 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-outline-variant/60 shadow-card"
+      className="flex flex-col flex-1 min-h-0 max-h-full relative overflow-hidden bg-surface-container/90 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-outline-variant/60 shadow-card"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/50 bg-surface-container-lowest/80 shrink-0 shadow-2xs">
@@ -222,7 +210,7 @@ export const ChatPanel = memo(function ChatPanel() {
       {/* Input Form — docked flush at bottom of chat panel */}
       <form
         onSubmit={handleSend}
-        className="relative p-2.5 sm:p-3 bg-surface-container-lowest/90 backdrop-blur-md border-t border-outline-variant/60 flex items-center gap-2 shrink-0 z-20 shadow-soft"
+        className="relative p-2.5 sm:p-3 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant/60 flex items-center gap-2 shrink-0 z-20 shadow-soft"
         style={{
           paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : undefined
         }}
