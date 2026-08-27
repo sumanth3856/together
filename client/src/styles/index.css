@@ -198,9 +198,7 @@
   }
 
   .modal-backdrop {
-    background: var(--overlay-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(0, 0, 0, 0.65);
   }
 
   /* Glassmorphism Panel */
@@ -367,22 +365,25 @@
   outline: none;
   border-color: var(--primary-accent);
   box-shadow: 0 0 0 3px var(--primary-container);
-  background-color: var(--surface-container);
+  background-color: var(--surface-container-lowest);
 }
 .code-input-slot::placeholder {
   color: var(--text-muted);
-  opacity: 0.3;
+  opacity: 0.4;
 }
 
 /* Mood Selection Cards */
 .mood-card-input:checked + div {
-  border-color: var(--primary-accent);
-  background-color: var(--primary-container);
-  box-shadow: 0 0 0 1px var(--primary-accent), 0 8px 24px rgba(229, 57, 53, 0.2);
+  border-color: var(--primary-accent) !important;
+  background-color: var(--primary-container) !important;
+  box-shadow: 0 0 0 1.5px var(--primary-accent), 0 8px 24px rgba(229, 57, 53, 0.18) !important;
 }
 .mood-card-input:checked + div .mood-icon {
-  color: var(--primary-accent);
+  color: var(--primary-accent) !important;
   font-variation-settings: 'FILL' 1;
+}
+.mood-card-input:checked + div h4 {
+  color: var(--primary-accent) !important;
 }
 
 /* Dynamic Mood Theming */
@@ -396,6 +397,16 @@
   --text-secondary: #8c9bb8;
 }
 
+[data-theme='light'] .mood-starlit {
+  --bg-base: #f0f4fc;
+  --surface-base: #f8faff;
+  --surface-container: #ffffff;
+  --surface-container-high: #e8eef8;
+  --surface-container-lowest: #ffffff;
+  --text-primary: #0a1128;
+  --text-secondary: #4a5568;
+}
+
 .mood-cinema {
   --bg-base: #000000;
   --surface-base: #070709;
@@ -406,6 +417,16 @@
   --text-secondary: #888e9b;
 }
 
+[data-theme='light'] .mood-cinema {
+  --bg-base: #f4f4f6;
+  --surface-base: #ffffff;
+  --surface-container: #ffffff;
+  --surface-container-high: #e5e5eb;
+  --surface-container-lowest: #ffffff;
+  --text-primary: #121214;
+  --text-secondary: #52525e;
+}
+
 .mood-cosy {
   --bg-base: #0d0a0d;
   --surface-base: #141014;
@@ -414,6 +435,16 @@
   --surface-container-lowest: #090709;
   --text-primary: #fff0f3;
   --text-secondary: #a89498;
+}
+
+[data-theme='light'] .mood-cosy {
+  --bg-base: #fbf7f8;
+  --surface-base: #ffffff;
+  --surface-container: #ffffff;
+  --surface-container-high: #f4e9ed;
+  --surface-container-lowest: #ffffff;
+  --text-primary: #241418;
+  --text-secondary: #6e5860;
 }
 
 /* Floating Reaction Particle */

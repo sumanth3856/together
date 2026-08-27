@@ -170,7 +170,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                     placeholder="Search YouTube..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-sm bg-surface-container-highest rounded-xl border border-outline-variant focus:border-primary placeholder:text-on-surface-muted"
+                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-base bg-surface-container-highest rounded-xl border border-outline-variant focus:border-primary placeholder:text-on-surface-muted text-on-surface"
                     data-testid="search-input"
                   />
                 </div>
@@ -193,7 +193,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                     placeholder="Paste link (SoundCloud, Vimeo, MP4)..."
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
-                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-sm bg-surface-container-highest rounded-xl border border-outline-variant focus:border-primary placeholder:text-on-surface-muted"
+                    className="input w-full pl-9 pr-2 py-1.5 h-10 text-base bg-surface-container-highest rounded-xl border border-outline-variant focus:border-primary placeholder:text-on-surface-muted text-on-surface"
                     data-testid="direct-url-input"
                   />
                 </div>
@@ -218,7 +218,7 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                       <span className="material-symbols-outlined text-3xl">smart_display</span>
                     </div>
                     <span className="font-semibold text-xs sm:text-sm text-on-surface">Search videos or paste a link</span>
-                    <span className="text-[11px] text-on-surface-muted mt-0.5">Results will appear here to queue and watch</span>
+                    <span className="text-xs text-on-surface-variant mt-0.5">Results will appear here to queue and watch</span>
                  </div>
               )}
               {loading && (
@@ -252,14 +252,14 @@ export function SearchAndQueuePanel({ onAddVideo, onPlayVideo, onRemoveVideo }) 
                         }}
                      />
                      {v.duration && (
-                       <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                       <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-bold">
                            {v.duration}
                        </div>
                      )}
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="text-xs sm:text-sm font-semibold text-on-surface line-clamp-2 group-hover:text-primary transition-colors leading-snug">{v.title}</div>
-                    <div className="text-[11px] sm:text-xs text-on-surface-muted truncate mt-1 flex items-center gap-1">
+                    <div className="text-xs text-on-surface-variant truncate mt-1 flex items-center gap-1">
                       <span className="material-symbols-outlined text-[13px]">person</span>
                       {v.author || 'Video'}
                     </div>

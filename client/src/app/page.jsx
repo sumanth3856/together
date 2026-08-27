@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useSocket } from '../hooks/useSocket';
 import { useRoomStore } from '../store/useRoomStore';
@@ -63,6 +63,9 @@ export default function Page() {
   const setToastNotification = useUIStore(state => state.setToastNotification);
   const incomingReaction = useUIStore(state => state.incomingReaction);
   const initTheme = useUIStore(state => state.initTheme);
+  const unreadChatCount = useUIStore(state => state.unreadChatCount);
+  const incrementUnreadChat = useUIStore(state => state.incrementUnreadChat);
+  const clearUnreadChat = useUIStore(state => state.clearUnreadChat);
 
   const [initialRoomId, setInitialRoomId] = useState('');
   const [desktopTab, setDesktopTab] = useState('search_queue');
@@ -70,11 +73,41 @@ export default function Page() {
   const [isMobileScreen, setIsMobileScreen] = useState(false);
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
   const [user, setUser] = useState(null);
+  const prevChatCountRef = useRef(0);
 
   // Initialize theme on client mount
   useEffect(() => {
     initTheme();
   }, [initTheme]);
+
+  // Clear unread chat badge when entering Chat tab
+  useEffect(() => {
+    if (mobileActiveTab === 'chat') {
+      clearUnreadChat();
+    }
+  }, [mobileActiveTab, clearUnreadChat]);
+
+  // Track incoming chat messages and display in-app notification when on Video tab
+  useEffect(() => {
+    const history = useRoomStore.getState().roomState?.chatHistory;
+    if (history && history.length > prevChatCountRef.current) {
+      const latestMsg = history[history.length - 1];
+      const isMe = latestMsg?.senderId === socketId || (user && latestMsg?.senderId === user.id);
+
+      if (latestMsg && !latestMsg.isSystem && !isMe) {
+        if (mobileActiveTab !== 'chat') {
+          incrementUnreadChat();
+          setToastNotification({
+            type: 'chat',
+            title: latestMsg.sender,
+            message: latestMsg.text,
+            avatar: latestMsg.avatar || null,
+          });
+        }
+      }
+    }
+    prevChatCountRef.current = chatHistoryLength;
+  }, [chatHistoryLength, mobileActiveTab, socketId, user, incrementUnreadChat, setToastNotification]);
 
   // Check Supabase Auth & Purge Sensitive URL tokens
   useEffect(() => {
@@ -390,7 +423,7 @@ export default function Page() {
                   activeTab={mobileActiveTab}
                   onSelectTab={setMobileActiveTab}
                   memberCount={members.length}
-                  chatCount={chatHistoryLength}
+                  chatCount={unreadChatCount}
                 />
               </div>
             )}

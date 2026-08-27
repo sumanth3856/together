@@ -196,7 +196,7 @@ export const PlaybackControls = memo(function PlaybackControls({
             </button>
 
             {/* Floating Percentage Tooltip on Hover */}
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-surface-container-highest text-on-surface text-[10px] font-bold px-2 py-0.5 rounded-full border border-outline-variant shadow-md pointer-events-none opacity-0 group-hover/volume:opacity-100 group-focus-within/volume:opacity-100 transition-opacity duration-150 whitespace-nowrap z-30">
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-surface-container-highest text-on-surface text-xs font-bold px-2 py-0.5 rounded-full border border-outline-variant shadow-md pointer-events-none opacity-0 group-hover/volume:opacity-100 group-focus-within/volume:opacity-100 transition-opacity duration-150 whitespace-nowrap z-30">
               {isMuted ? 'Muted' : `${volume}%`}
             </div>
 
@@ -208,7 +208,7 @@ export const PlaybackControls = memo(function PlaybackControls({
               onChange={onVolumeChange}
               aria-label="Volume slider"
               style={{
-                background: `linear-gradient(to right, #e53935 0%, #e53935 ${isMuted ? 0 : volume}%, rgba(255, 255, 255, 0.12) ${isMuted ? 0 : volume}%, rgba(255, 255, 255, 0.12) 100%)`
+                background: `linear-gradient(to right, var(--primary-accent) 0%, var(--primary-accent) ${isMuted ? 0 : volume}%, var(--outline-variant) ${isMuted ? 0 : volume}%, var(--outline-variant) 100%)`
               }}
               className="w-20 sm:w-28 md:w-32 h-1.5 rounded-full appearance-none outline-none cursor-pointer accent-primary hover:h-2 transition-all"
             />

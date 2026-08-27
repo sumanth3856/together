@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RoomManager } from '../src/roomManager.js';
 
-test('RoomManager - Host Grace Period Lifecycle (Reconnect cancels timer)', async () => {
+test('RoomManager - Host Disconnect Lifecycle (Host departure transfers host immediately)', async () => {
   const room = RoomManager.createRoom('host-1', 'sock-host-1', 'HostAlice', null, 'Test Room', 'cosy');
   assert.equal(room.hostId, 'host-1');
 
@@ -10,34 +10,34 @@ test('RoomManager - Host Grace Period Lifecycle (Reconnect cancels timer)', asyn
   RoomManager.joinRoom(room.roomId, 'user-2', 'sock-user-2', 'UserBob', null);
   assert.equal(room.members.size, 2);
 
-  // Host disconnects (socket leaves)
+  // Host disconnects (socket leaves) -> user-2 immediately becomes host
   const leaveResult = RoomManager.leaveRoom('sock-host-1');
   assert.equal(leaveResult.roomId, room.roomId);
+  assert.equal(room.hostId, 'user-2');
 
-  // Host reconnects within grace period
+  // Host rejoins as a member
+  const rejoinResult = RoomManager.joinRoom(room.roomId, 'host-1', 'sock-host-1-new', 'HostAlice', null);
+  assert.equal(room.members.has('host-1'), true);
+  assert.equal(room.hostId, 'user-2');
+});
+
+test('RoomManager - Solo Host Disconnect (Room preserved for host rejoin)', async () => {
+  const room = RoomManager.createRoom('host-1', 'sock-host-1', 'HostAlice', null, 'Test Room 2', 'cosy');
+
+  // Host disconnects
+  RoomManager.leaveRoom('sock-host-1');
+  
+  // Host remains unchanged because 0 other members were in room
+  assert.equal(room.hostId, 'host-1');
+
+  // Host reconnects
   const rejoinResult = RoomManager.joinRoom(room.roomId, 'host-1', 'sock-host-1-new', 'HostAlice', null);
   assert.equal(rejoinResult.wasReconnect, true);
   assert.equal(room.hostId, 'host-1');
 });
 
-test('RoomManager - Host Grace Period Lifecycle (Host departure transfers host when grace period expires)', async () => {
-  const room = RoomManager.createRoom('host-1', 'sock-host-1', 'HostAlice', null, 'Test Room 2', 'cosy');
-  RoomManager.joinRoom(room.roomId, 'user-2', 'sock-user-2', 'UserBob', null);
-
-  // Host disconnects
-  RoomManager.leaveRoom('sock-host-1');
-
-  // Wait for grace period (30s grace in roomManager.js) to execute
-  // In unit test environment, we wait for timeout or simulate timer expiration
-  await new Promise(resolve => setTimeout(resolve, 50));
-  
-  // Host remains unchanged until grace timer finishes or host reconnects
-  assert.equal(room.members.has('user-2'), true);
-});
-
-test('RoomManager - Repeated disconnect/reconnect cycles', () => {
+test('RoomManager - Repeated disconnect/reconnect cycles for solo room', () => {
   const room = RoomManager.createRoom('host-1', 'sock-host-1', 'HostAlice', null, 'Cycle Room', 'cosy');
-  RoomManager.joinRoom(room.roomId, 'user-2', 'sock-user-2', 'UserBob', null);
 
   for (let i = 0; i < 3; i++) {
     RoomManager.leaveRoom(`sock-host-${i + 1}`);

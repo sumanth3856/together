@@ -31,11 +31,11 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
             {currentVideo?.title || 'No Video Loaded'}
           </h3>
           <div className="flex items-center gap-2.5 flex-wrap">
-             <div className="chip bg-success-container text-success border border-success/30 text-[10px] sm:text-[11px] uppercase tracking-wider">
+             <div className="chip bg-success-container text-success border border-success/30 text-xs font-semibold uppercase tracking-wider">
                <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></div>
                <span>{isPlaying ? 'Live' : 'Paused'}</span>
              </div>
-             <span className="text-on-surface-muted text-[11px] sm:text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
+             <span className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
                  <span className="material-symbols-outlined text-[14px]">group</span>
                  {memberCount} Watching
              </span>
@@ -84,16 +84,16 @@ export const VideoDetailsCard = memo(function VideoDetailsCard({ currentSocketId
             name="videoUrl"
             type="text"
             placeholder="Paste YouTube, SoundCloud, or Video URL..."
-            className="input flex-1 bg-surface-container-highest text-xs sm:text-sm py-2 px-3 rounded-xl border border-outline-variant focus:border-primary placeholder:text-on-surface-muted"
+            className="input flex-1 bg-surface-container-highest text-base py-2 px-3.5 rounded-xl border border-outline-variant focus:border-primary placeholder:text-on-surface-muted text-on-surface"
           />
-          <button type="submit" className="btn btn-primary px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-soft">
+          <button type="submit" className="btn btn-primary px-4 sm:px-5 py-2 rounded-xl text-sm font-semibold shadow-soft">
             Load
           </button>
         </form>
 
         <button 
           onClick={handleCopyShareLink} 
-          className="btn btn-secondary w-full py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 border border-outline-variant hover:bg-surface-container-highest transition-colors shadow-soft"
+          className="btn btn-secondary w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border border-outline-variant hover:bg-surface-container-highest transition-colors shadow-soft"
         >
           {copiedLink ? <span className="material-symbols-outlined text-[18px] text-success">check</span> : <span className="material-symbols-outlined text-[18px]">share</span>}
           <span>{copiedLink ? 'Link Copied!' : 'Copy Share Link'}</span>

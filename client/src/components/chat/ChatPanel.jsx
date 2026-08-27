@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, memo } from 'react';
+﻿import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { EmojiReactions } from './EmojiReactions';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -14,20 +14,39 @@ export const ChatPanel = memo(function ChatPanel() {
   const myUserId = currentMember?.userId;
   const incomingReaction = useUIStore(state => state.incomingReaction);
   const { sendChatMessage: onSendMessage, sendReaction: onSendReaction } = useSocket();
+  
   const [inputText, setInputText] = useState('');
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
+
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
   const chatBottomRef = useRef(null);
+  const prevHistoryLengthRef = useRef(chatHistory.length);
 
-  const scrollToBottom = (behavior = 'smooth') => {
+  const scrollToBottom = useCallback((behavior = 'smooth') => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTo({
         top: chatContainerRef.current.scrollHeight,
         behavior,
       });
+      setHasNewMessagesBelow(false);
+      setIsScrolledUp(false);
     }
-  };
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    const isNearBottom = distanceFromBottom < 80;
+    
+    setIsScrolledUp(!isNearBottom);
+    if (isNearBottom) {
+      setHasNewMessagesBelow(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -53,29 +72,44 @@ export const ChatPanel = memo(function ChatPanel() {
       window.visualViewport.removeEventListener('resize', onViewportResize);
       window.visualViewport.removeEventListener('scroll', onViewportResize);
     };
-  }, []);
+  }, [scrollToBottom]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll on new messages if near bottom; otherwise show "New messages ↓" pill
   useEffect(() => {
-    if (chatHistory.length > 0) {
-      requestAnimationFrame(() => {
-        scrollToBottom('smooth');
-      });
-    }
-  }, [chatHistory.length]);
+    const isInitialLoad = prevHistoryLengthRef.current === 0 && chatHistory.length > 0;
+    const hasAddedMessage = chatHistory.length > prevHistoryLengthRef.current;
+    prevHistoryLengthRef.current = chatHistory.length;
 
-  // Scroll to bottom when component mounts
+    if (isInitialLoad) {
+      requestAnimationFrame(() => {
+        scrollToBottom('auto');
+      });
+    } else if (hasAddedMessage) {
+      if (!isScrolledUp) {
+        requestAnimationFrame(() => {
+          scrollToBottom('smooth');
+        });
+      } else {
+        setHasNewMessagesBelow(true);
+      }
+    }
+  }, [chatHistory.length, isScrolledUp, scrollToBottom]);
+
+  // Initial scroll to bottom on mount
   useEffect(() => {
     requestAnimationFrame(() => {
       scrollToBottom('auto');
     });
-  }, []);
+  }, [scrollToBottom]);
 
   const handleSend = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     onSendMessage(inputText.trim());
     setInputText('');
+    requestAnimationFrame(() => {
+      scrollToBottom('smooth');
+    });
   };
 
   // Format a timestamp as a relative string ("just now", "2 min ago", etc.)
@@ -92,7 +126,7 @@ export const ChatPanel = memo(function ChatPanel() {
 
   return (
     <div
-      className="flex flex-col flex-1 min-h-0 max-h-full relative overflow-hidden bg-surface-container/90 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-outline-variant/60 shadow-card"
+      className="flex flex-col flex-1 min-h-0 max-h-full relative overflow-hidden bg-surface-container/95 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-outline-variant/60 shadow-card"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/50 bg-surface-container-lowest/80 shrink-0 shadow-2xs">
@@ -102,15 +136,15 @@ export const ChatPanel = memo(function ChatPanel() {
           </div>
           <h2 className="font-display-lg text-base sm:text-lg font-bold text-on-background">Moments</h2>
           {nonSystemMessageCount > 0 && (
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant border border-outline-variant/60 tabular-nums">
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant border border-outline-variant/60 tabular-nums">
               {nonSystemMessageCount}
             </span>
           )}
         </div>
 
         {/* Live sync pill badge */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success-container/80 text-success text-[11px] font-bold border border-success/30 shadow-2xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-success-container/80 text-success text-xs font-bold border border-success/30 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
           Live
         </div>
       </div>
@@ -124,7 +158,8 @@ export const ChatPanel = memo(function ChatPanel() {
       {/* Message Stream */}
       <div
         ref={chatContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-3 space-y-3 overscroll-contain"
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-3 space-y-3 overscroll-contain relative"
         aria-live="polite"
         aria-label="Chat message history"
       >
@@ -133,15 +168,15 @@ export const ChatPanel = memo(function ChatPanel() {
             <div className="w-12 h-12 rounded-2xl bg-surface-container-highest flex items-center justify-center mb-3 text-on-surface-muted shadow-2xs">
               <span className="material-symbols-outlined text-[24px]">chat_bubble_outline</span>
             </div>
-            <p className="text-xs sm:text-sm font-semibold text-on-surface-variant">No moments yet.</p>
-            <p className="text-[11px] text-on-surface-muted mt-0.5 max-w-[200px]">Send a reaction or share your thoughts as the video plays!</p>
+            <p className="text-sm font-semibold text-on-surface-variant">No moments yet.</p>
+            <p className="text-xs text-on-surface-muted mt-1 max-w-[220px]">Send a reaction or share your thoughts as the video plays!</p>
           </div>
         ) : (
           chatHistory.map((msg, index) => {
             if (msg.isSystem) {
               return (
-                <div key={msg.id || index} className="w-full flex justify-center py-1 animate-fade-in">
-                  <span className="bg-surface-container-highest/60 backdrop-blur-xs text-on-surface-variant px-3 py-1 rounded-full text-[11px] sm:text-xs border border-outline-variant/40 shadow-2xs text-center max-w-[85%] break-words leading-tight">
+                <div key={msg.id || index} className="w-full flex justify-center py-1.5 animate-fade-in">
+                  <span className="bg-surface-container-highest/80 backdrop-blur-xs text-on-surface-variant px-3.5 py-1 rounded-full text-xs font-medium border border-outline-variant/40 shadow-2xs text-center max-w-[88%] break-words leading-tight">
                     {msg.text}
                   </span>
                 </div>
@@ -153,35 +188,38 @@ export const ChatPanel = memo(function ChatPanel() {
             return (
               <div
                 key={msg.id || index}
-                className={`w-full flex gap-2.5 py-1 animate-fade-in ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+                className={`w-full flex items-end gap-2.5 py-1 animate-fade-in ${isMe ? 'justify-end' : 'justify-start'}`}
               >
-                {/* Avatar */}
-                <div className="shrink-0 pt-0.5 relative">
-                  {msg.avatar ? (
-                    <img 
-                      src={msg.avatar} 
-                      alt={msg.sender || 'Avatar'} 
-                      loading="lazy" 
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
-                        if (fallback) fallback.style.display = 'flex';
-                      }}
-                      className="w-8 h-8 rounded-full border border-outline-variant/60 object-cover shadow-2xs" 
-                    />
-                  ) : null}
-                  <div 
-                    style={{ display: msg.avatar ? 'none' : 'flex' }}
-                    className={`avatar-fallback w-8 h-8 rounded-full items-center justify-center text-xs sm:text-sm font-bold shadow-2xs ${isMe ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface border border-outline-variant/60'}`}
-                  >
-                    {msg.sender?.charAt(0).toUpperCase() || '?'}
+                {/* Incoming Member Avatar (aligned at bottom of message group) */}
+                {!isMe && (
+                  <div className="shrink-0 relative self-end mb-0.5">
+                    {msg.avatar ? (
+                      <img 
+                        src={msg.avatar} 
+                        alt={msg.sender || 'Avatar'} 
+                        loading="lazy" 
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                        className="w-8 h-8 rounded-full border border-outline-variant/60 object-cover shadow-2xs" 
+                      />
+                    ) : null}
+                    <div 
+                      style={{ display: msg.avatar ? 'none' : 'flex' }}
+                      className="avatar-fallback w-8 h-8 rounded-full items-center justify-center text-xs font-bold shadow-2xs bg-surface-container-highest text-on-surface border border-outline-variant/60"
+                    >
+                      {msg.sender?.charAt(0).toUpperCase() || '?'}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Content Bubble */}
-                <div className={`flex flex-col min-w-0 max-w-[78%] sm:max-w-[72%] ${isMe ? 'items-end' : 'items-start'}`}>
+                {/* Content Bubble Column */}
+                <div className={`flex flex-col min-w-0 max-w-[80%] sm:max-w-[74%] ${isMe ? 'items-end' : 'items-start'}`}>
+                  {/* Metadata header */}
                   <div className={`flex items-center gap-1.5 mb-1 px-1 flex-wrap ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <span className="text-xs sm:text-sm text-on-surface font-semibold truncate max-w-[130px]">
+                    <span className="text-xs sm:text-sm text-on-surface font-semibold truncate max-w-[140px]">
                       {isMe ? 'You' : msg.sender}
                     </span>
                     {msg.isHost && (
@@ -189,23 +227,64 @@ export const ChatPanel = memo(function ChatPanel() {
                         star
                       </span>
                     )}
-                    <span className="text-[11px] text-on-surface-muted font-medium" title={new Date(msg.timestamp).toLocaleTimeString()}>
+                    <span className="text-xs text-on-surface-muted font-medium" title={new Date(msg.timestamp).toLocaleTimeString()}>
                       {formatRelativeTime(msg.timestamp)}
                     </span>
                   </div>
                   
+                  {/* Text bubble */}
                   <div 
-                    className={`inline-block w-fit px-3.5 py-2 text-sm shadow-soft break-all [overflow-wrap:anywhere] leading-relaxed ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-xs' : 'bg-surface-container-highest text-on-surface rounded-2xl rounded-tl-xs border border-outline-variant/60'}`}
+                    className={`inline-block w-fit px-4 py-2.5 text-sm sm:text-base shadow-soft break-all [overflow-wrap:anywhere] leading-relaxed ${isMe ? 'bg-primary text-on-primary rounded-2xl rounded-tr-xs' : 'bg-surface-container-highest text-on-surface rounded-2xl rounded-tl-xs border border-outline-variant/60'}`}
                   >
                     {msg.text}
                   </div>
                 </div>
+
+                {/* Own Avatar (aligned at bottom on the right) */}
+                {isMe && (
+                  <div className="shrink-0 relative self-end mb-0.5">
+                    {msg.avatar ? (
+                      <img 
+                        src={msg.avatar} 
+                        alt="You" 
+                        loading="lazy" 
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                        className="w-8 h-8 rounded-full border border-primary/30 object-cover shadow-2xs" 
+                      />
+                    ) : null}
+                    <div 
+                      style={{ display: msg.avatar ? 'none' : 'flex' }}
+                      className="avatar-fallback w-8 h-8 rounded-full items-center justify-center text-xs font-bold shadow-2xs bg-primary text-on-primary"
+                    >
+                      {msg.sender?.charAt(0).toUpperCase() || 'Y'}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
         )}
         <div ref={chatBottomRef} />
       </div>
+
+      {/* Floating "New Messages ↓" Affordance Pill */}
+      {hasNewMessagesBelow && (
+        <div className="absolute bottom-16 left-0 right-0 flex justify-center z-30 pointer-events-none animate-fade-in-up">
+          <button
+            type="button"
+            onClick={() => scrollToBottom('smooth')}
+            className="pointer-events-auto flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary text-on-primary font-semibold text-xs shadow-lift hover:bg-primary-hover active:scale-95 transition-all border border-primary-container"
+            aria-label="Scroll to latest messages"
+          >
+            <span className="material-symbols-outlined text-[16px] animate-bounce">arrow_downward</span>
+            New messages
+          </button>
+        </div>
+      )}
 
       {/* Input Form — docked flush at bottom of chat panel */}
       <form
@@ -219,7 +298,7 @@ export const ChatPanel = memo(function ChatPanel() {
           <input
             ref={inputRef}
             type="text"
-            className="input w-full rounded-full pl-4 pr-10 py-2 text-sm sm:text-base bg-surface-container-highest border-outline-variant focus:border-primary placeholder:text-on-surface-muted"
+            className="input w-full rounded-full pl-4 pr-10 py-2.5 text-base bg-surface-container-highest border-outline-variant focus:border-primary placeholder:text-on-surface-muted text-on-surface"
             placeholder="Share a moment…"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

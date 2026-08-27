@@ -75,7 +75,7 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
           </div>
           <span className="font-display-lg text-lg sm:text-xl font-bold text-on-background">Watching Together</span>
         </div>
-        <span className="chip bg-success-container border border-success/30 text-success text-[11px] uppercase tracking-wider">
+        <span className="chip bg-success-container border border-success/30 text-success text-xs font-semibold uppercase tracking-wider">
           {members.length} online
         </span>
       </div>
@@ -140,12 +140,12 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
                     {m.nickname}
                   </span>
                   {isYou && (
-                    <span className="text-[10px] sm:text-[11px] text-primary font-bold tracking-wider uppercase bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
+                    <span className="text-xs text-primary font-bold tracking-wider uppercase bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
                       (You)
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-on-surface-muted">
+                <span className="text-xs text-on-surface-variant">
                   {isHost ? 'Room Host' : 'Viewer'}
                 </span>
               </div>
@@ -177,7 +177,7 @@ export const MemberList = memo(function MemberList({ members = [], currentSocket
                           <div className="text-xs sm:text-sm font-semibold text-on-surface truncate">
                             {m.nickname}
                           </div>
-                          <div className="text-[11px] text-on-surface-muted flex items-center gap-1 font-medium">
+                          <div className="text-xs text-on-surface-muted flex items-center gap-1 font-medium">
                             {isHost ? 'Room Host' : 'Viewer'}
                           </div>
                         </div>

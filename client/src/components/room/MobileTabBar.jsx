@@ -13,7 +13,7 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
         aria-label="Video tab"
       >
         <span className={`material-symbols-outlined text-[22px] ${activeTab === 'video' ? 'fill-1' : ''}`}>movie</span>
-        <span className="text-[11px] font-semibold mt-0.5 tracking-wide">Video</span>
+        <span className="text-xs font-semibold mt-0.5 tracking-wide">Video</span>
       </button>
 
       <button 
@@ -25,12 +25,12 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
         <div className="relative flex items-center justify-center">
           <span className={`material-symbols-outlined text-[22px] ${activeTab === 'chat' ? 'fill-1' : ''}`}>chat_bubble</span>
           {chatCount > 0 && (
-            <span className="absolute -top-1 -right-2.5 bg-primary text-on-primary text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center shadow-soft tabular-nums">
+            <span className="absolute -top-1.5 -right-3 bg-primary text-on-primary text-[11px] font-bold min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center shadow-soft tabular-nums border border-surface-container-lowest">
               {chatCount > 99 ? '99+' : chatCount}
             </span>
           )}
         </div>
-        <span className="text-[11px] font-semibold mt-0.5 tracking-wide">Chat</span>
+        <span className="text-xs font-semibold mt-0.5 tracking-wide">Chat</span>
       </button>
 
       <button 
@@ -40,7 +40,7 @@ export function MobileTabBar({ activeTab, onSelectTab, memberCount, chatCount })
         aria-label="Members tab"
       >
         <span className={`material-symbols-outlined text-[22px] ${activeTab === 'members' ? 'fill-1' : ''}`}>groups</span>
-        <span className="text-[11px] font-semibold mt-0.5 tracking-wide">Guests ({memberCount})</span>
+        <span className="text-xs font-semibold mt-0.5 tracking-wide">Guests ({memberCount})</span>
       </button>
     </nav>
   );

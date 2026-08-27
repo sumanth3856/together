@@ -63,10 +63,10 @@ export function UserProfileModal({ isOpen, onClose, user }) {
         <div className="absolute inset-0 modal-backdrop" onClick={onClose} aria-hidden="true"></div>
         
         {/* Modal Container */}
-        <div className="relative z-10 w-full max-w-[800px] bg-surface-container/98 backdrop-blur-2xl rounded-3xl shadow-cinema overflow-hidden border border-outline-variant text-on-surface animate-fade-in-up flex flex-col md:flex-row">
+        <div className="relative z-10 w-full max-w-[800px] bg-surface-container rounded-3xl shadow-2xl overflow-hidden border border-outline text-on-surface animate-fade-in-up flex flex-col md:flex-row">
             
             {/* Left Sidebar: Profile Summary */}
-            <div className="w-full md:w-1/3 bg-surface-container-lowest/80 p-8 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-outline-variant/50">
+            <div className="w-full md:w-1/3 bg-surface-container-low p-8 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-outline">
                 <div className="shrink-0 relative mb-4">
                     {userAvatar ? (
                       <img
@@ -77,18 +77,18 @@ export function UserProfileModal({ isOpen, onClose, user }) {
                           const fallback = e.currentTarget.parentElement?.querySelector('.profile-avatar-fallback');
                           if (fallback) fallback.style.display = 'flex';
                         }}
-                        className="w-28 h-28 rounded-full border-2 border-outline-variant object-cover shadow-soft"
+                        className="w-28 h-28 rounded-full border-2 border-outline object-cover shadow-soft"
                       />
                     ) : null}
                     <div
                       style={{ display: userAvatar ? 'none' : 'flex' }}
-                      className="profile-avatar-fallback w-28 h-28 rounded-full bg-surface-container-highest text-primary items-center justify-center text-4xl font-display-lg border-2 border-outline-variant shadow-soft"
+                      className="profile-avatar-fallback w-28 h-28 rounded-full bg-surface-container-highest text-primary items-center justify-center text-4xl font-display-lg border-2 border-outline shadow-soft"
                     >
                       {initial}
                     </div>
                 </div>
                 <h2 id="profile-title" className="font-display-lg text-xl font-bold mb-1 text-on-background">{displayName || 'User'}</h2>
-                <p className="text-xs text-on-surface-muted break-all">{user?.email}</p>
+                <p className="text-xs text-on-surface-variant break-all">{user?.email}</p>
                 <div className="mt-auto pt-6 w-full">
                     <button 
                         onClick={() => setShowSignoutConfirm(true)}
@@ -110,14 +110,14 @@ export function UserProfileModal({ isOpen, onClose, user }) {
             </div>
 
             {/* Right Content: Settings Form */}
-            <div className="w-full md:w-2/3 p-6 sm:p-8">
+            <div className="w-full md:w-2/3 p-6 sm:p-8 bg-surface-container">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-display-lg text-2xl sm:text-3xl font-bold text-on-background">Account Settings</h3>
                     <button 
                       onClick={onClose} 
                       title="Close dialog" 
                       aria-label="Close dialog"
-                      className="w-10 h-10 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-on-surface transition-colors"
+                      className="w-10 h-10 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface border border-outline transition-colors"
                     >
                         <span className="material-symbols-outlined">close</span>
                     </button>
@@ -128,12 +128,12 @@ export function UserProfileModal({ isOpen, onClose, user }) {
                         <label className="block text-sm font-semibold text-on-surface">Display Name</label>
                         <input 
                             type="text" 
-                            className="input"
+                            className="input text-base"
                             value={displayName}
                             onChange={(e) => setDisplayName(e.target.value)}
                             disabled={isSaving}
                         />
-                        <p className="text-xs text-on-surface-muted">This is how you will appear to others in the room</p>
+                        <p className="text-xs text-on-surface-variant">This is how you will appear to others in the room</p>
                     </div>
 
                     <div className="space-y-2">

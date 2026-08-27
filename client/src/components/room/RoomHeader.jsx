@@ -47,7 +47,7 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
                 className="bg-surface-container-highest/80 hover:bg-surface-container-highest transition-all px-3 sm:px-4 py-1.5 rounded-full border border-outline-variant/80 hover:border-primary/50 flex items-center gap-2 group active:scale-95 shadow-soft"
               >
                   <span className="hidden sm:inline text-xs font-semibold text-on-surface-variant uppercase tracking-wider whitespace-nowrap">Room</span>
-                  <span className="font-display-lg font-bold text-primary text-xs sm:text-base md:text-lg tracking-wider sm:tracking-widest whitespace-nowrap select-all">{roomId}</span>
+                  <span className="font-display-lg font-bold text-primary text-sm sm:text-base md:text-lg tracking-wider sm:tracking-widest whitespace-nowrap select-all">{roomId}</span>
                   <span className="material-symbols-outlined text-[15px] sm:text-[17px] text-on-surface-variant group-hover:text-primary transition-colors shrink-0">content_copy</span>
               </button>
           </div>
@@ -95,7 +95,7 @@ export function RoomHeader({ onLeaveRoom, roomId, user }) {
               onClick={() => setShowLeaveConfirm(true)}
               title={isHost ? "Disband and leave room" : "Leave room"}
               aria-label={isHost ? "Disband and leave room" : "Leave room"}
-              className="btn btn-secondary px-3 sm:px-4 py-1.5 sm:py-2 hover:bg-error hover:text-on-error hover:border-error border-outline-variant/80 rounded-full text-xs sm:text-sm font-semibold shadow-soft"
+              className="btn btn-secondary px-3 sm:px-4 py-1.5 sm:py-2 hover:bg-error hover:text-on-error hover:border-error border-outline-variant/80 rounded-full text-sm font-semibold shadow-soft"
             >
                 <span className="material-symbols-outlined text-[18px]">logout</span>
                 <span className="hidden sm:inline">Leave</span>

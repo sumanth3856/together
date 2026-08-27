@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import ReactPlayer from 'react-player';
 import { useRoomStore } from '../../store/useRoomStore';
 import { PlaybackControls } from './PlaybackControls';
+import { CoupleWatchingVector } from './CoupleWatchingVector';
 
 // Custom lightweight debounce/throttle utility
 function throttle(func, limit) {
@@ -343,25 +344,27 @@ export function VideoPlayer({
   return (
     <div className="w-full flex flex-col gap-3" data-testid="video-player-container">
       {/* Screen Frame Container */}
-      <div className="relative group w-full aspect-video bg-black rounded-2xl md:rounded-3xl overflow-hidden shadow-cinema flex items-center justify-center border border-outline-variant/60 ring-1 ring-white/5">
+      <div className={`relative group w-full ${!videoUrl ? 'aspect-video min-h-[250px] sm:min-h-[300px] md:min-h-0' : 'aspect-video'} bg-black rounded-2xl md:rounded-3xl overflow-hidden shadow-cinema flex items-center justify-center border border-outline ring-1 ring-white/5`}>
         {/* Cover for un-authorized members to block native player clicks */}
         {!canControl && (
           <div className="absolute inset-0 z-10 cursor-not-allowed" aria-label="Controls restricted to host" />
         )}
 
         {videoLoadError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-error bg-surface-container-lowest p-6 text-center" data-testid="video-error-state">
-            <span className="material-symbols-outlined text-5xl mb-2 text-error">error</span>
-            <p className="font-semibold text-base sm:text-lg text-on-surface">Failed to load video</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-error bg-surface-container-lowest p-4 sm:p-6 text-center" data-testid="video-error-state">
+            <span className="material-symbols-outlined text-4xl sm:text-5xl mb-2 text-error">error</span>
+            <p className="font-semibold text-sm sm:text-base md:text-lg text-on-surface">Failed to load video</p>
             <p className="text-xs sm:text-sm text-on-surface-variant mt-1 max-w-sm">Please check the link or search for a different video</p>
           </div>
         ) : !videoUrl ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant bg-gradient-to-b from-surface-container-lowest to-surface-container p-6 text-center" data-testid="video-empty-state">
-            <div className="w-16 h-16 rounded-2xl bg-surface-container-highest flex items-center justify-center mb-3 text-primary shadow-soft">
-              <span className="material-symbols-outlined text-4xl fill-1">movie</span>
-            </div>
-            <p className="font-semibold text-base sm:text-lg text-on-surface">Search or paste a link to start watching</p>
-            <p className="text-xs sm:text-sm text-on-surface-variant mt-1 max-w-sm">Queue videos from YouTube or paste any media link below</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant bg-gradient-to-b from-surface-container-lowest to-surface-container p-3 sm:p-6 md:p-8 text-center animate-fade-in overflow-hidden" data-testid="video-empty-state">
+            <CoupleWatchingVector className="mb-2 sm:mb-3.5" />
+            <h3 className="font-display-lg text-sm sm:text-lg md:text-2xl font-bold text-on-background max-w-lg px-2 leading-tight">
+              Search or paste a link to start watching
+            </h3>
+            <p className="text-[11px] sm:text-xs md:text-sm text-on-surface-variant mt-1 sm:mt-1.5 max-w-md leading-relaxed px-2">
+              Queue videos from YouTube or paste any media link below to watch in sync
+            </p>
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center overflow-hidden">

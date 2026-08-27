@@ -112,5 +112,9 @@ export const useUIStore = create((set, get) => ({
 
   incomingReaction: null,
   setIncomingReaction: (reaction) => set({ incomingReaction: reaction }),
+
+  unreadChatCount: 0,
+  incrementUnreadChat: () => set((state) => ({ unreadChatCount: state.unreadChatCount + 1 })),
+  clearUnreadChat: () => set({ unreadChatCount: 0 }),
 }));
 

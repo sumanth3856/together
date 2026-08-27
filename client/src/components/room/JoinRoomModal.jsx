@@ -97,10 +97,10 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user
         <div className="absolute inset-0 modal-backdrop" onClick={onClose} aria-hidden="true"></div>
         
         {/* Modal Container */}
-        <div className="relative z-10 my-auto w-full max-w-[480px] bg-surface-container/98 backdrop-blur-2xl rounded-3xl shadow-cinema overflow-hidden border border-outline-variant text-on-surface animate-fade-in-up">
+        <div className="relative z-10 my-auto w-full max-w-[480px] bg-surface-container rounded-3xl shadow-2xl overflow-hidden border border-outline text-on-surface animate-fade-in-up">
             
             {/* Header */}
-            <div className="p-6 pb-2 flex justify-between items-start">
+            <div className="p-6 pb-4 flex justify-between items-start border-b border-outline bg-surface-container">
                 <div>
                     <h2 id="join-room-title" className="font-display-lg text-2xl sm:text-3xl font-bold mb-1 text-on-background">Join Room</h2>
                     <p className="text-sm text-on-surface-variant">Enter the 6-digit invite code</p>
@@ -109,7 +109,7 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user
                   onClick={onClose} 
                   title="Close dialog" 
                   aria-label="Close dialog"
-                  className="w-10 h-10 rounded-full bg-surface-container-highest hover:bg-surface-bright flex items-center justify-center text-on-surface transition-colors"
+                  className="w-10 h-10 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-on-surface border border-outline transition-colors"
                 >
                     <span className="material-symbols-outlined">close</span>
                 </button>
@@ -182,7 +182,7 @@ export function JoinRoomModal({ isOpen, onClose, onJoinRoom, initialRoomId, user
             </div>
 
             {/* Footer */}
-            <div className="p-4 bg-surface-container-lowest/80 border-t border-outline-variant flex items-center justify-center gap-2 text-on-surface-muted text-xs">
+            <div className="p-4 bg-surface-container-low border-t border-outline flex items-center justify-center gap-2 text-on-surface-variant text-xs font-medium">
                 <span className="material-symbols-outlined text-[16px]">verified_user</span>
                 End-to-end synchronized connection
             </div>

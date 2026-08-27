@@ -27,9 +27,6 @@ const ROOM_KEY = (id) => `together:room:${id}`;
 // ─── In-Memory Cache ─────────────────────────────────────────────────────────
 export const rooms = new Map();
 
-// Track disconnected users awaiting reconnect: userId -> { roomId, timer }
-const pendingReconnects = new Map();
-
 // ─── Serialization ────────────────────────────────────────────────────────────
 
 function serializeRoom(room) {
@@ -290,28 +287,11 @@ export const RoomManager = {
       if (!member.socketIds.includes(socketId)) {
         member.socketIds.push(socketId);
       }
-
-      if (pendingReconnects.has(actualUserId)) {
-        clearTimeout(pendingReconnects.get(actualUserId).timer);
-        pendingReconnects.delete(actualUserId);
-
-        pushChatMessage(room, {
-          id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          sender: 'System',
-          text: `${member.nickname} reconnected.`,
-          isSystem: true,
-          timestamp: Date.now()
-        });
-      }
       persistRoom(room);
       return { room, member, wasReconnect: true };
     }
 
-    const isReconnecting = pendingReconnects.has(actualUserId);
-    if (isReconnecting) {
-      clearTimeout(pendingReconnects.get(actualUserId).timer);
-      pendingReconnects.delete(actualUserId);
-    }
+    const wasHostOrKnown = room.hostId === actualUserId;
 
     const member = {
       userId: actualUserId,
@@ -324,14 +304,14 @@ export const RoomManager = {
     pushChatMessage(room, {
       id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender: 'System',
-      text: `${member.nickname} ${isReconnecting ? 'reconnected.' : 'joined the room.'}`,
+      text: `${member.nickname} joined the room.`,
       isSystem: true,
       timestamp: Date.now()
     });
 
     room.members.set(actualUserId, member);
     persistRoom(room);
-    return { room, member, wasReconnect: isReconnecting };
+    return { room, member, wasReconnect: wasHostOrKnown };
   },
 
   leaveRoom(socketId, preferredRoomId = null) {
@@ -344,54 +324,32 @@ export const RoomManager = {
 
       room.members.delete(member.userId);
 
+      // Immediately push leave presence message
       pushChatMessage(room, {
         id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         sender: 'System',
-        text: `${member.nickname} disconnected.`,
+        text: `${member.nickname} left the room.`,
         isSystem: true,
         timestamp: Date.now()
       });
 
-      // Persist the room state (even with 0 members) so it survives restarts
+      // If host disconnected, transfer host to next oldest active member if any remain
+      if (room.hostId === member.userId && room.members.size > 0) {
+        const nextHost = Array.from(room.members.values())
+          .sort((a, b) => a.joinedAt - b.joinedAt)[0];
+        if (nextHost) {
+          room.hostId = nextHost.userId;
+          pushChatMessage(room, {
+            id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            sender: 'System',
+            text: `${nextHost.nickname} is the new host.`,
+            isSystem: true,
+            timestamp: Date.now()
+          });
+        }
+      }
+
       persistRoom(room);
-
-      // If room is now empty, schedule a grace period for reconnect.
-      // After grace, just evict from memory (NOT from Redis) to save RAM.
-      const timer = setTimeout(() => {
-        const pendingEntry = pendingReconnects.get(member.userId);
-        if (!pendingEntry || pendingEntry.timer !== timer) return;
-
-        pendingReconnects.delete(member.userId);
-        const currentRoom = rooms.get(roomId);
-        if (!currentRoom) return;
-
-        if (currentRoom.members.size === 0) {
-          // Evict from memory only — Redis copy stays for future rejoin
-          rooms.delete(roomId);
-          return;
-        }
-
-        if (currentRoom.hostId === member.userId) {
-          const nextHost = Array.from(currentRoom.members.values())
-            .sort((a, b) => a.joinedAt - b.joinedAt)[0];
-          if (nextHost) {
-            currentRoom.hostId = nextHost.userId;
-            pushChatMessage(currentRoom, {
-              id: `sys-msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-              sender: 'System',
-              text: `${nextHost.nickname} is the new host.`,
-              isSystem: true,
-              timestamp: Date.now()
-            });
-            if (currentRoom._io) {
-              currentRoom._io.to(roomId).emit('room_state_updated', RoomManager.getRoomStateDTO(currentRoom));
-            }
-            persistRoom(currentRoom);
-          }
-        }
-      }, RECONNECT_GRACE_MS);
-
-      pendingReconnects.set(member.userId, { roomId, timer });
       return { roomId, room, member, sessionEnded: false };
     };
 
@@ -414,11 +372,6 @@ export const RoomManager = {
     const processIntentionalLeave = (roomId, room, member) => {
       member.socketIds = member.socketIds.filter(id => id !== socketId);
       let sessionEnded = false;
-
-      if (pendingReconnects.has(member.userId)) {
-        clearTimeout(pendingReconnects.get(member.userId).timer);
-        pendingReconnects.delete(member.userId);
-      }
 
       if (room.hostId === member.userId) {
         // Host intentionally left — disband room
@@ -744,19 +697,14 @@ export const RoomManager = {
 // Keeps active rooms in memory. Redis is the source of truth for persistence.
 export const cleanupInterval = setInterval(() => {
   const now = Date.now();
-  const roomsWithPending = new Set();
-  for (const p of pendingReconnects.values()) {
-    roomsWithPending.add(p.roomId);
-  }
-
   for (const [roomId, room] of rooms.entries()) {
-    if (room.members.size === 0 && !roomsWithPending.has(roomId)) {
+    if (room.members.size === 0) {
       // Evict idle empty rooms from memory — they remain in Redis
       rooms.delete(roomId);
     } else {
       // Evict rooms inactive for > 2 hours from memory (they are safe in Redis)
       const isIdle = (now - room.playback.updatedAt > 2 * 60 * 60 * 1000);
-      if (isIdle && !roomsWithPending.has(roomId)) {
+      if (isIdle) {
         rooms.delete(roomId);
       }
     }

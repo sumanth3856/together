@@ -127,7 +127,7 @@ test('leaveRoom — removes member and adds system message if fully disconnected
 
   const lastMsg = room.chatHistory.at(-1);
   assert.ok(lastMsg.isSystem);
-  assert.ok(lastMsg.text.includes('disconnected'));
+  assert.ok(lastMsg.text.includes('left the room'));
 });
 
 test('leaveRoom — does NOT immediately disband room (grace period)', (t) => {

@@ -63,9 +63,9 @@ export function ConfirmationModal({
       {/* Modal Content */}
       <div 
         ref={modalRef}
-        className="relative w-full max-w-md bg-surface-container/98 backdrop-blur-2xl rounded-3xl p-8 shadow-cinema border border-outline-variant text-on-surface animate-fade-in-up text-center"
+        className="relative w-full max-w-md bg-surface-container rounded-3xl p-8 shadow-2xl border border-outline text-on-surface animate-fade-in-up text-center"
       >
-        <div className={`w-16 h-16 rounded-full ${styles.iconBg} flex items-center justify-center mx-auto mb-5 border border-outline-variant/60 shadow-soft`}>
+        <div className={`w-16 h-16 rounded-full ${styles.iconBg} flex items-center justify-center mx-auto mb-5 border border-outline/60 shadow-soft`}>
           <span className={`material-symbols-outlined text-[32px] ${styles.iconColor}`}>
             {styles.icon}
           </span>
