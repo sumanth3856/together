@@ -12,7 +12,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#0a0c12" />
@@ -43,7 +43,7 @@ export default function RootLayout({ children }) {
           }}
         />
       </head>
-      <body className={`antialiased ${oswald.variable} ${playfairDisplay.variable} ${chivo.variable}`}>
+      <body className={`antialiased ${oswald.variable} ${playfairDisplay.variable} ${chivo.variable}`} suppressHydrationWarning>
         {children}
       </body>
     </html>
