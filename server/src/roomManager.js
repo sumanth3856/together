@@ -34,6 +34,7 @@ function serializeRoom(room) {
     ...room,
     members: Array.from(room.members.entries()),
     bannedUsers: Array.from(room.bannedUsers),
+    seenUsers: Array.from(room.seenUsers || []),
     _io: undefined, // never persist socket.io instance
   };
 }
@@ -43,6 +44,7 @@ function deserializeRoom(data) {
     ...data,
     members: new Map(data.members || []),
     bannedUsers: new Set(data.bannedUsers || []),
+    seenUsers: new Set(data.seenUsers || []),
     _io: null,
   };
 }
@@ -228,6 +230,7 @@ export const RoomManager = {
       },
       members: new Map([[hostUser.userId, hostUser]]),
       bannedUsers: new Set(),
+      seenUsers: new Set([hostUser.userId]),
       chatHistory: [
         {
           id: 'sys-init',
@@ -291,7 +294,9 @@ export const RoomManager = {
       return { room, member, wasReconnect: true };
     }
 
-    const wasHostOrKnown = room.hostId === actualUserId;
+    const wasKnownUser = room.seenUsers ? room.seenUsers.has(actualUserId) : (room.hostId === actualUserId);
+    if (!room.seenUsers) room.seenUsers = new Set();
+    room.seenUsers.add(actualUserId);
 
     const member = {
       userId: actualUserId,
@@ -311,7 +316,7 @@ export const RoomManager = {
 
     room.members.set(actualUserId, member);
     persistRoom(room);
-    return { room, member, wasReconnect: wasHostOrKnown };
+    return { room, member, wasReconnect: wasKnownUser };
   },
 
   leaveRoom(socketId, preferredRoomId = null) {

@@ -116,5 +116,25 @@ export const useUIStore = create((set, get) => ({
   unreadChatCount: 0,
   incrementUnreadChat: () => set((state) => ({ unreadChatCount: state.unreadChatCount + 1 })),
   clearUnreadChat: () => set({ unreadChatCount: 0 }),
+
+  typingUsers: {},
+  setUserTyping: ({ userId, nickname, avatar, isTyping }) => {
+    if (!userId) return;
+    set((state) => {
+      const updated = { ...state.typingUsers };
+      if (isTyping) {
+        updated[userId] = {
+          userId,
+          nickname: nickname || 'Someone',
+          avatar: avatar || null,
+          timestamp: Date.now(),
+        };
+      } else {
+        delete updated[userId];
+      }
+      return { typingUsers: updated };
+    });
+  },
+  clearTypingUsers: () => set({ typingUsers: {} }),
 }));
 

@@ -3,14 +3,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ChatPanel } from './ChatPanel';
 import { useRoomStore } from '../../store/useRoomStore';
+import { useUIStore } from '../../store/useUIStore';
 
 const mockSendChatMessage = vi.fn();
 const mockSendReaction = vi.fn();
+const mockSendTypingStatus = vi.fn();
 
 vi.mock('../../hooks/useSocket', () => ({
   useSocket: () => ({
     sendChatMessage: mockSendChatMessage,
     sendReaction: mockSendReaction,
+    sendTypingStatus: mockSendTypingStatus,
   }),
 }));
 
@@ -31,6 +34,9 @@ vi.mock('@tanstack/react-virtual', () => ({
 describe('ChatPanel Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useUIStore.setState({
+      typingUsers: {},
+    });
     useRoomStore.setState({
       socketId: 'sock-1',
       roomState: {
@@ -59,10 +65,54 @@ describe('ChatPanel Component', () => {
     const sendBtn = screen.getByLabelText('Send message');
 
     fireEvent.change(input, { target: { value: 'Excited for the movie!' } });
+    expect(mockSendTypingStatus).toHaveBeenCalledWith(true);
+
     fireEvent.click(sendBtn);
 
     expect(mockSendChatMessage).toHaveBeenCalledWith('Excited for the movie!');
+    expect(mockSendTypingStatus).toHaveBeenCalledWith(false);
     expect(input.value).toBe('');
+  });
+
+  it('renders typing indicator with avatar when other users are typing', () => {
+    useUIStore.setState({
+      typingUsers: {
+        'u-friend': {
+          userId: 'u-friend',
+          nickname: 'Friend',
+          avatar: 'https://example.com/avatar.jpg',
+          timestamp: Date.now(),
+        },
+      },
+    });
+
+    render(<ChatPanel />);
+    expect(screen.getByText('Friend is typing…')).toBeInTheDocument();
+    const avatarImg = screen.getByAltText('Friend');
+    expect(avatarImg).toBeInTheDocument();
+    expect(avatarImg.getAttribute('src')).toBe('https://example.com/avatar.jpg');
+  });
+
+  it('renders multiple typing users correctly', () => {
+    useUIStore.setState({
+      typingUsers: {
+        'u-alex': {
+          userId: 'u-alex',
+          nickname: 'Alex',
+          avatar: null,
+          timestamp: Date.now(),
+        },
+        'u-sam': {
+          userId: 'u-sam',
+          nickname: 'Sam',
+          avatar: null,
+          timestamp: Date.now(),
+        },
+      },
+    });
+
+    render(<ChatPanel />);
+    expect(screen.getByText('Alex and Sam are typing…')).toBeInTheDocument();
   });
 
   it('renders empty state when no messages exist', () => {

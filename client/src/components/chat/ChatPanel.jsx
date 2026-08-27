@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { EmojiReactions } from './EmojiReactions';
 import { useRoomStore } from '../../store/useRoomStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -13,13 +13,16 @@ export const ChatPanel = memo(function ChatPanel() {
   const currentMember = members?.find(m => m.socketIds?.includes(socketId));
   const myUserId = currentMember?.userId;
   const incomingReaction = useUIStore(state => state.incomingReaction);
-  const { sendChatMessage: onSendMessage, sendReaction: onSendReaction } = useSocket();
+  const typingUsers = useUIStore(state => state.typingUsers || {});
+  const { sendChatMessage: onSendMessage, sendReaction: onSendReaction, sendTypingStatus: onSendTypingStatus } = useSocket();
   
   const [inputText, setInputText] = useState('');
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
 
+  const isTypingRef = useRef(false);
+  const typingTimeoutRef = useRef(null);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
   const chatBottomRef = useRef(null);
@@ -102,9 +105,49 @@ export const ChatPanel = memo(function ChatPanel() {
     });
   }, [scrollToBottom]);
 
+  // Clean up typing state on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (isTypingRef.current && onSendTypingStatus) {
+        onSendTypingStatus(false);
+      }
+    };
+  }, [onSendTypingStatus]);
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setInputText(val);
+
+    if (val.trim().length > 0) {
+      if (!isTypingRef.current) {
+        isTypingRef.current = true;
+        if (onSendTypingStatus) onSendTypingStatus(true);
+      }
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        isTypingRef.current = false;
+        if (onSendTypingStatus) onSendTypingStatus(false);
+      }, 2500);
+    } else {
+      if (isTypingRef.current) {
+        isTypingRef.current = false;
+        if (onSendTypingStatus) onSendTypingStatus(false);
+      }
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+  };
+
   const handleSend = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+
+    if (isTypingRef.current) {
+      isTypingRef.current = false;
+      if (onSendTypingStatus) onSendTypingStatus(false);
+    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
     onSendMessage(inputText.trim());
     setInputText('');
     requestAnimationFrame(() => {
@@ -123,6 +166,11 @@ export const ChatPanel = memo(function ChatPanel() {
   };
 
   const nonSystemMessageCount = chatHistory.filter(m => !m.isSystem).length;
+
+  const now = Date.now();
+  const activeTypingUsers = Object.values(typingUsers).filter(
+    (u) => u && u.userId !== myUserId && (now - u.timestamp < 4500)
+  );
 
   return (
     <div
@@ -286,6 +334,50 @@ export const ChatPanel = memo(function ChatPanel() {
         </div>
       )}
 
+      {/* Realtime Typing Indicator Bar */}
+      {activeTypingUsers.length > 0 && (
+        <div
+          className="px-3 sm:px-4 py-1.5 bg-surface-container-highest/80 backdrop-blur-xs border-t border-outline-variant/40 flex items-center justify-between gap-2 shrink-0 z-10 animate-fade-in"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Overlapping Avatar Stack */}
+            <div className="flex -space-x-2 shrink-0">
+              {activeTypingUsers.slice(0, 3).map((u) => (
+                <div
+                  key={u.userId}
+                  className="relative w-5 h-5 rounded-full overflow-hidden border border-surface-container-highest ring-1 ring-outline-variant/60 shadow-2xs"
+                >
+                  {u.avatar ? (
+                    <img src={u.avatar} alt={u.nickname} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[9px]">
+                      {u.nickname?.charAt(0).toUpperCase() || '?'}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Label */}
+            <span className="text-xs text-on-surface-variant font-medium truncate">
+              {activeTypingUsers.length === 1
+                ? `${activeTypingUsers[0].nickname} is typing…`
+                : activeTypingUsers.length === 2
+                ? `${activeTypingUsers[0].nickname} and ${activeTypingUsers[1].nickname} are typing…`
+                : `${activeTypingUsers[0].nickname} and ${activeTypingUsers.length - 1} others are typing…`}
+            </span>
+          </div>
+
+          {/* Animated 3-dot pulse */}
+          <div className="flex items-center gap-1 shrink-0 px-1.5 py-1 rounded-full bg-surface-container/60">
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+          </div>
+        </div>
+      )}
+
       {/* Input Form — docked flush at bottom of chat panel */}
       <form
         onSubmit={handleSend}
@@ -301,7 +393,7 @@ export const ChatPanel = memo(function ChatPanel() {
             className="input w-full rounded-full pl-4 pr-10 py-2.5 text-base bg-surface-container-highest border-outline-variant focus:border-primary placeholder:text-on-surface-muted text-on-surface"
             placeholder="Share a moment…"
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleInputChange}
             aria-label="Chat message input"
           />
         </div>

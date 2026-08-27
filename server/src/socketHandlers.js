@@ -261,7 +261,34 @@ export function setupSocketHandlers(io) {
       const result = RoomManager.addChatMessage(currentRoomId, socket.id, cleanText);
       if (result && result.message) {
         io.to(currentRoomId).emit('chat_received', result.message);
+        // Clear typing indicator for this user when message is sent
+        const room = RoomManager.getRoom(currentRoomId);
+        const member = RoomManager.getMemberBySocketId(room, socket.id);
+        if (member) {
+          socket.to(currentRoomId).emit('user_typing_status', {
+            userId: member.userId,
+            nickname: member.nickname,
+            avatar: member.avatar,
+            isTyping: false
+          });
+        }
       }
+    });
+
+    // 5b. Realtime Typing Indicator
+    socket.on('typing_status', ({ isTyping }) => {
+      if (!currentRoomId) return;
+      const room = RoomManager.getRoom(currentRoomId);
+      if (!room) return;
+      const member = RoomManager.getMemberBySocketId(room, socket.id);
+      if (!member) return;
+
+      socket.to(currentRoomId).emit('user_typing_status', {
+        userId: member.userId,
+        nickname: member.nickname,
+        avatar: member.avatar,
+        isTyping: Boolean(isTyping)
+      });
     });
 
     const handleAction = (actionName, rateLimitMs, managerFunc, extractArgs = (d) => [d]) => {

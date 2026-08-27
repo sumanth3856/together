@@ -171,6 +171,7 @@ export function useSocket() {
         useRoomStore.getState().setSessionEnded(false);
         useRoomStore.getState().setRoomState(null);
         useRoomStore.getState().setIsReconnecting(false);
+        useUIStore.getState().clearTypingUsers();
         if (typeof window !== 'undefined') {
           window.history.replaceState({}, '', window.location.pathname);
         }
@@ -182,6 +183,7 @@ export function useSocket() {
         activeSessionObj = null;
         useRoomStore.getState().setRoomState(null);
         useRoomStore.getState().setIsReconnecting(false);
+        useUIStore.getState().clearTypingUsers();
         if (typeof window !== 'undefined') {
           window.history.replaceState({}, '', window.location.pathname);
         }
@@ -190,6 +192,13 @@ export function useSocket() {
 
       socket.on('chat_received', (message) => {
         useRoomStore.getState().updateChatHistory(message);
+        if (message?.senderId) {
+          useUIStore.getState().setUserTyping({ userId: message.senderId, isTyping: false });
+        }
+      });
+
+      socket.on('user_typing_status', (data) => {
+        useUIStore.getState().setUserTyping(data);
       });
     }
   };
@@ -285,6 +294,10 @@ export function useSocket() {
     if (globalSocket) globalSocket.emit('update_room_settings', newSettings);
   }, []);
 
+  const sendTypingStatus = useCallback((isTyping) => {
+    if (globalSocket) globalSocket.emit('typing_status', { isTyping: Boolean(isTyping) });
+  }, []);
+
   return {
     socket: globalSocket,
     createRoom,
@@ -293,6 +306,7 @@ export function useSocket() {
     syncPlayback,
     sendChatMessage,
     sendReaction,
+    sendTypingStatus,
     addToQueue,
     removeFromQueue,
     playNext,

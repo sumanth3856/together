@@ -10,6 +10,7 @@
  * to in-memory-only mode, making local development work without Redis.
  */
 
+import 'dotenv/config';
 import { Redis } from '@upstash/redis';
 
 let redis = null;
